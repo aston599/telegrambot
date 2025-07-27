@@ -1,0 +1,96 @@
+2025-07-27 20:38:09 - INFO - Bot lock file oluşturuldu - PID: 33644
+2025-07-27 20:38:09 - INFO - ============================================================
+2025-07-27 20:38:09 - INFO - MODERN TELEGRAM BOT BASLATILIYOR (aiogram)
+2025-07-27 20:38:09 - INFO - ============================================================
+2025-07-27 20:38:09 - INFO - Konfigürasyon doğrulandı!
+2025-07-27 20:38:09 - INFO - 🔧 Bot Token: 7633083532:AAFG8ba4h...
+2025-07-27 20:38:09 - INFO - Admin ID: 8154732274
+2025-07-27 20:38:09 - INFO - Database URL: postgresql://postgres.yfbyyuej...
+2025-07-27 20:38:09 - INFO - Database bağlantısı kuruluyor...
+2025-07-27 20:38:09 - INFO - Database bağlantısı kuruluyor...
+2025-07-27 20:38:11 - INFO - ✅ Event participants tablosuna yeni kolonlar eklendi
+2025-07-27 20:38:13 - INFO - ✅ Market products tablosuna yeni kolonlar eklendi
+2025-07-27 20:38:13 - INFO - ✅ product_type kolonu kaldırıldı
+2025-07-27 20:38:13 - INFO - ✅ company_name kolonu NULL yapıldı
+2025-07-27 20:38:13 - INFO - ✅ Eski unit_price kolonu kaldırıldı
+2025-07-27 20:38:14 - INFO - ✅ Database tabloları ve varsayılan veriler hazırlandı!
+2025-07-27 20:38:14 - INFO - ✅ System settings tablosu oluşturuldu
+2025-07-27 20:38:14 - INFO - ✅ Scheduled messages settings tablosu oluşturuldu
+2025-07-27 20:38:15 - INFO - ✅ Custom commands tablosu güncellendi
+2025-07-27 20:38:15 - INFO - 🔍 Test kullanıcıları ekleniyor...
+2025-07-27 20:38:15 - INFO - ✅ Test kullanıcıları eklendi! Result: INSERT 0 0
+2025-07-27 20:38:15 - INFO - ✅ Database'de toplam 6 kullanıcı var
+2025-07-27 20:38:15 - INFO - 🔍 Test market ürünleri kontrol ediliyor...
+2025-07-27 20:38:15 - INFO - 🔍 Mevcut ürün sayısı: 13
+2025-07-27 20:38:15 - INFO - ✅ Duplicate ürünler temizlendi! Kalan ürün sayısı: 13
+2025-07-27 20:38:16 - INFO - Database bağlantısı ve tablolar hazır!
+2025-07-27 20:38:16 - INFO - Database bağlantısı başarılı!
+2025-07-27 20:38:16 - INFO - 📅 Scheduled messages ayarları yükleniyor...
+2025-07-27 20:38:16 - INFO - 📥 Bot profilleri yüklendi: ['test_bot']
+2025-07-27 20:38:16 - WARNING - Scheduled messages ayarları yüklenemedi: cannot access local variable 'bot' where it is not associated with a value
+2025-07-27 20:38:16 - INFO - Bot instance oluşturuluyor...
+2025-07-27 20:38:16 - INFO - Bot ve Dispatcher oluşturuldu!
+2025-07-27 20:38:16 - INFO - Handler'lar kaydediliyor...
+2025-07-27 20:38:16 - INFO - Callback handler'lar kaydedildi
+2025-07-27 20:38:16 - INFO - Manuel handler'lar kayıtlandı - Router'lar YOK!
+2025-07-27 20:38:16 - INFO - Tüm handler'lar kaydedildi!
+2025-07-27 20:38:16 - INFO - Background cleanup task başlatıldı!
+2025-07-27 20:38:16 - INFO - Kayıt teşvik sistemi başlatıldı!
+2025-07-27 20:38:16 - INFO - Bot bilgileri alınıyor...
+2025-07-27 20:38:16 - INFO - 🧹 Memory cleanup task başlatıldı!
+2025-07-27 20:38:16 - INFO - 🎯 Recruitment background task başlatıldı
+2025-07-27 20:38:17 - INFO - Bot: @KirveLastBot - Kirve Bot
+2025-07-27 20:38:17 - INFO - Admin ID: 8154732274
+2025-07-27 20:38:17 - INFO - 🚀 Bot başarıyla çalışmaya başladı!
+2025-07-27 20:38:17 - INFO - Durdurmak için Ctrl+C
+2025-07-27 20:38:17 - INFO - Startup bildirimi hazırlanıyor...
+2025-07-27 20:38:17 - INFO - Start polling
+2025-07-27 20:38:17 - INFO - Database pool hazır, startup bildirimi gönderiliyor (attempt 1)
+2025-07-27 20:38:17 - INFO - 🔔 Startup bildirimi başlatılıyor...
+2025-07-27 20:38:17 - INFO - Run polling for bot @KirveLastBot id=7633083532 - 'Kirve Bot'
+2025-07-27 20:38:17 - INFO - 📬 5 kullanıcıya startup bildirimi gönderiliyor...
+2025-07-27 20:38:18 - INFO - ✅ Startup bildirimi tamamlandı - Başarılı: 2, Başarısız: 3
+2025-07-27 20:38:20 - INFO - 🔍 Callback data: admin_restart_confirm - User: 8154732274
+2025-07-27 20:38:20 - INFO - 🔍 CALLBACK DEBUG - Action: admin_restart_confirm, User: 8154732274
+2025-07-27 20:38:20 - INFO - 🔍 UNKNOWN CALLBACK - Action: admin_restart_confirm, User: 8154732274
+2025-07-27 20:38:23 - INFO - Bot lock file oluşturuldu - PID: 36752
+2025-07-27 20:38:23 - INFO - ============================================================
+2025-07-27 20:38:23 - INFO - MODERN TELEGRAM BOT BASLATILIYOR (aiogram)
+2025-07-27 20:38:23 - INFO - ============================================================
+2025-07-27 20:38:23 - INFO - Konfigürasyon doğrulandı!
+2025-07-27 20:38:23 - INFO - 🔧 Bot Token: 7633083532:AAFG8ba4h...
+2025-07-27 20:38:23 - INFO - Admin ID: 8154732274
+2025-07-27 20:38:23 - INFO - Database URL: postgresql://postgres.yfbyyuej...
+2025-07-27 20:38:23 - INFO - Database bağlantısı kuruluyor...
+2025-07-27 20:38:23 - INFO - Database bağlantısı kuruluyor...
+2025-07-27 20:38:25 - INFO - ✅ Event participants tablosuna yeni kolonlar eklendi
+2025-07-27 20:38:26 - INFO - ✅ Market products tablosuna yeni kolonlar eklendi
+2025-07-27 20:38:26 - INFO - ✅ product_type kolonu kaldırıldı
+2025-07-27 20:38:26 - INFO - ✅ company_name kolonu NULL yapıldı
+2025-07-27 20:38:27 - INFO - ✅ Eski unit_price kolonu kaldırıldı
+2025-07-27 20:38:27 - INFO - ✅ Database tabloları ve varsayılan veriler hazırlandı!
+2025-07-27 20:38:27 - INFO - ✅ System settings tablosu oluşturuldu
+2025-07-27 20:38:27 - INFO - ✅ Scheduled messages settings tablosu oluşturuldu
+2025-07-27 20:38:28 - INFO - ✅ Custom commands tablosu güncellendi
+2025-07-27 20:38:28 - INFO - 🔍 Test kullanıcıları ekleniyor...
+2025-07-27 20:38:28 - INFO - ✅ Test kullanıcıları eklendi! Result: INSERT 0 0
+2025-07-27 20:38:28 - INFO - ✅ Database'de toplam 6 kullanıcı var
+2025-07-27 20:38:28 - INFO - 🔍 Test market ürünleri kontrol ediliyor...
+2025-07-27 20:38:29 - INFO - 🔍 Mevcut ürün sayısı: 13
+2025-07-27 20:38:29 - INFO - ✅ Duplicate ürünler temizlendi! Kalan ürün sayısı: 13
+2025-07-27 20:38:29 - INFO - Database bağlantısı ve tablolar hazır!
+2025-07-27 20:38:29 - INFO - Database bağlantısı başarılı!
+2025-07-27 20:38:29 - INFO - 📅 Scheduled messages ayarları yükleniyor...
+2025-07-27 20:38:29 - INFO - 📥 Bot profilleri yüklendi: ['test_bot']
+2025-07-27 20:38:29 - WARNING - Scheduled messages ayarları yüklenemedi: cannot access local variable 'bot' where it is not associated with a value
+2025-07-27 20:38:29 - INFO - Bot instance oluşturuluyor...
+2025-07-27 20:38:29 - INFO - Bot ve Dispatcher oluşturuldu!
+2025-07-27 20:38:29 - INFO - Handler'lar kaydediliyor...
+2025-07-27 20:38:29 - INFO - Callback handler'lar kaydedildi
+2025-07-27 20:38:29 - INFO - Manuel handler'lar kayıtlandı - Router'lar YOK!
+2025-07-27 20:38:29 - INFO - Tüm handler'lar kaydedildi!
+2025-07-27 20:38:29 - INFO - Background cleanup task başlatıldı!
+2025-07-27 20:38:29 - INFO - Kayıt teşvik sistemi başlatıldı!
+2025-07-27 20:38:29 - INFO - Bot bilgileri alınıyor...
+2025-07-27 20:38:29 - INFO - 🧹 Memory cleanup task başlatıldı!
+2025-07-27 20:38:29 - INFO - 🎯 Recruitment background task başlatıldı

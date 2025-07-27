@@ -1,0 +1,228 @@
+2025-07-26 23:12:58,284 - utils.logger - INFO - Bot lock file oluşturuldu - PID: 28212
+2025-07-26 23:12:58,285 - utils.logger - INFO - ============================================================
+2025-07-26 23:12:58,285 - utils.logger - INFO - MODERN TELEGRAM BOT BASLATILIYOR (aiogram)
+2025-07-26 23:12:58,285 - utils.logger - INFO - ============================================================
+2025-07-26 23:12:58,285 - utils.logger - INFO - Konfigürasyon doğrulandı!
+2025-07-26 23:12:58,285 - utils.logger - INFO - 🔧 Bot Token: 7633083532:AAFG8ba4h...
+2025-07-26 23:12:58,285 - utils.logger - INFO - Admin ID: 8154732274
+2025-07-26 23:12:58,286 - utils.logger - INFO - Database URL: postgresql://postgres.yfbyyuej...
+2025-07-26 23:12:58,286 - utils.logger - INFO - Database bağlantısı kuruluyor...
+2025-07-26 23:12:58,286 - database - INFO - Database bağlantısı kuruluyor...
+2025-07-26 23:13:00,202 - database - INFO - ✅ Event participants tablosuna yeni kolonlar eklendi
+2025-07-26 23:13:02,033 - database - INFO - ✅ Market products tablosuna yeni kolonlar eklendi
+2025-07-26 23:13:02,106 - database - INFO - ✅ product_type kolonu kaldırıldı
+2025-07-26 23:13:02,174 - database - INFO - ✅ company_name kolonu NULL yapıldı
+2025-07-26 23:13:02,310 - database - INFO - ✅ Eski unit_price kolonu kaldırıldı
+2025-07-26 23:13:02,786 - database - INFO - ✅ Database tabloları ve varsayılan veriler hazırlandı!
+2025-07-26 23:13:03,537 - database - INFO - ✅ Custom commands tablosu güncellendi
+2025-07-26 23:13:03,673 - database - INFO - 🔍 Test kullanıcıları ekleniyor...
+2025-07-26 23:13:03,742 - database - INFO - ✅ Test kullanıcıları eklendi! Result: INSERT 0 0
+2025-07-26 23:13:03,876 - database - INFO - ✅ Database'de toplam 6 kullanıcı var
+2025-07-26 23:13:03,876 - database - INFO - 🔍 Test market ürünleri kontrol ediliyor...
+2025-07-26 23:13:04,010 - database - INFO - 🔍 Mevcut ürün sayısı: 13
+2025-07-26 23:13:04,210 - database - INFO - ✅ Duplicate ürünler temizlendi! Kalan ürün sayısı: 13
+2025-07-26 23:13:04,278 - database - INFO - Database bağlantısı ve tablolar hazır!
+2025-07-26 23:13:04,278 - utils.logger - INFO - Database bağlantısı başarılı!
+2025-07-26 23:13:04,279 - utils.logger - INFO - Bot instance oluşturuluyor...
+2025-07-26 23:13:04,516 - utils.logger - INFO - Bot ve Dispatcher oluşturuldu!
+2025-07-26 23:13:04,521 - utils.logger - INFO - Handler'lar kaydediliyor...
+2025-07-26 23:13:04,521 - utils.logger - INFO - Callback handler'lar kaydedildi
+2025-07-26 23:13:04,525 - utils.logger - INFO - Manuel handler'lar kayıtlandı - Router'lar YOK!
+2025-07-26 23:13:04,529 - utils.logger - INFO - Tüm handler'lar kaydedildi!
+2025-07-26 23:13:04,529 - utils.logger - INFO - Background cleanup task başlatıldı!
+2025-07-26 23:13:04,530 - utils.logger - INFO - Kayıt teşvik sistemi başlatıldı!
+2025-07-26 23:13:04,530 - utils.logger - INFO - Bot bilgileri alınıyor...
+2025-07-26 23:13:04,534 - utils.memory_manager - INFO - 🧹 Memory cleanup task başlatıldı!
+2025-07-26 23:13:04,534 - handlers.recruitment_system - INFO - 🎯 Recruitment background task başlatıldı
+2025-07-26 23:13:05,051 - utils.logger - INFO - Bot: @KirveLastBot - Kirve Bot
+2025-07-26 23:13:05,051 - utils.logger - INFO - Admin ID: 8154732274
+2025-07-26 23:13:05,052 - utils.logger - INFO - 🚀 Bot başarıyla çalışmaya başladı!
+2025-07-26 23:13:05,052 - utils.logger - INFO - Durdurmak için Ctrl+C
+2025-07-26 23:13:05,052 - utils.logger - INFO - Startup bildirimi hazırlanıyor...
+2025-07-26 23:13:05,053 - aiogram.dispatcher - INFO - Start polling
+2025-07-26 23:13:05,053 - utils.logger - INFO - Database pool hazır, startup bildirimi gönderiliyor (attempt 1)
+2025-07-26 23:13:05,276 - handlers.system_notifications - INFO - 🔔 Startup bildirimi başlatılıyor...
+2025-07-26 23:13:05,349 - handlers.recruitment_system - INFO - 📭 Yeni kayıtsız kullanıcı bulunamadı
+2025-07-26 23:13:05,357 - aiogram.dispatcher - INFO - Run polling for bot @KirveLastBot id=7633083532 - 'Kirve Bot'
+2025-07-26 23:13:05,479 - handlers.system_notifications - INFO - 📬 5 kullanıcıya startup bildirimi gönderiliyor...
+2025-07-26 23:13:06,851 - handlers.system_notifications - INFO - ✅ Startup bildirimi tamamlandı - Başarılı: 3, Başarısız: 2
+2025-07-26 23:14:48,070 - handlers.message_monitor - INFO - 🔍 Grup mesajı yakalandı - User: 6513506166, Text: asd...
+2025-07-26 23:14:48,070 - handlers.message_monitor - INFO - 📏 Mesaj uzunluğu kontrolü - User: 6513506166, Length: 3, Min: 1
+2025-07-26 23:14:48,073 - handlers.message_monitor - INFO - 🔄 Kelime tekrarı kontrolü - User: 6513506166, Unique: True
+2025-07-26 23:14:49,018 - handlers.message_monitor - INFO - 📊 Kullanıcı kayıt durumu - User: 6513506166, Registered: True
+2025-07-26 23:14:50,101 - database - INFO - 💎 Sistem aktivitesi - User: 6513506166
+2025-07-26 23:14:50,170 - handlers.chat_system - INFO - handle_chat_message tetiklendi - User: 6513506166, Text: asd
+2025-07-26 23:14:50,373 - handlers.chat_system - INFO - handle_chat_message: cevap yok
+2025-07-26 23:14:50,373 - aiogram.event - INFO - Update id=69392975 is handled. Duration 2316 ms by bot id=7633083532
+2025-07-26 23:14:57,525 - handlers.profile_handler - INFO - 👤 /menu komutu - User: mike (6513506166)
+2025-07-26 23:15:00,130 - handlers.profile_handler - INFO - ✅ Profil menüsü gösterildi - User: 6513506166
+2025-07-26 23:15:00,130 - aiogram.event - INFO - Update id=69392976 is handled. Duration 2606 ms by bot id=7633083532
+2025-07-26 23:15:26,977 - handlers.profile_handler - INFO - 👤 Profil callback - User: mike (6513506166) - Data: profile_market
+2025-07-26 23:15:27,409 - handlers.profile_handler - INFO - 🔍 MARKET BUTTON - Text: [sex] asd — 1.00 Kirve Point, Callback: view_product_18
+2025-07-26 23:15:27,410 - handlers.profile_handler - INFO - 🔍 MARKET BUTTON - Text: [11111111] 1111111 — 1.00 Kirve Point, Callback: view_product_17
+2025-07-26 23:15:27,411 - handlers.profile_handler - INFO - 🔍 MARKET BUTTON - Text: [Babasite] 500 Freespin — 10.00 Kirve Point, Callback: view_product_16
+2025-07-26 23:15:27,412 - handlers.profile_handler - INFO - 🔍 MARKET BUTTON - Text: [Bilinmiyor] Bu bir test ürünü. — 25.00 Kirve Point, Callback: view_product_14
+2025-07-26 23:15:27,625 - aiogram.event - INFO - Update id=69392977 is handled. Duration 649 ms by bot id=7633083532
+2025-07-26 23:15:29,710 - utils.logger - INFO - 🔍 Market callback tetiklendi - Action: market_stats, User: 6513506166
+2025-07-26 23:15:29,710 - utils.logger - WARNING - ❌ Admin olmayan kullanıcı market callback'e erişmeye çalıştı: 6513506166
+2025-07-26 23:15:29,840 - aiogram.event - INFO - Update id=69392978 is handled. Duration 135 ms by bot id=7633083532
+2025-07-26 23:15:31,641 - aiogram.event - INFO - Update id=69392979 is not handled. Duration 6 ms by bot id=7633083532
+2025-07-26 23:30:00,384 - aiogram.event - INFO - Update id=69392980 is not handled. Duration 6 ms by bot id=7633083532
+2025-07-26 23:30:35,856 - aiogram.event - INFO - Update id=69392981 is not handled. Duration 1 ms by bot id=7633083532
+2025-07-26 23:30:40,091 - utils.logger - INFO - 🛡️ ADMIN PANEL DEBUG - User: 8154732274, Text: '/adminkomutlar'
+2025-07-26 23:30:40,092 - utils.logger - INFO - ℹ️ Komut oluşturma süreci yoktu - User: 8154732274
+2025-07-26 23:30:40,098 - utils.logger - INFO - 🛡️ Admin panel komutu ÖZELİNDE - User: KirveHub (8154732274)
+2025-07-26 23:30:40,232 - utils.logger - INFO - ✅ Admin panel gösterildi - User: 8154732274
+2025-07-26 23:30:40,233 - aiogram.event - INFO - Update id=69392982 is handled. Duration 141 ms by bot id=7633083532
+2025-07-26 23:30:54,096 - aiogram.dispatcher - INFO - Polling stopped
+2025-07-26 23:30:54,355 - utils.logger - INFO - Temizlik işlemleri başlatılıyor...
+2025-07-26 23:30:54,355 - database - INFO - 🗄️ Database bağlantısı kapatıldı.
+2025-07-26 23:30:54,357 - utils.logger - INFO - Bot session kapatıldı.
+2025-07-26 23:30:54,359 - utils.logger - INFO - Bot lock file kaldırıldı
+2025-07-26 23:30:54,360 - utils.logger - INFO - Temizlik işlemleri tamamlandı!
+2025-07-26 23:30:54,362 - aiogram.dispatcher - INFO - Polling stopped for bot @KirveLastBot id=7633083532 - 'Kirve Bot'
+2025-07-26 23:53:35,906 - utils.logger - INFO - Bot lock file oluşturuldu - PID: 31244
+2025-07-26 23:53:35,907 - utils.logger - INFO - ============================================================
+2025-07-26 23:53:35,907 - utils.logger - INFO - MODERN TELEGRAM BOT BASLATILIYOR (aiogram)
+2025-07-26 23:53:35,908 - utils.logger - INFO - ============================================================
+2025-07-26 23:53:35,908 - utils.logger - INFO - Konfigürasyon doğrulandı!
+2025-07-26 23:53:35,908 - utils.logger - INFO - 🔧 Bot Token: 7633083532:AAFG8ba4h...
+2025-07-26 23:53:35,908 - utils.logger - INFO - Admin ID: 8154732274
+2025-07-26 23:53:35,908 - utils.logger - INFO - Database URL: postgresql://postgres.yfbyyuej...
+2025-07-26 23:53:35,909 - utils.logger - INFO - Database bağlantısı kuruluyor...
+2025-07-26 23:53:35,909 - database - INFO - Database bağlantısı kuruluyor...
+2025-07-26 23:53:37,757 - database - INFO - ✅ Event participants tablosuna yeni kolonlar eklendi
+2025-07-26 23:53:39,535 - database - INFO - ✅ Market products tablosuna yeni kolonlar eklendi
+2025-07-26 23:53:39,601 - database - INFO - ✅ product_type kolonu kaldırıldı
+2025-07-26 23:53:39,667 - database - INFO - ✅ company_name kolonu NULL yapıldı
+2025-07-26 23:53:39,799 - database - INFO - ✅ Eski unit_price kolonu kaldırıldı
+2025-07-26 23:53:40,261 - database - INFO - ✅ Database tabloları ve varsayılan veriler hazırlandı!
+2025-07-26 23:53:40,984 - database - INFO - ✅ Custom commands tablosu güncellendi
+2025-07-26 23:53:41,118 - database - INFO - 🔍 Test kullanıcıları ekleniyor...
+2025-07-26 23:53:41,186 - database - INFO - ✅ Test kullanıcıları eklendi! Result: INSERT 0 0
+2025-07-26 23:53:41,316 - database - INFO - ✅ Database'de toplam 6 kullanıcı var
+2025-07-26 23:53:41,317 - database - INFO - 🔍 Test market ürünleri kontrol ediliyor...
+2025-07-26 23:53:41,449 - database - INFO - 🔍 Mevcut ürün sayısı: 13
+2025-07-26 23:53:41,644 - database - INFO - ✅ Duplicate ürünler temizlendi! Kalan ürün sayısı: 13
+2025-07-26 23:53:41,710 - database - INFO - Database bağlantısı ve tablolar hazır!
+2025-07-26 23:53:41,710 - utils.logger - INFO - Database bağlantısı başarılı!
+2025-07-26 23:53:41,711 - utils.logger - INFO - Bot instance oluşturuluyor...
+2025-07-26 23:53:42,087 - utils.logger - INFO - Bot ve Dispatcher oluşturuldu!
+2025-07-26 23:53:42,093 - utils.logger - INFO - Handler'lar kaydediliyor...
+2025-07-26 23:53:42,093 - utils.logger - INFO - Callback handler'lar kaydedildi
+2025-07-26 23:53:42,097 - utils.logger - INFO - Manuel handler'lar kayıtlandı - Router'lar YOK!
+2025-07-26 23:53:42,100 - utils.logger - INFO - Tüm handler'lar kaydedildi!
+2025-07-26 23:53:42,101 - utils.logger - INFO - Background cleanup task başlatıldı!
+2025-07-26 23:53:42,101 - utils.logger - INFO - Kayıt teşvik sistemi başlatıldı!
+2025-07-26 23:53:42,101 - utils.logger - INFO - Bot bilgileri alınıyor...
+2025-07-26 23:53:42,102 - utils.memory_manager - INFO - 🧹 Memory cleanup task başlatıldı!
+2025-07-26 23:53:42,103 - handlers.recruitment_system - INFO - 🎯 Recruitment background task başlatıldı
+2025-07-26 23:53:42,721 - utils.logger - INFO - Bot: @KirveLastBot - Kirve Bot
+2025-07-26 23:53:42,722 - utils.logger - INFO - Admin ID: 8154732274
+2025-07-26 23:53:42,722 - utils.logger - INFO - 🚀 Bot başarıyla çalışmaya başladı!
+2025-07-26 23:53:42,723 - utils.logger - INFO - Durdurmak için Ctrl+C
+2025-07-26 23:53:42,723 - utils.logger - INFO - Startup bildirimi hazırlanıyor...
+2025-07-26 23:53:42,723 - aiogram.dispatcher - INFO - Start polling
+2025-07-26 23:53:42,723 - utils.logger - INFO - Database pool hazır, startup bildirimi gönderiliyor (attempt 1)
+2025-07-26 23:53:43,029 - handlers.system_notifications - INFO - 🔔 Startup bildirimi başlatılıyor...
+2025-07-26 23:53:43,102 - handlers.recruitment_system - INFO - 📭 Yeni kayıtsız kullanıcı bulunamadı
+2025-07-26 23:53:43,112 - aiogram.dispatcher - INFO - Run polling for bot @KirveLastBot id=7633083532 - 'Kirve Bot'
+2025-07-26 23:53:43,200 - utils.logger - INFO - 🛡️ ADMIN PANEL DEBUG - User: 8154732274, Text: '/adminkomutlar'
+2025-07-26 23:53:43,200 - utils.logger - INFO - ℹ️ Komut oluşturma süreci yoktu - User: 8154732274
+2025-07-26 23:53:43,201 - utils.logger - INFO - 🛡️ Admin panel komutu ÖZELİNDE - User: KirveHub (8154732274)
+2025-07-26 23:53:43,223 - handlers.system_notifications - INFO - 📬 5 kullanıcıya startup bildirimi gönderiliyor...
+2025-07-26 23:53:43,399 - aiogram.event - INFO - Update id=69392984 is handled. Duration 200 ms by bot id=7633083532
+2025-07-26 23:53:43,479 - utils.logger - INFO - ✅ Admin panel gösterildi - User: 8154732274
+2025-07-26 23:53:43,480 - aiogram.event - INFO - Update id=69392983 is handled. Duration 281 ms by bot id=7633083532
+2025-07-26 23:53:44,525 - handlers.system_notifications - INFO - ✅ Startup bildirimi tamamlandı - Başarılı: 3, Başarısız: 2
+2025-07-26 23:56:09,832 - aiogram.event - INFO - Update id=69392985 is handled. Duration 197 ms by bot id=7633083532
+2025-07-26 23:56:11,704 - utils.logger - INFO - 🛡️ ADMIN PANEL DEBUG - User: 8154732274, Text: '/adminkomutlar'
+2025-07-26 23:56:11,704 - utils.logger - INFO - ℹ️ Komut oluşturma süreci yoktu - User: 8154732274
+2025-07-26 23:56:11,705 - utils.logger - INFO - 🛡️ Admin panel komutu ÖZELİNDE - User: KirveHub (8154732274)
+2025-07-26 23:56:11,827 - utils.logger - INFO - ✅ Admin panel gösterildi - User: 8154732274
+2025-07-26 23:56:11,827 - aiogram.event - INFO - Update id=69392986 is handled. Duration 123 ms by bot id=7633083532
+2025-07-26 23:56:14,148 - aiogram.event - INFO - Update id=69392987 is handled. Duration 196 ms by bot id=7633083532
+2025-07-26 23:57:26,878 - aiogram.dispatcher - INFO - Polling stopped
+2025-07-26 23:57:27,133 - utils.logger - INFO - Temizlik işlemleri başlatılıyor...
+2025-07-26 23:57:27,201 - database - INFO - 🗄️ Database bağlantısı kapatıldı.
+2025-07-26 23:57:27,201 - utils.logger - INFO - Bot session kapatıldı.
+2025-07-26 23:57:27,202 - utils.logger - INFO - Bot lock file kaldırıldı
+2025-07-26 23:57:27,202 - utils.logger - INFO - Temizlik işlemleri tamamlandı!
+2025-07-26 23:57:27,203 - aiogram.dispatcher - INFO - Polling stopped for bot @KirveLastBot id=7633083532 - 'Kirve Bot'
+2025-07-26 23:57:30,517 - utils.logger - INFO - Bot lock file oluşturuldu - PID: 28916
+2025-07-26 23:57:30,517 - utils.logger - INFO - ============================================================
+2025-07-26 23:57:30,518 - utils.logger - INFO - MODERN TELEGRAM BOT BASLATILIYOR (aiogram)
+2025-07-26 23:57:30,518 - utils.logger - INFO - ============================================================
+2025-07-26 23:57:30,518 - utils.logger - INFO - Konfigürasyon doğrulandı!
+2025-07-26 23:57:30,518 - utils.logger - INFO - 🔧 Bot Token: 7633083532:AAFG8ba4h...
+2025-07-26 23:57:30,519 - utils.logger - INFO - Admin ID: 8154732274
+2025-07-26 23:57:30,519 - utils.logger - INFO - Database URL: postgresql://postgres.yfbyyuej...
+2025-07-26 23:57:30,519 - utils.logger - INFO - Database bağlantısı kuruluyor...
+2025-07-26 23:57:30,520 - database - INFO - Database bağlantısı kuruluyor...
+2025-07-26 23:57:32,432 - database - INFO - ✅ Event participants tablosuna yeni kolonlar eklendi
+2025-07-26 23:57:34,161 - database - INFO - ✅ Market products tablosuna yeni kolonlar eklendi
+2025-07-26 23:57:34,225 - database - INFO - ✅ product_type kolonu kaldırıldı
+2025-07-26 23:57:34,291 - database - INFO - ✅ company_name kolonu NULL yapıldı
+2025-07-26 23:57:34,419 - database - INFO - ✅ Eski unit_price kolonu kaldırıldı
+2025-07-26 23:57:34,866 - database - INFO - ✅ Database tabloları ve varsayılan veriler hazırlandı!
+2025-07-26 23:57:35,564 - database - INFO - ✅ Custom commands tablosu güncellendi
+2025-07-26 23:57:35,693 - database - INFO - 🔍 Test kullanıcıları ekleniyor...
+2025-07-26 23:57:35,756 - database - INFO - ✅ Test kullanıcıları eklendi! Result: INSERT 0 0
+2025-07-26 23:57:35,882 - database - INFO - ✅ Database'de toplam 6 kullanıcı var
+2025-07-26 23:57:35,883 - database - INFO - 🔍 Test market ürünleri kontrol ediliyor...
+2025-07-26 23:57:36,017 - database - INFO - 🔍 Mevcut ürün sayısı: 13
+2025-07-26 23:57:36,206 - database - INFO - ✅ Duplicate ürünler temizlendi! Kalan ürün sayısı: 13
+2025-07-26 23:57:36,271 - database - INFO - Database bağlantısı ve tablolar hazır!
+2025-07-26 23:57:36,271 - utils.logger - INFO - Database bağlantısı başarılı!
+2025-07-26 23:57:36,272 - utils.logger - INFO - Bot instance oluşturuluyor...
+2025-07-26 23:57:36,641 - utils.logger - INFO - Bot ve Dispatcher oluşturuldu!
+2025-07-26 23:57:36,647 - utils.logger - INFO - Handler'lar kaydediliyor...
+2025-07-26 23:57:36,648 - utils.logger - INFO - Callback handler'lar kaydedildi
+2025-07-26 23:57:36,652 - utils.logger - INFO - Manuel handler'lar kayıtlandı - Router'lar YOK!
+2025-07-26 23:57:36,657 - utils.logger - INFO - Tüm handler'lar kaydedildi!
+2025-07-26 23:57:36,657 - utils.logger - INFO - Background cleanup task başlatıldı!
+2025-07-26 23:57:36,658 - utils.logger - INFO - Kayıt teşvik sistemi başlatıldı!
+2025-07-26 23:57:36,658 - utils.logger - INFO - Bot bilgileri alınıyor...
+2025-07-26 23:57:36,660 - utils.memory_manager - INFO - 🧹 Memory cleanup task başlatıldı!
+2025-07-26 23:57:36,660 - handlers.recruitment_system - INFO - 🎯 Recruitment background task başlatıldı
+2025-07-26 23:57:37,314 - utils.logger - INFO - Bot: @KirveLastBot - Kirve Bot
+2025-07-26 23:57:37,314 - utils.logger - INFO - Admin ID: 8154732274
+2025-07-26 23:57:37,315 - utils.logger - INFO - 🚀 Bot başarıyla çalışmaya başladı!
+2025-07-26 23:57:37,315 - utils.logger - INFO - Durdurmak için Ctrl+C
+2025-07-26 23:57:37,315 - utils.logger - INFO - Startup bildirimi hazırlanıyor...
+2025-07-26 23:57:37,315 - aiogram.dispatcher - INFO - Start polling
+2025-07-26 23:57:37,316 - utils.logger - INFO - Database pool hazır, startup bildirimi gönderiliyor (attempt 1)
+2025-07-26 23:57:37,641 - handlers.system_notifications - INFO - 🔔 Startup bildirimi başlatılıyor...
+2025-07-26 23:57:37,705 - handlers.recruitment_system - INFO - 📭 Yeni kayıtsız kullanıcı bulunamadı
+2025-07-26 23:57:37,726 - aiogram.dispatcher - INFO - Run polling for bot @KirveLastBot id=7633083532 - 'Kirve Bot'
+2025-07-26 23:57:37,833 - handlers.system_notifications - INFO - 📬 5 kullanıcıya startup bildirimi gönderiliyor...
+2025-07-26 23:57:39,286 - handlers.system_notifications - INFO - ✅ Startup bildirimi tamamlandı - Başarılı: 3, Başarısız: 2
+2025-07-26 23:57:45,092 - utils.logger - INFO - 🛡️ ADMIN PANEL DEBUG - User: 6513506166, Text: '/adminkomut'
+2025-07-26 23:57:45,092 - utils.logger - INFO - ❌ Admin değil - User: 6513506166, Admin ID: 8154732274
+2025-07-26 23:57:45,093 - aiogram.event - INFO - Update id=69392988 is handled. Duration 1 ms by bot id=7633083532
+2025-07-26 23:57:51,351 - utils.logger - INFO - 🛡️ ADMIN PANEL DEBUG - User: 8154732274, Text: '/adminkomut'
+2025-07-26 23:57:51,352 - utils.logger - INFO - ℹ️ Komut oluşturma süreci yoktu - User: 8154732274
+2025-07-26 23:57:51,353 - utils.logger - INFO - 🛡️ Admin panel komutu ÖZELİNDE - User: KirveHub (8154732274)
+2025-07-26 23:57:51,680 - utils.logger - INFO - ✅ Admin panel gösterildi - User: 8154732274
+2025-07-26 23:57:51,680 - aiogram.event - INFO - Update id=69392989 is handled. Duration 329 ms by bot id=7633083532
+2025-07-26 23:57:53,947 - utils.logger - INFO - 🔍 Callback data: admin_commands_list - User: 8154732274
+2025-07-26 23:57:54,064 - aiogram.event - INFO - Update id=69392990 is handled. Duration 138 ms by bot id=7633083532
+2025-07-26 23:59:11,340 - aiogram.event - INFO - Update id=69392991 is handled. Duration 191 ms by bot id=7633083532
+2025-07-26 23:59:13,651 - aiogram.event - INFO - Update id=69392992 is handled. Duration 174 ms by bot id=7633083532
+2025-07-27 00:01:05,785 - aiogram.event - INFO - Update id=69392993 is handled. Duration 119 ms by bot id=7633083532
+2025-07-27 00:01:12,567 - utils.logger - INFO - 🎯 LOTTERY DATA SET - User: 8154732274, Step: cost, Data: {'type': 'lottery', 'step': 'cost', 'created_at': datetime.datetime(2025, 7, 27, 0, 1, 12, 567260)}
+2025-07-27 00:01:12,678 - aiogram.event - INFO - Update id=69392994 is handled. Duration 113 ms by bot id=7633083532
+2025-07-27 00:01:13,466 - utils.logger - INFO - 🎯 LOTTERY INPUT HANDLER - User: 8154732274, Text: 1
+2025-07-27 00:01:13,466 - utils.logger - INFO - 🎯 Event input - User: 8154732274, Step: cost, Text: 1
+2025-07-27 00:01:13,592 - aiogram.event - INFO - Update id=69392995 is handled. Duration 318 ms by bot id=7633083532
+2025-07-27 00:01:14,673 - aiogram.event - INFO - Update id=69392996 is handled. Duration 122 ms by bot id=7633083532
+2025-07-27 00:01:16,037 - aiogram.event - INFO - Update id=69392997 is handled. Duration 140 ms by bot id=7633083532
+2025-07-27 00:03:16,674 - aiogram.dispatcher - INFO - Polling stopped
+2025-07-27 00:03:16,911 - aiogram.dispatcher - ERROR - Failed to fetch updates - TelegramNetworkError: HTTP Client says - ClientOSError: [Errno 1] [SSL: APPLICATION_DATA_AFTER_CLOSE_NOTIFY] application data after close notify (_ssl.c:2775)
+2025-07-27 00:03:16,912 - aiogram.dispatcher - WARNING - Sleep for 1.000000 seconds and try again... (tryings = 0, bot id = 7633083532)
+2025-07-27 00:03:16,940 - utils.logger - INFO - Temizlik işlemleri başlatılıyor...
+2025-07-27 00:03:17,003 - database - INFO - 🗄️ Database bağlantısı kapatıldı.
+2025-07-27 00:03:17,003 - utils.logger - INFO - Bot session kapatıldı.
+2025-07-27 00:03:17,005 - utils.logger - INFO - Bot lock file kaldırıldı
+2025-07-27 00:03:17,005 - utils.logger - INFO - Temizlik işlemleri tamamlandı!
+2025-07-27 00:03:17,006 - aiogram.dispatcher - INFO - Polling stopped for bot @KirveLastBot id=7633083532 - 'Kirve Bot'
