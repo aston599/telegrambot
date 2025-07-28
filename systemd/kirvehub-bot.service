@@ -1,0 +1,39 @@
+[Unit]
+Description=KirveHub Telegram Bot
+Documentation=https://github.com/your-repo/kirvehub-bot
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=notify
+User=kirvehub
+Group=kirvehub
+WorkingDirectory=/home/kirvehub/telegrambot
+Environment=PATH=/home/kirvehub/telegrambot/venv/bin
+Environment=PYTHONPATH=/home/kirvehub/telegrambot
+ExecStart=/home/kirvehub/telegrambot/venv/bin/python main.py
+ExecReload=/bin/kill -s HUP $MAINPID
+KillMode=mixed
+TimeoutStopSec=5
+PrivateTmp=true
+Restart=always
+RestartSec=10
+
+# Security
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/home/kirvehub/telegrambot/logs /home/kirvehub/telegrambot/data
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=4096
+
+[Install]
+WantedBy=multi-user.target 

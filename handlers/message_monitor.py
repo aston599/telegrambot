@@ -80,8 +80,8 @@ async def monitor_group_message(message: Message) -> None:
     """Grup mesajlarını monitör et - Performance optimized"""
     
     # DEBUG: Grup mesajı yakalandı
-    text_preview = message.text[:50] if message.text else "No text"
-    logger.info(f"🔍 Grup mesajı yakalandı - User: {message.from_user.id}, Text: {text_preview}...")
+    # text_preview = message.text[:50] if message.text else "No text"
+    # logger.info(f"🔍 Grup mesajı yakalandı - User: {message.from_user.id}, Text: {text_preview}...")
     
     # Temel kontroller - Hızlı
     if not message.text or not message.from_user or not message.chat:
@@ -191,14 +191,14 @@ async def monitor_group_message(message: Message) -> None:
         
         if success:
             # Point bildirimi - SADECE MILESTONE'LARDA (1.00, 2.00, 3.00...)
-            total_points = user_points.get('kirve_points', 0) + point_amount if user_points else point_amount
+            total_points = user_points.get('kirve_points', 0) + point_per_message if user_points else point_per_message
             
             # Milestone kontrolü (1.00, 2.00, 3.00...)
             if total_points >= 1.0 and int(total_points) == total_points:
                 await send_private_point_notification(
                     user.id, user.first_name, total_points, 
                     user_points.get('total_messages', 0) + 1, 
-                    chat.title, point_amount, is_milestone=True
+                    chat.title, point_per_message, is_milestone=True
                 )
                 
     except Exception as e:

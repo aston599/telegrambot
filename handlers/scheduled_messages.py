@@ -7,6 +7,7 @@ from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 from database import get_config, get_db_pool
 from utils.logger import setup_logger
 from utils.memory_manager import memory_manager
+import time
 
 logger = setup_logger()
 
@@ -48,10 +49,12 @@ async def get_scheduled_settings() -> Dict[str, Any]:
     
     try:
         pool = await get_db_pool()
+        
         async with pool.acquire() as conn:
             result = await conn.fetchrow(
                 "SELECT settings FROM scheduled_messages_settings WHERE id = 1"
             )
+            
             if result:
                 settings = result['settings']
                 # Eğer string ise JSON parse et
@@ -61,11 +64,15 @@ async def get_scheduled_settings() -> Dict[str, Any]:
                         parsed_settings = json.loads(settings)
                         # Bot profillerini global değişkene yükle
                         if 'bot_profiles' in parsed_settings:
-                            BOT_PROFILES = parsed_settings['bot_profiles']
-                            logger.info(f"📥 Bot profilleri yüklendi: {list(BOT_PROFILES.keys())}")
+                            # Mevcut BOT_PROFILES'i koru, sadece eksik olanları ekle
+                            for bot_id, profile in parsed_settings['bot_profiles'].items():
+                                if bot_id not in BOT_PROFILES:
+                                    BOT_PROFILES[bot_id] = profile
+                                    logger.info(f"🔍 DEBUG - Yeni bot profili eklendi: {bot_id}")
+                            logger.info(f"🔍 DEBUG - BOT_PROFILES güncellendi: {list(BOT_PROFILES.keys())}")
                         else:
-                            BOT_PROFILES = DEFAULT_BOT_PROFILES.copy()
-                            logger.info(f"📥 Varsayılan bot profilleri yüklendi: {list(BOT_PROFILES.keys())}")
+                            if not BOT_PROFILES:  # Sadece boşsa yükle
+                                BOT_PROFILES = DEFAULT_BOT_PROFILES.copy()
                         return parsed_settings
                     except Exception as parse_error:
                         logger.error(f"❌ JSON parse hatası: {settings}, Error: {parse_error}")
@@ -79,11 +86,14 @@ async def get_scheduled_settings() -> Dict[str, Any]:
                 else:
                     # Bot profillerini global değişkene yükle
                     if 'bot_profiles' in settings:
-                        BOT_PROFILES = settings['bot_profiles']
-                        logger.info(f"📥 Bot profilleri yüklendi: {list(BOT_PROFILES.keys())}")
+                        # Mevcut BOT_PROFILES'i koru, sadece eksik olanları ekle
+                        for bot_id, profile in settings['bot_profiles'].items():
+                            if bot_id not in BOT_PROFILES:
+                                BOT_PROFILES[bot_id] = profile
+                        logger.info(f"🔍 DEBUG - BOT_PROFILES güncellendi (dict): {list(BOT_PROFILES.keys())}")
                     else:
-                        BOT_PROFILES = DEFAULT_BOT_PROFILES.copy()
-                        logger.info(f"📥 Varsayılan bot profilleri yüklendi: {list(BOT_PROFILES.keys())}")
+                        if not BOT_PROFILES:  # Sadece boşsa yükle
+                            BOT_PROFILES = DEFAULT_BOT_PROFILES.copy()
                     return settings
             else:
                 # Varsayılan ayarları oluştur
@@ -98,12 +108,12 @@ async def get_scheduled_settings() -> Dict[str, Any]:
                     json.dumps(default_settings, default=json_serial)
                 )
                 BOT_PROFILES = DEFAULT_BOT_PROFILES.copy()
-                logger.info(f"📥 Yeni varsayılan ayarlar oluşturuldu: {list(BOT_PROFILES.keys())}")
                 return default_settings
     except Exception as e:
         logger.error(f"❌ Zamanlayıcı ayarları alınırken hata: {e}")
+        import traceback
+        logger.error(f"❌ GET_SCHEDULED_SETTINGS TRACEBACK: {traceback.format_exc()}")
         BOT_PROFILES = DEFAULT_BOT_PROFILES.copy()
-        logger.info(f"📥 Hata durumunda varsayılan bot profilleri yüklendi: {list(BOT_PROFILES.keys())}")
         return {
             "active_bots": {},
             "groups": [],
@@ -137,7 +147,9 @@ async def save_scheduled_settings(settings: Dict[str, Any]) -> bool:
         # Ayarları güncelle
         current_settings.update(settings)
         current_settings['bot_profiles'] = BOT_PROFILES  # Global BOT_PROFILES'ı kaydet
-        logger.info(f"💾 Bot profilleri kaydediliyor: {list(BOT_PROFILES.keys())}")
+        # Sadece değişiklik varsa log at
+        if BOT_PROFILES:
+            logger.debug(f"💾 Bot profilleri kaydediliyor: {list(BOT_PROFILES.keys())}")
         
         # Veritabanına kaydet
         async with pool.acquire() as conn:
@@ -189,10 +201,14 @@ async def send_scheduled_message(bot_id: str, group_id: int, message_text: str, 
         
         # Link varsa buton ekle
         keyboard = None
+        logger.info(f"🔍 DEBUG - Link: {link}, Link Text: {link_text}")
         if link and link_text:
             keyboard = InlineKeyboardMarkup(inline_keyboard=[
                 [InlineKeyboardButton(text=link_text, url=link)]
             ])
+            logger.info(f"🔍 DEBUG - Keyboard oluşturuldu: {link_text} -> {link}")
+        else:
+            logger.info(f"🔍 DEBUG - Link veya link_text eksik: link={link}, link_text={link_text}")
         
         # Görsel varsa görselle gönder, yoksa sadece metin
         if image_url:
@@ -231,6 +247,9 @@ async def scheduled_message_task(bot: Bot):
             settings = await get_scheduled_settings()
             active_bots = settings.get("active_bots", {})
             
+            logger.info(f"🔍 DEBUG - Active bots: {active_bots}")
+            logger.info(f"🔍 DEBUG - BOT_PROFILES keys: {list(BOT_PROFILES.keys())}")
+            
             if not active_bots:
                 await asyncio.sleep(60)  # 1 dakika bekle
                 continue
@@ -245,6 +264,15 @@ async def scheduled_message_task(bot: Bot):
                     image = profile.get("image")
                     interval = profile.get("interval", 30)
                     
+                    logger.info(f"🔍 DEBUG - Bot Profile: {bot_id}")
+                    logger.info(f"🔍 DEBUG - Full Profile: {profile}")
+                    logger.info(f"🔍 DEBUG - Profile keys: {list(profile.keys())}")
+                    logger.info(f"🔍 DEBUG - Message: {message}")
+                    logger.info(f"🔍 DEBUG - Link: {link}")
+                    logger.info(f"🔍 DEBUG - Link Text: {link_text}")
+                    logger.info(f"🔍 DEBUG - Image: {image}")
+                    logger.info(f"🔍 DEBUG - Interval: {interval}")
+                    
                     # Son mesaj zamanını kontrol et
                     last_time = settings.get("last_message_time", {}).get(bot_id)
                     if last_time:
@@ -252,14 +280,15 @@ async def scheduled_message_task(bot: Bot):
                         if (datetime.now() - last_dt).total_seconds() < interval * 60:
                             continue  # Henüz zamanı gelmemiş
                     
-                    # Aktif grupları al
-                    groups = await get_active_groups()
+                    # Bot profilinden grupları al
+                    bot_groups = profile.get("groups", [])
+                    if not bot_groups:
+                        logger.warning(f"⚠️ Bot {bot_id} için grup tanımlanmamış!")
+                        continue
                     
                     # Her gruba mesaj gönder
-                    for group_id in groups:
+                    for group_id in bot_groups:
                         try:
-                            # Bot profilinden link_text'i al
-                            link_text = profile.get("link_text", "Linke Git")
                             await send_scheduled_message(
                                 bot_id, 
                                 group_id, 
@@ -279,7 +308,7 @@ async def scheduled_message_task(bot: Bot):
                     settings["last_message_time"][bot_id] = datetime.now().isoformat()
                     await save_scheduled_settings(settings)
                     
-                    logger.info(f"✅ Bot {bot_id} mesajı gönderildi - {len(groups)} grup")
+                    logger.info(f"✅ Bot {bot_id} mesajı gönderildi - {len(bot_groups)} grup")
             
             # 1 dakika bekle
             await asyncio.sleep(60)
@@ -393,15 +422,22 @@ async def get_scheduled_status() -> Dict[str, Any]:
     """Zamanlayıcı durumunu al"""
     try:
         settings = await get_scheduled_settings()
-        active_bots = settings.get("active_bots", {})
         
-        return {
+        active_bots = settings.get("active_bots", {})
+        logger.info(f"✅ Active bots: {active_bots}")
+        logger.info(f"✅ BOT_PROFILES keys: {list(BOT_PROFILES.keys())}")
+        
+        result = {
             "active_bots": active_bots,
             "available_bots": list(BOT_PROFILES.keys()),
             "bot_profiles": BOT_PROFILES
         }
+        return result
+        
     except Exception as e:
         logger.error(f"❌ Zamanlayıcı durumu alınırken hata: {e}")
+        import traceback
+        logger.error(f"❌ GET_SCHEDULED_STATUS TRACEBACK: {traceback.format_exc()}")
         return {}
 
 async def send_bot_activation_notification(bot_id: str, interval: int, first_message_time: datetime) -> None:
@@ -730,6 +766,33 @@ async def scheduled_callback_handler(callback) -> None:
             
         elif action == "scheduled_back":
             await show_scheduled_messages_menu(callback)
+            
+        elif action.startswith("add_link_"):
+            # Link ekleme işlemi
+            bot_id = action.replace("add_link_", "")
+            logger.info(f"🔍 Link ekleme başlatıldı - bot_id: {bot_id}")
+            
+            # Input state'i ayarla
+            from utils.memory_manager import memory_manager
+            memory_manager.set_input_state(user_id, f"add_link_{bot_id}")
+            
+            response = f"""
+🔗 **Link Ekleme - Aşama 1**
+
+**Bot:** {BOT_PROFILES.get(bot_id, {}).get('name', bot_id)}
+
+**Link URL'sini yazın:**
+Örnek: https://t.me/kirvehub
+
+**Not:** Link opsiyoneldir, geçmek için "❌ İptal" butonuna basın.
+            """
+            
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="❌ İptal", callback_data="scheduled_bot_management")]
+            ])
+            
+            await callback.message.edit_text(response, parse_mode="Markdown", reply_markup=keyboard)
+            await callback.answer()
             
         elif action.startswith("create_bot_profile"):
             # Bot oluşturma input state'ini başlat
@@ -1364,7 +1427,6 @@ async def show_scheduled_messages_menu(callback) -> None:
 
 **Mevcut Botlar:**
 """
-        
         for bot_id in status.get('available_bots', []):
             profile = status.get('bot_profiles', {}).get(bot_id, {})
             active = status.get('active_bots', {}).get(bot_id, False)
@@ -1391,10 +1453,17 @@ async def show_scheduled_messages_menu(callback) -> None:
         ])
         
         await callback.message.edit_text(response, parse_mode="Markdown", reply_markup=keyboard)
+        await callback.answer()  # ✅ Callback'i answer et!
         
     except Exception as e:
         logger.error(f"❌ Zamanlanmış mesajlar menüsü hatası: {e}")
-        await callback.answer("❌ Bir hata oluştu!", show_alert=True)
+        import traceback
+        logger.error(f"❌ SCHEDULED MENU TRACEBACK: {traceback.format_exc()}")
+        try:
+            await callback.answer("❌ Bir hata oluştu!", show_alert=True)
+        except:
+            logger.error(f"❌ Callback answer da başarısız!")
+        return
 
 async def show_scheduled_bot_management_menu(callback) -> None:
     """Bot yönetimi menüsü"""
@@ -1407,33 +1476,50 @@ async def show_scheduled_bot_management_menu(callback) -> None:
 **Mevcut Botlar:**
 """
         
-        keyboard_buttons = []
+        # Bot listesi butonları
+        bot_buttons = []
         for bot_id in status.get('available_bots', []):
             profile = status.get('bot_profiles', {}).get(bot_id, {})
             active = status.get('active_bots', {}).get(bot_id, False)
             active_mark = "✅" if active else "❌"
-            keyboard_buttons.append([
+            response += f"• {active_mark} {profile.get('name', bot_id)} ({profile.get('interval', 30)}dk)\n"
+            
+            # Her bot için buton ekle
+            bot_buttons.append([
                 InlineKeyboardButton(
                     text=f"{active_mark} {profile.get('name', bot_id)}",
                     callback_data=f"edit_bot_{bot_id}"
                 )
             ])
             
-        keyboard_buttons.append([
-            InlineKeyboardButton(text="➕ Yeni Bot Oluştur", callback_data="create_bot_profile")
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="➕ Yeni Bot Oluştur",
+                    callback_data="create_bot_profile"
+                )
+            ],
+            *bot_buttons,  # Bot butonlarını ekle
+            [
+                InlineKeyboardButton(
+                    text="⬅️ Geri",
+                    callback_data="scheduled_back"
+                )
+            ]
         ])
-        
-        keyboard_buttons.append([
-            InlineKeyboardButton(text="⬅️ Geri", callback_data="scheduled_back")
-        ])
-        
-        keyboard = InlineKeyboardMarkup(inline_keyboard=keyboard_buttons)
         
         await callback.message.edit_text(response, parse_mode="Markdown", reply_markup=keyboard)
+        await callback.answer()  # ✅ Callback'i answer et!
         
     except Exception as e:
         logger.error(f"❌ Bot yönetimi menüsü hatası: {e}")
-        await callback.answer("❌ Bir hata oluştu!", show_alert=True)
+        import traceback
+        logger.error(f"❌ BOT MANAGEMENT TRACEBACK: {traceback.format_exc()}")
+        try:
+            await callback.answer("❌ Bir hata oluştu!", show_alert=True)
+        except:
+            logger.error(f"❌ Callback answer da başarısız!")
+        return
 
 async def show_scheduled_status_menu(callback) -> None:
     """Zamanlanmış mesaj durumu menüsü"""
@@ -1483,13 +1569,17 @@ async def show_create_bot_menu(callback) -> None:
 **Bot oluşturma sistemi aktif!**
 
 **Aşama 1:** Bot adını yazın
-**Aşama 2:** Mesaj içeriğini yazın (görsel de ekleyebilirsiniz)
-**Aşama 3:** Link eklemek ister misiniz? (opsiyonel)
+**Aşama 2:** Aralık ayarlayın (dakika)
+**Aşama 3:** Mesaj içeriğini yazın
+**Aşama 4:** Link eklemek ister misiniz? (opsiyonel)
+**Aşama 5:** Link buton metnini yazın (opsiyonel)
 
 **Örnek:**
 Bot Adı: "KirveHub Duyuru"
+Aralık: "30" (30 dakika)
 Mesaj: "💎 KirveHub'da point kazanmak çok kolay!"
 Link: "https://example.com" (opsiyonel)
+Link Metni: "GÜVENİLİR SİTELER" (opsiyonel)
 
 ⬇️ **Başlamak için "Bot Oluştur" butonuna basın**
         """
@@ -2154,7 +2244,582 @@ async def handle_scheduled_input(message: Message) -> None:
             
         logger.info(f"🔍 Input handler - User: {user_id}, State: {input_state}")
         
-        if input_state.startswith("recreate_bot_name_"):
+        if input_state == "create_bot_name":
+            # AŞAMA 1: Yeni bot oluşturma - Bot adı alındı
+            logger.info(f"🔍 Yeni bot oluşturma AŞAMA 1 - User: {user_id}")
+            
+            bot_name = message.text.strip()
+            logger.info(f"🔍 Bot adı alındı: {bot_name}")
+            
+            if len(bot_name) < 3:
+                await message.answer("❌ Bot adı çok kısa! En az 3 karakter olmalı.")
+                return
+                
+            # Bot ID oluştur
+            bot_id = f"bot_{int(time.time())}"
+            logger.info(f"🔍 Bot ID oluşturuldu: {bot_id}")
+            
+            # Bot profilini oluştur
+            BOT_PROFILES[bot_id] = {
+                "name": bot_name,
+                "message": "💎 KirveHub'da point kazanmak çok kolay! Her mesajın değeri var!",
+                "interval": 30,
+                "link": None,
+                "image": None,
+                "active": False
+            }
+            logger.info(f"🔍 Bot profili oluşturuldu: {BOT_PROFILES[bot_id]}")
+            logger.info(f"🔍 Bot profili oluşturuldu: {BOT_PROFILES[bot_id]}")
+            
+            # AŞAMA 2'ye geç: Aralık ayarlama
+            memory_manager.set_input_state(user_id, f"create_bot_interval_{bot_id}")
+            logger.info(f"🔍 Input state güncellendi: create_bot_interval_{bot_id}")
+            
+            response = f"""
+🤖 **Bot Oluşturma - Aşama 2**
+
+**Bot Adı:** {bot_name}
+
+**Kaç dakikada bir mesaj atacak?**
+Örnek: `30` (30 dakika), `60` (1 saat), `120` (2 saat)
+
+**Lütfen dakika cinsinden yazın:**
+            """
+            
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="⏭️ Geç", callback_data=f"create_bot_skip_interval_{bot_id}")],
+                [InlineKeyboardButton(text="❌ İptal", callback_data="scheduled_bot_management")]
+            ])
+            
+            await message.answer(response, parse_mode="Markdown", reply_markup=keyboard)
+            logger.info(f"🔍 AŞAMA 2'ye geçildi - bot_id: {bot_id}")
+            
+        elif input_state.startswith("create_bot_interval_"):
+            # AŞAMA 2: Yeni bot oluşturma - Aralık alındı
+            bot_id = input_state.replace("create_bot_interval_", "")
+            logger.info(f"🔍 Yeni bot oluşturma AŞAMA 2 - bot_id: {bot_id}")
+            
+            try:
+                interval = int(message.text.strip())
+                if interval < 1 or interval > 1440:  # 1 dakika - 24 saat
+                    await message.answer("❌ Geçersiz aralık! 1-1440 dakika arası olmalı.")
+                    return
+                    
+                # Bot profilini güncelle
+                if bot_id not in BOT_PROFILES:
+                    logger.info(f"🔍 BOT_PROFILES'e bot_id ekleniyor: {bot_id}")
+                    BOT_PROFILES[bot_id] = {}
+                
+                BOT_PROFILES[bot_id]["interval"] = interval
+                logger.info(f"🔍 Bot aralığı güncellendi: {interval}")
+                
+                # AŞAMA 3'e geç: Mesaj içeriği
+                memory_manager.set_input_state(user_id, f"create_bot_message_{bot_id}")
+                logger.info(f"🔍 Input state güncellendi: create_bot_message_{bot_id}")
+                
+                response = f"""
+🤖 **Bot Oluşturma - Aşama 3**
+
+**Bot Adı:** {BOT_PROFILES[bot_id]['name']}
+**Aralık:** {interval} dakika
+
+**Bot hangi mesajı atacak?**
+Örnek: "💎 KirveHub'da point kazanmak çok kolay!"
+
+**Lütfen mesaj içeriğini yazın:**
+                """
+                
+                keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                    [InlineKeyboardButton(text="⏭️ Geç", callback_data=f"create_bot_skip_message_{bot_id}")],
+                    [InlineKeyboardButton(text="❌ İptal", callback_data="scheduled_bot_management")]
+                ])
+                
+                await message.answer(response, parse_mode="Markdown", reply_markup=keyboard)
+                logger.info(f"🔍 AŞAMA 3'e geçildi - bot_id: {bot_id}")
+                
+            except ValueError:
+                await message.answer("❌ Geçersiz sayı! Lütfen sadece sayı yazın.")
+                return
+                
+        elif input_state.startswith("create_bot_link_text_"):
+            # AŞAMA 5: Yeni bot oluşturma - Link metni alındı
+            bot_id = input_state.replace("create_bot_link_text_", "")
+            logger.info(f"🔍 Yeni bot oluşturma AŞAMA 5 - bot_id: {bot_id}")
+            
+            link_text = message.text.strip()
+            logger.info(f"🔍 Link metni alındı: {link_text}")
+            
+            if len(link_text) < 2:
+                await message.answer("❌ Link metni çok kısa! En az 2 karakter olmalı.")
+                return
+            
+            # Bot profilini güncelle
+            if bot_id not in BOT_PROFILES:
+                logger.info(f"🔍 BOT_PROFILES'e bot_id ekleniyor: {bot_id}")
+                BOT_PROFILES[bot_id] = {}
+            
+            BOT_PROFILES[bot_id]["link_text"] = link_text
+            logger.info(f"🔍 Bot link metni güncellendi")
+            
+            # Bot profilini veritabanına kaydet
+            current_settings = await get_scheduled_settings()
+            if bot_id in BOT_PROFILES:
+                current_settings['bot_profiles'][bot_id] = BOT_PROFILES[bot_id]
+                await save_scheduled_settings(current_settings)
+                logger.info(f"🔍 Bot profili kaydedildi")
+            
+            # Input state'i temizle
+            memory_manager.clear_input_state(user_id)
+            logger.info(f"🔍 Input state temizlendi")
+            
+            response = f"""
+✅ **Bot Başarıyla Oluşturuldu!**
+
+**Bot Adı:** {BOT_PROFILES[bot_id]['name']}
+**Mesaj:** {BOT_PROFILES[bot_id]['message']}
+**Aralık:** {BOT_PROFILES[bot_id]['interval']} dakika
+**Link:** {BOT_PROFILES[bot_id]['link']}
+**Link Metni:** {link_text}
+
+Bot artık kullanıma hazır! Bot yönetimi menüsünden aktifleştirebilirsiniz.
+            """
+            
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="⚙️ Bot Yönetimi", callback_data="scheduled_bot_management")]
+            ])
+            
+            await message.answer(response, parse_mode="Markdown", reply_markup=keyboard)
+            logger.info(f"🔍 Bot oluşturma tamamlandı - bot_id: {bot_id}")
+            
+        elif input_state.startswith("create_bot_link_"):
+            # AŞAMA 4: Yeni bot oluşturma - Link URL alındı
+            bot_id = input_state.replace("create_bot_link_", "")
+            logger.info(f"🔍 Yeni bot oluşturma AŞAMA 4 - bot_id: {bot_id}")
+            
+            link_url = message.text.strip()
+            logger.info(f"🔍 Link URL alındı: {link_url}")
+            
+            # Basit URL kontrolü
+            if not link_url.startswith(('http://', 'https://', 't.me/')):
+                await message.answer("❌ Geçersiz URL! http://, https:// veya t.me/ ile başlamalı.")
+                return
+            
+            # Bot profilini güncelle
+            if bot_id not in BOT_PROFILES:
+                logger.info(f"🔍 BOT_PROFILES'e bot_id ekleniyor: {bot_id}")
+                BOT_PROFILES[bot_id] = {}
+            
+            BOT_PROFILES[bot_id]["link"] = link_url
+            logger.info(f"🔍 Bot linki güncellendi")
+            
+            # AŞAMA 5: Link metni sor
+            memory_manager.set_input_state(user_id, f"create_bot_link_text_{bot_id}")
+            
+            response = f"""
+🔗 **Bot Oluşturma - Aşama 5**
+
+**Bot Adı:** {BOT_PROFILES[bot_id]['name']}
+**URL:** {link_url}
+
+**Link metnini yazın:**
+Örnek: "GÜVENİLİR SİTELER", "SİTEYE GİT", "TIKLA"
+
+**Not:** Bu metin link butonunda görünecek.
+            """
+            
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="⏭️ Geç", callback_data=f"create_bot_skip_link_text_{bot_id}")],
+                [InlineKeyboardButton(text="❌ İptal", callback_data="scheduled_bot_management")]
+            ])
+            
+            await message.answer(response, parse_mode="Markdown", reply_markup=keyboard)
+            logger.info(f"🔍 AŞAMA 5'e geçildi - bot_id: {bot_id}")
+            
+        elif input_state.startswith("add_link_text_"):
+            # Link ekleme input - AŞAMA 2: Link metni
+            logger.info(f"🔍 DEBUG: add_link_text_ state başladı - input_state: {input_state}")
+            
+            # Bot ID'yi doğru çıkar: add_link_text_bot_1753721077 -> bot_1753721077
+            bot_id = input_state.replace("add_link_text_", "")
+            logger.info(f"🔍 DEBUG: bot_id after replace: {bot_id}")
+            
+            # Eğer bot_id hala yanlış format ise düzelt
+            if not bot_id.startswith("bot_"):
+                # text_bot_1753721077 -> bot_1753721077
+                if bot_id.startswith("text_bot_"):
+                    bot_id = bot_id.replace("text_bot_", "bot_")
+                else:
+                    # Son rakamları al
+                    digits = ''.join(filter(str.isdigit, bot_id))
+                    bot_id = f"bot_{digits}"
+            
+            logger.info(f"🔍 Link metni input - bot_id: {bot_id}")
+            
+            link_text = message.text.strip()
+            logger.info(f"🔍 Link metni alındı: {link_text}")
+            
+            if len(link_text) < 2:
+                await message.answer("❌ Link metni çok kısa! En az 2 karakter olmalı.")
+                return
+            
+            # Bot profilini güncelle
+            if bot_id not in BOT_PROFILES:
+                logger.info(f"🔍 BOT_PROFILES'e bot_id ekleniyor: {bot_id}")
+                BOT_PROFILES[bot_id] = {}
+            
+            BOT_PROFILES[bot_id]["link_text"] = link_text
+            logger.info(f"🔍 Bot link metni güncellendi")
+            
+            # Bot profilini veritabanına kaydet
+            current_settings = await get_scheduled_settings()
+            if bot_id in BOT_PROFILES:
+                current_settings['bot_profiles'][bot_id] = BOT_PROFILES[bot_id]
+                await save_scheduled_settings(current_settings)
+                logger.info(f"🔍 Bot profili kaydedildi")
+            
+            # Input state'i temizle
+            memory_manager.clear_input_state(user_id)
+            logger.info(f"🔍 Input state temizlendi")
+            
+            response = f"""
+✅ **Link Başarıyla Eklendi!**
+
+**Bot:** {BOT_PROFILES[bot_id]['name']}
+**URL:** {BOT_PROFILES[bot_id]['link']}
+**Metin:** {link_text}
+
+Bot artık link ile birlikte kullanıma hazır!
+            """
+            
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="⚙️ Bot Yönetimi", callback_data="scheduled_bot_management")]
+            ])
+            
+            await message.answer(response, parse_mode="Markdown", reply_markup=keyboard)
+            logger.info(f"🔍 Link ekleme tamamlandı - bot_id: {bot_id}")
+            
+        elif input_state.startswith("add_link_"):
+            # Link ekleme input - AŞAMA 1: URL
+            bot_id = input_state.replace("add_link_", "")
+            logger.info(f"🔍 Link ekleme input - bot_id: {bot_id}")
+            
+            link_url = message.text.strip()
+            logger.info(f"🔍 Link URL alındı: {link_url}")
+            
+            # Basit URL kontrolü
+            if not link_url.startswith(('http://', 'https://', 't.me/')):
+                await message.answer("❌ Geçersiz URL! http://, https:// veya t.me/ ile başlamalı.")
+                return
+            
+            # Bot profilini güncelle
+            if bot_id not in BOT_PROFILES:
+                logger.info(f"🔍 BOT_PROFILES'e bot_id ekleniyor: {bot_id}")
+                BOT_PROFILES[bot_id] = {}
+            
+            BOT_PROFILES[bot_id]["link"] = link_url
+            logger.info(f"🔍 Bot linki güncellendi")
+            
+            # AŞAMA 2: Link metni sor
+            memory_manager.set_input_state(user_id, f"add_link_text_{bot_id}")
+            
+            response = f"""
+🔗 **Link Ekleme - Aşama 2**
+
+**Bot:** {BOT_PROFILES[bot_id]['name']}
+**URL:** {link_url}
+
+**Link metnini yazın:**
+Örnek: "GÜVENİLİR SİTELER", "SİTEYE GİT", "TIKLA"
+
+**Not:** Bu metin link butonunda görünecek.
+            """
+            
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="❌ İptal", callback_data="scheduled_bot_management")]
+            ])
+            
+            await message.answer(response, parse_mode="Markdown", reply_markup=keyboard)
+            logger.info(f"🔍 Link metni bekleniyor - bot_id: {bot_id}")
+                    
+        elif input_state.startswith("create_bot_message_"):
+            # AŞAMA 3: Yeni bot oluşturma - Mesaj içeriği alındı
+            bot_id = input_state.replace("create_bot_message_", "")
+            logger.info(f"🔍 Yeni bot oluşturma AŞAMA 3 - bot_id: {bot_id}")
+            
+            message_text = message.text.strip()
+            logger.info(f"🔍 Bot mesajı alındı: {message_text}")
+            
+            if len(message_text) < 5:
+                await message.answer("❌ Mesaj çok kısa! En az 5 karakter olmalı.")
+                return
+                
+            # Bot profilini güncelle
+            if bot_id not in BOT_PROFILES:
+                logger.info(f"🔍 BOT_PROFILES'e bot_id ekleniyor: {bot_id}")
+                BOT_PROFILES[bot_id] = {}
+            
+            BOT_PROFILES[bot_id]["message"] = message_text
+            logger.info(f"🔍 Bot mesajı güncellendi")
+            
+            # Bot profilini veritabanına kaydet
+            current_settings = await get_scheduled_settings()
+            # BOT_PROFILES'i koruyarak güncelle
+            if bot_id in BOT_PROFILES:
+                current_settings['bot_profiles'][bot_id] = BOT_PROFILES[bot_id]
+                await save_scheduled_settings(current_settings)
+                logger.info(f"🔍 Bot profili kaydedildi")
+            else:
+                logger.error(f"❌ Bot profili bulunamadı! bot_id: {bot_id}")
+                await message.answer("❌ Bot profili kaydedilemedi! Lütfen tekrar başlayın.")
+                memory_manager.clear_input_state(user_id)
+                return
+            logger.info(f"🔍 Bot profili kaydedildi")
+            
+            # AŞAMA 4'e geç: Grup seçimi
+            memory_manager.set_input_state(user_id, f"create_bot_groups_{bot_id}")
+            logger.info(f"🔍 Input state güncellendi: create_bot_groups_{bot_id}")
+            
+            # Kayıtlı grupları al
+            from database import get_registered_groups
+            groups = await get_registered_groups()
+            
+            if not groups:
+                await message.answer("❌ Kayıtlı grup bulunamadı! Önce grupları kaydetmelisiniz.")
+                memory_manager.clear_input_state(user_id)
+                return
+            
+            response = f"""
+🤖 **Bot Oluşturma - Aşama 4**
+
+**Bot Adı:** {BOT_PROFILES[bot_id]['name']}
+**Mesaj:** {BOT_PROFILES[bot_id]['message'][:50]}{'...' if len(BOT_PROFILES[bot_id]['message']) > 50 else ''}
+
+**Hangi gruplarda çalışacak?**
+Aşağıdaki gruplardan seçin (virgülle ayırarak):
+
+"""
+            
+            for i, group in enumerate(groups, 1):
+                response += f"**{i}.** {group['group_name']} (ID: {group['group_id']})\n"
+            
+            response += f"""
+**Örnek:** `1, 3, 5` (1., 3. ve 5. gruplarda çalışır)
+
+**Grup numaralarını yazın:**
+            """
+            
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="⏭️ Geç", callback_data=f"create_bot_skip_link_{bot_id}")],
+                [InlineKeyboardButton(text="❌ İptal", callback_data="scheduled_bot_management")]
+            ])
+            
+            await message.answer(response, parse_mode="Markdown", reply_markup=keyboard)
+            logger.info(f"🔍 AŞAMA 4'e geçildi - bot_id: {bot_id}")
+            
+            # Bu kısım gereksiz, kaldırıldı
+            
+        elif input_state.startswith("create_bot_groups_"):
+            # AŞAMA 4: Yeni bot oluşturma - Grup seçimi alındı
+            bot_id = input_state.replace("create_bot_groups_", "")
+            logger.info(f"🔍 Yeni bot oluşturma AŞAMA 4 - bot_id: {bot_id}")
+            
+            groups_input = message.text.strip()
+            logger.info(f"🔍 Grup seçimi alındı: {groups_input}")
+            
+            # Kayıtlı grupları al
+            from database import get_registered_groups
+            all_groups = await get_registered_groups()
+            
+            if not all_groups:
+                await message.answer("❌ Kayıtlı grup bulunamadı!")
+                memory_manager.clear_input_state(user_id)
+                return
+            
+            # Grup numaralarını parse et
+            try:
+                selected_indices = [int(x.strip()) - 1 for x in groups_input.split(',')]
+                selected_groups = []
+                
+                for idx in selected_indices:
+                    if 0 <= idx < len(all_groups):
+                        selected_groups.append(all_groups[idx]['group_id'])
+                    else:
+                        await message.answer(f"❌ Geçersiz grup numarası: {idx + 1}")
+                        return
+                
+                if not selected_groups:
+                    await message.answer("❌ En az bir grup seçmelisiniz!")
+                    return
+                
+                # Bot profilini güncelle
+                if bot_id not in BOT_PROFILES:
+                    logger.info(f"🔍 BOT_PROFILES'e bot_id ekleniyor: {bot_id}")
+                    BOT_PROFILES[bot_id] = {}
+                
+                BOT_PROFILES[bot_id]["groups"] = selected_groups
+                logger.info(f"🔍 Bot grupları güncellendi: {selected_groups}")
+                
+                # AŞAMA 5'e geç: Link ekleme (opsiyonel)
+                memory_manager.set_input_state(user_id, f"create_bot_link_{bot_id}")
+                logger.info(f"🔍 Input state güncellendi: create_bot_link_{bot_id}")
+                
+                response = f"""
+🤖 **Bot Oluşturma - Aşama 5**
+
+**Bot Adı:** {BOT_PROFILES[bot_id]['name']}
+**Mesaj:** {BOT_PROFILES[bot_id]['message'][:50]}{'...' if len(BOT_PROFILES[bot_id]['message']) > 50 else ''}
+**Seçilen Gruplar:** {len(selected_groups)} grup
+
+**Link eklemek istiyor musunuz?**
+• Evet: Link URL'sini yazın
+• Hayır: "Hayır" yazın
+
+**Link URL'si veya "Hayır" yazın:**
+                """
+                
+                keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                    [InlineKeyboardButton(text="⏭️ Geç", callback_data=f"create_bot_skip_link_{bot_id}")],
+                    [InlineKeyboardButton(text="❌ İptal", callback_data="scheduled_bot_management")]
+                ])
+                
+                await message.answer(response, parse_mode="Markdown", reply_markup=keyboard)
+                logger.info(f"🔍 AŞAMA 5'e geçildi - bot_id: {bot_id}")
+                
+            except ValueError:
+                await message.answer("❌ Geçersiz format! Örnek: `1, 3, 5`")
+                return
+                
+        elif input_state.startswith("create_bot_link_"):
+            # AŞAMA 5: Yeni bot oluşturma - Link alındı
+            bot_id = input_state.replace("create_bot_link_", "")
+            logger.info(f"🔍 Yeni bot oluşturma AŞAMA 5 - bot_id: {bot_id}")
+            
+            link_input = message.text.strip()
+            logger.info(f"🔍 Link input alındı: {link_input}")
+            
+            if link_input.lower() == "hayır":
+                # Link eklemek istemiyor
+                logger.info(f"🔍 Link eklenmeyecek")
+                
+                # Input state'i temizle
+                memory_manager.clear_input_state(user_id)
+                logger.info(f"🔍 Input state temizlendi")
+                
+                response = f"""
+✅ **Bot Başarıyla Oluşturuldu!**
+
+**Bot Adı:** {BOT_PROFILES[bot_id]['name']}
+**Aralık:** {BOT_PROFILES[bot_id]['interval']} dakika
+**Mesaj:** {BOT_PROFILES[bot_id]['message'][:50]}{'...' if len(BOT_PROFILES[bot_id]['message']) > 50 else ''}
+
+Bot artık kullanıma hazır! Bot yönetimi menüsünden aktifleştirebilirsiniz.
+                """
+                
+                keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                    [InlineKeyboardButton(text="⚙️ Bot Yönetimi", callback_data="scheduled_bot_management")]
+                ])
+                
+                await message.answer(response, parse_mode="Markdown", reply_markup=keyboard)
+                logger.info(f"🔍 Bot oluşturma tamamlandı - bot_id: {bot_id}")
+                return
+            else:
+                # Link URL'si alındı
+                if not link_input.startswith(('http://', 'https://', 't.me/')):
+                    await message.answer("❌ Geçersiz URL! http://, https:// veya t.me/ ile başlamalı.")
+                    return
+                
+                # Bot profilini güncelle
+                if bot_id not in BOT_PROFILES:
+                    logger.info(f"🔍 BOT_PROFILES'e bot_id ekleniyor: {bot_id}")
+                    BOT_PROFILES[bot_id] = {}
+                
+                BOT_PROFILES[bot_id]["link"] = link_input
+                logger.info(f"🔍 Bot linki güncellendi")
+                
+                # Bot profilini veritabanına kaydet
+                current_settings = await get_scheduled_settings()
+                if bot_id in BOT_PROFILES:
+                    current_settings['bot_profiles'][bot_id] = BOT_PROFILES[bot_id]
+                    await save_scheduled_settings(current_settings)
+                    logger.info(f"🔍 Bot profili kaydedildi")
+                
+                # AŞAMA 5'e geç: Link metni
+                memory_manager.set_input_state(user_id, f"create_bot_link_text_{bot_id}")
+                logger.info(f"🔍 Input state güncellendi: create_bot_link_text_{bot_id}")
+                
+                response = f"""
+🤖 **Bot Oluşturma - Aşama 5**
+
+**Bot Adı:** {BOT_PROFILES[bot_id]['name']}
+**Link:** {link_input}
+
+**Link butonunda ne yazsın?**
+Örnek: "GÜVENİLİR SİTELER", "OYNAMAYA BAŞLA", "YARDIM AL"
+
+**Link buton metnini yazın:**
+                """
+                
+                keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                    [InlineKeyboardButton(text="⏭️ Geç", callback_data=f"create_bot_skip_link_text_{bot_id}")],
+                    [InlineKeyboardButton(text="❌ İptal", callback_data="scheduled_bot_management")]
+                ])
+                
+                await message.answer(response, parse_mode="Markdown", reply_markup=keyboard)
+                logger.info(f"🔍 AŞAMA 5'e geçildi - bot_id: {bot_id}")
+                
+        elif input_state.startswith("create_bot_link_text_"):
+            # AŞAMA 6: Yeni bot oluşturma - Link metni alındı
+            bot_id = input_state.replace("create_bot_link_text_", "")
+            logger.info(f"🔍 Yeni bot oluşturma AŞAMA 6 - bot_id: {bot_id}")
+            
+            link_text = message.text.strip()
+            logger.info(f"🔍 Link metni alındı: {link_text}")
+            
+            if len(link_text) < 2:
+                await message.answer("❌ Link metni çok kısa! En az 2 karakter olmalı.")
+                return
+            
+            # Bot profilini güncelle
+            if bot_id not in BOT_PROFILES:
+                logger.info(f"🔍 BOT_PROFILES'e bot_id ekleniyor: {bot_id}")
+                BOT_PROFILES[bot_id] = {}
+            
+            BOT_PROFILES[bot_id]["link_text"] = link_text
+            logger.info(f"🔍 Bot link metni güncellendi")
+            
+            # Bot profilini veritabanına kaydet
+            current_settings = await get_scheduled_settings()
+            if bot_id in BOT_PROFILES:
+                current_settings['bot_profiles'][bot_id] = BOT_PROFILES[bot_id]
+                await save_scheduled_settings(current_settings)
+                logger.info(f"🔍 Bot profili kaydedildi")
+            
+            # Input state'i temizle
+            memory_manager.clear_input_state(user_id)
+            logger.info(f"🔍 Input state temizlendi")
+            
+            response = f"""
+✅ **Bot Başarıyla Oluşturuldu!**
+
+**Bot Adı:** {BOT_PROFILES[bot_id]['name']}
+**Aralık:** {BOT_PROFILES[bot_id]['interval']} dakika
+**Mesaj:** {BOT_PROFILES[bot_id]['message'][:50]}{'...' if len(BOT_PROFILES[bot_id]['message']) > 50 else ''}
+**Link:** {BOT_PROFILES[bot_id]['link']}
+**Link Metni:** {link_text}
+
+Bot artık kullanıma hazır! Bot yönetimi menüsünden aktifleştirebilirsiniz.
+            """
+            
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="⚙️ Bot Yönetimi", callback_data="scheduled_bot_management")]
+            ])
+            
+            await message.answer(response, parse_mode="Markdown", reply_markup=keyboard)
+            logger.info(f"🔍 Bot oluşturma tamamlandı - bot_id: {bot_id}")
+            logger.info(f"🔍 DEBUG - Final BOT_PROFILES[{bot_id}]: {BOT_PROFILES[bot_id]}")
+            logger.info(f"🔍 DEBUG - Final BOT_PROFILES[{bot_id}] keys: {list(BOT_PROFILES[bot_id].keys())}")
+            
+        elif input_state.startswith("recreate_bot_name_"):
             # AŞAMA 1: Bot adı alındı
             # Bot ID'yi doğru parse et - recreate_bot_name_bot_1753628023 formatından
             bot_id = input_state.replace("recreate_bot_name_", "")
@@ -2411,3 +3076,61 @@ async def handle_scheduled_input(message: Message) -> None:
         logger.error(f"❌ Chat input handler hatası: {e}")
         await message.answer("❌ Bir hata oluştu! Lütfen tekrar başlayın.")
         memory_manager.clear_input_state(message.from_user.id)
+
+async def clear_test_bots() -> bool:
+    """Test bot'larını temizle"""
+    try:
+        logger.info(f"🧹 Test bot'ları temizleniyor...")
+        
+        # Mevcut ayarları al
+        current_settings = await get_scheduled_settings()
+        
+        # Test bot'larını bul ve kaldır
+        bot_profiles = current_settings.get('bot_profiles', {})
+        active_bots = current_settings.get('active_bots', {})
+        last_message_time = current_settings.get('last_message_time', {})
+        
+        # Test bot'larını tespit et
+        test_bots_to_remove = []
+        for bot_id in bot_profiles.keys():
+            if bot_id.startswith('test_') or bot_id.startswith('bot_'):
+                test_bots_to_remove.append(bot_id)
+                logger.info(f"🧹 Test bot tespit edildi: {bot_id}")
+        
+        # Test bot'larını kaldır
+        for bot_id in test_bots_to_remove:
+            if bot_id in bot_profiles:
+                del bot_profiles[bot_id]
+                logger.info(f"✅ Bot profili kaldırıldı: {bot_id}")
+            
+            if bot_id in active_bots:
+                del active_bots[bot_id]
+                logger.info(f"✅ Aktif bot kaldırıldı: {bot_id}")
+                
+            if bot_id in last_message_time:
+                del last_message_time[bot_id]
+                logger.info(f"✅ Son mesaj zamanı kaldırıldı: {bot_id}")
+        
+        # Global BOT_PROFILES'i güncelle
+        global BOT_PROFILES
+        BOT_PROFILES = bot_profiles.copy()
+        
+        # Ayarları kaydet
+        current_settings['bot_profiles'] = bot_profiles
+        current_settings['active_bots'] = active_bots
+        current_settings['last_message_time'] = last_message_time
+        
+        success = await save_scheduled_settings(current_settings)
+        
+        if success:
+            logger.info(f"✅ Test bot'ları başarıyla temizlendi! Kaldırılan: {len(test_bots_to_remove)}")
+            return True
+        else:
+            logger.error(f"❌ Test bot'ları temizlenirken hata!")
+            return False
+            
+    except Exception as e:
+        logger.error(f"❌ Test bot temizleme hatası: {e}")
+        import traceback
+        logger.error(f"❌ TRACEBACK: {traceback.format_exc()}")
+        return False

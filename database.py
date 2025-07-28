@@ -5,7 +5,7 @@
 import asyncpg
 import logging
 from typing import Optional, Dict, Any
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 import asyncio
 
 from config import get_config
@@ -2146,6 +2146,7 @@ async def add_custom_command(command_name: str, scope: int, response_message: st
                     created_by = EXCLUDED.created_by,
                     created_at = NOW()
             ''', command_name, scope, response_message, button_text, button_url, created_by)
+            logger.info(f"✅ Dinamik komut kaydedildi: {command_name}")
             return True
         except Exception as e:
             logger.error(f"❌ Dinamik komut ekleme hatası: {e}")

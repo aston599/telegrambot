@@ -115,15 +115,33 @@ class MemoryManager:
         """Kullanıcının input state'ini ayarla"""
         key = f"input_state_{user_id}"
         self.cache_manager.set_cache(key, state, ttl=300)  # 5 dakika
+        logger.info(f"🎯 INPUT STATE SET - User: {user_id}, State: {state}")
         
     def get_input_state(self, user_id: int) -> Optional[str]:
         """Kullanıcının input state'ini al"""
         key = f"input_state_{user_id}"
-        return self.cache_manager.get_cache(key)
+        state = self.cache_manager.get_cache(key)
+        logger.info(f"🎯 INPUT STATE GET - User: {user_id}, State: {state}")
+        return state
         
     def clear_input_state(self, user_id: int) -> None:
         """Kullanıcının input state'ini temizle"""
         key = f"input_state_{user_id}"
+        self.cache_manager.clear_cache(key)
+        
+    def set_lottery_data(self, user_id: int, data: Dict[str, Any]) -> None:
+        """Çekiliş verilerini kaydet"""
+        key = f"lottery_data_{user_id}"
+        self.cache_manager.set_cache(key, data, ttl=3600)  # 1 saat
+        
+    def get_lottery_data(self, user_id: int) -> Optional[Dict[str, Any]]:
+        """Çekiliş verilerini al"""
+        key = f"lottery_data_{user_id}"
+        return self.cache_manager.get_cache(key)
+        
+    def clear_lottery_data(self, user_id: int) -> None:
+        """Çekiliş verilerini temizle"""
+        key = f"lottery_data_{user_id}"
         self.cache_manager.clear_cache(key)
 
 # Global instance

@@ -12,7 +12,8 @@ Modüler yapıda, Python 3.13 uyumlu
 
 import asyncio
 import logging
-from aiogram import Bot, Dispatcher, F
+from aiogram import Bot, Dispatcher
+from aiogram import F
 from aiogram.filters import CommandStart, Command
 from aiogram.types import Message
 
@@ -31,31 +32,24 @@ from handlers.recruitment_system import (
 from handlers.chat_system import (
     handle_chat_message, send_chat_response, bot_write_command
 )
-from handlers.admin_panel import router as admin_panel_router
-# Event management kaldırıldı
-# from handlers.admin_commands_list import router as admin_commands_list_router  # KALDIRILDI - Manuel handler
+from handlers.admin_panel import admin_commands_list_command
 from handlers.simple_events import router as simple_events_router, set_bot_instance as set_events_bot_instance
 from handlers.unknown_commands import router as unknown_commands_router, set_bot_instance as set_unknown_bot_instance
-from handlers.event_participation import router as event_participation_router, set_bot_instance as set_participation_bot_instance  # GERİ EKLENDİ - Router aktif
+from handlers.event_participation import router as event_participation_router, set_bot_instance as set_participation_bot_instance
 from handlers.events_list import set_bot_instance as set_events_list_bot_instance
 from handlers.system_notifications import send_maintenance_notification, send_startup_notification
-# from handlers.event_management import router as event_management_router, set_bot_instance as set_management_bot_instance  # KALDIRILDI - Manuel handler
-# from handlers.broadcast_system import router as broadcast_system_router
-# dp.include_router(broadcast_system_router)
-
-# 🔥 YENİ EKSİK SİSTEMLER - SOHBET TABANLI
-from handlers.scheduled_messages import set_bot_instance as set_scheduled_bot, start_scheduled_messages
-from handlers.balance_event import router as balance_event_router
-
+from handlers.scheduled_messages import scheduled_messages_command, scheduled_callback_handler
 from utils import setup_logger
 from utils.logger import setup_logger, log_important, log_system_error, log_performance
 from utils.rate_limiter import rate_limiter, rate_limit
 from utils.memory_manager import memory_manager, start_memory_cleanup, cleanup_all_resources
-# Reports router'ları kaldırıldı - admin_panel_callback'te import ediliyor
-# Broadcast system router'ını kaldır - manuel handler kullanacağız
 
 # Logger'ı kur
 logger = setup_logger()
+
+# Aiogram debug loglarını aktif et
+logging.getLogger("aiogram").setLevel(logging.INFO)
+logging.getLogger("aiohttp").setLevel(logging.WARNING)
 
 # Global bot instance kontrolü - Enhanced
 _bot_instance = None
@@ -176,10 +170,22 @@ async def main():
             log_important("⚠️ Database olmadan devam ediliyor!", "WARNING")
         else:
             log_important("✅ Database bağlantısı başarılı!")
-        
+            
         # Bot ve Dispatcher oluştur
         log_important("🤖 Bot instance oluşturuluyor...")
         bot = Bot(token=config.BOT_TOKEN)
+        _bot_instance = bot  # Global instance'ı set et
+        
+        # Scheduled messages ayarlarını yükle
+        log_important("📅 Scheduled messages ayarları yükleniyor...")
+        try:
+            from handlers.scheduled_messages import get_scheduled_settings, start_scheduled_messages, set_bot_instance as set_scheduled_bot_instance
+            await get_scheduled_settings()
+            set_scheduled_bot_instance(bot)  # Bot instance'ını set et
+            await start_scheduled_messages(bot)  # Zamanlayıcıyı başlat
+            log_important("✅ Scheduled messages sistemi başlatıldı!")
+        except Exception as e:
+            log_important(f"⚠️ Scheduled messages ayarları yüklenemedi: {e}", "WARNING")
         _bot_instance = bot  # Global instance'ı set et
         dp = Dispatcher()
         log_important("✅ Bot ve Dispatcher oluşturuldu!")
@@ -196,9 +202,7 @@ async def main():
         from handlers.admin_panel import set_bot_instance as set_admin_panel_bot_instance
         set_admin_panel_bot_instance(bot)
         
-        # Admin commands list bot instance'ını set et
-        # from handlers.admin_commands_list import set_bot_instance as set_admin_commands_list_bot_instance
-# set_admin_commands_list_bot_instance(bot)
+        
         
         # Unknown commands bot instance'ını set et
         set_unknown_bot_instance(bot)
@@ -218,14 +222,6 @@ async def main():
         # Broadcast system - BOT INSTANCE SET ET
         from handlers.broadcast_system import set_bot_instance as set_broadcast_bot_instance
         set_broadcast_bot_instance(bot)
-        
-        # 🔥 YENİ EKSİK SİSTEMLER - BOT INSTANCE SET ET
-        set_scheduled_bot(bot)  # Zamanlanmış mesajlar sistemi
-        # set_balance_event_bot(bot)  # Bakiye etkinlikleri sistemi - MEVCUT DEĞİL
-        
-        # 📊 İstatistikler Sistemi - BOT INSTANCE SET ET
-        from handlers.statistics_system import set_bot_instance as set_stats_bot_instance
-        set_stats_bot_instance(bot)  # İstatistikler sistemi
         
         # Handler'ları kaydet
         log_important("🎯 Handler'lar kaydediliyor...")
@@ -257,6 +253,7 @@ async def main():
         dp.callback_query(F.data == "profile_refresh")(profile_callback_handler)
         
         # Admin sipariş callback'leri - MANUEL KAYIT (ÖNCE - daha spesifik)
+        from handlers.admin_market_management import orders_list_command, approve_order_command, reject_order_command
         from handlers.admin_order_management import handle_admin_approve_order, handle_admin_reject_order
         
         # Wrapper fonksiyonlar
@@ -291,10 +288,7 @@ async def main():
         
         # Admin sipariş callback'leri - admin_panel.py içinde handle ediliyor
         
-        # Admin commands list callback'leri - KALDIRILDI
-        # from handlers.admin_commands_list import admin_commands_callback
-        # dp.callback_query(F.data.startswith("admin_commands_"))(admin_commands_callback)
-        # admin_commands_back router tarafından yönetiliyor
+
         
         # Etkinlik listesi callback'i
         from handlers.events_list import refresh_lotteries_list_callback
@@ -353,43 +347,29 @@ async def main():
         from handlers.admin_market_management import router as market_router
         dp.include_router(market_router)
         
-        # Admin commands list router - KALDIRILDI
-        # from handlers.admin_commands_list import router as admin_commands_router
-        # dp.include_router(admin_commands_router)
-        
-        # Reports router'ları - ZATEN YUKARIDA İMPORT EDİLDİ
-        # from handlers.reports.user_report import router as user_report_router
-        # from handlers.reports.point_report import router as point_report_router
-        # from handlers.reports.event_report import router as event_report_router
-        # from handlers.reports.system_report import router as system_report_router
-            # Reports router'ları kaldırıldı - admin_panel_callback'te import ediliyor
-        
         # 🔥 CRİTİK: MANUEL HANDLER KAYIT - GRUP SESSİZLİĞİ İÇİN (ROUTER'LAR YOK!)
-        # TEK ADMİN PANELİ SİSTEMİ - admin_commands_list.py kaldırıldı
-        from handlers.admin_panel import admin_panel_command, clean_messages_command, list_groups_command, help_command, approve_order_command, test_market_system_command, test_sql_queries_command, test_user_orders_command
+        # TEK ADMİN PANELİ SİSTEMİ - Tüm admin komutları admin_panel.py'de
+        from handlers.admin_panel import admin_panel_command, clean_messages_command, list_groups_command, help_command, approve_order_command
         from handlers.admin_order_management import show_orders_list_modern
-        # from handlers.admin_commands_list import admin_commands_list  # KALDIRILDI
         from handlers.events_list import list_active_lotteries as list_active_events, refresh_lotteries_list_callback
         from handlers.event_management import end_lottery_command as end_event_command
         
-        # MANUEL HANDLER KAYITLARI - TEK ADMİN PANELİ
+        # MANUEL HANDLER KAYITLARI
         dp.message(Command("adminpanel"))(admin_panel_command)  # Ana admin panel
         dp.message(Command("adminkomutlar"))(admin_panel_command)  # Admin komutları (alias)
-        # dp.message(Command("adminkomut"))(admin_commands_list)  # Admin komutları listesi - KALDIRILDI
+        dp.message(Command("adminkomut"))(admin_commands_list_command)  # Admin komutları (doğrudan liste)
         dp.message(Command("temizle"))(clean_messages_command)   # Mesaj silme
         dp.message(Command("gruplar"))(list_groups_command)      # Grup listesi
         dp.message(Command("yardim"))(help_command)              # Yardım menüsü
         dp.message(Command("siparisliste"))(show_orders_list_modern) # Sipariş listesi
         dp.message(Command("siparisonayla"))(approve_order_command) # Sipariş onaylama
+        dp.message(Command("siparisreddet"))(reject_order_command) # Sipariş reddetme
         
-        # Test komutları
-        dp.message(Command("testmarket"))(test_market_system_command) # Market test
-        dp.message(Command("testsql"))(test_sql_queries_command) # SQL test
-        dp.message(Command("testsiparis"))(test_user_orders_command) # Sipariş test
+
         dp.message(Command("etkinlikler"))(list_active_events)
         dp.message(Command("etkinlikbitir"))(end_event_command)
         
-        # Admin komutları - MANUEL
+        # Admin komutları - MANUEL (admin_commands.py'den)
         from handlers.admin_commands import (
             delete_command_command, take_permission_command, 
             check_admin_level_command, admin_help_command
@@ -420,66 +400,71 @@ async def main():
         dp.message(Command("cekilisler"))(list_active_lotteries)
         dp.message(Command("cekilisbitir"))(end_lottery_command)
         
-        # 🔥 YENİ EKSİK SİSTEMLER - MANUEL KOMUTLAR
-        # Zamanlanmış mesajlar sistemi komutları - EKSİK FONKSIYONLAR, KALDIRILDI
-        # from handlers.scheduled_messages import create_scheduled_bot_command, list_scheduled_bots_command, edit_scheduled_bot_command, delete_scheduled_bot_command
-        # dp.message(Command("zamanlanmesmesaj"))(create_scheduled_bot_command)
-        # dp.message(Command("zamanlimesajlar"))(list_scheduled_bots_command)
-        # dp.message(Command("zamanlimesajduzenle"))(edit_scheduled_bot_command)
-        # dp.message(Command("zamanlimesajsil"))(delete_scheduled_bot_command)
-        
-        # Bakiye etkinlikleri sistemi komutları - EKSİK FONKSIYONLAR, KALDIRILDI
-        # from handlers.balance_event import create_balance_event_command, list_balance_events_command
-        # dp.message(Command("bakiyeetkinlik"))(create_balance_event_command)
-        # dp.message(Command("bakiyeetkinlikler"))(list_balance_events_command)
-        
-        # Admin izin yöneticisi komutları - EKSİK FONKSIYONLAR, KALDIRILDI
-        # from handlers.admin_permission_manager import admin_permission_command, set_admin_level_command
-        # dp.message(Command("adminyetki"))(admin_permission_command)
-        # dp.message(Command("adminseviyeayarla"))(set_admin_level_command)
-        
-        # 📊 İstatistikler Sistemi komutları - YENİ!
-        from handlers.statistics_system import admin_stats_command, system_stats_command
-        dp.message(Command("adminstats"))(admin_stats_command)
-        dp.message(Command("sistemistatistik"))(system_stats_command)
-        
         log_important("Manuel handler'lar kayıtlandı - Router'lar YOK!")
         
         # Etkinlik katılım handler'ı için gerekli
-        dp.include_router(event_participation_router)  # GERİ EKLENDİ - Katılım handler için
+        dp.include_router(event_participation_router)
         
         # Event management router'ını da ekle - end_event callback'i için
         from handlers.event_management import router as event_management_router
-        dp.include_router(event_management_router)  # End event callback için
+        dp.include_router(event_management_router)
         
-        # Statistics system callback'leri - MANUEL KAYIT
+        # Statistics system callback'leri
         from handlers.statistics_system import handle_stats_callback
         dp.callback_query(F.data.startswith("stats_"))(handle_stats_callback)
         
-        # Dynamic command creator router'ını dahil et - EN ÖNCE!
+        # Zamanlanmış mesajlar sistemi
+        dp.message(Command("zamanlanmismesaj"))(scheduled_messages_command)
+        dp.callback_query(F.data.startswith("scheduled_"))(scheduled_callback_handler)
+        dp.callback_query(F.data.startswith("toggle_bot_"))(scheduled_callback_handler)
+        dp.callback_query(F.data.startswith("edit_bot_"))(scheduled_callback_handler)
+        dp.callback_query(F.data.startswith("bot_toggle_"))(scheduled_callback_handler)
+        dp.callback_query(F.data.startswith("edit_messages_"))(scheduled_callback_handler)
+        dp.callback_query(F.data.startswith("edit_interval_"))(scheduled_callback_handler)
+        dp.callback_query(F.data.startswith("edit_link_"))(scheduled_callback_handler)
+        dp.callback_query(F.data.startswith("edit_image_"))(scheduled_callback_handler)
+        dp.callback_query(F.data.startswith("edit_name_"))(scheduled_callback_handler)
+        dp.callback_query(F.data.startswith("set_interval_"))(scheduled_callback_handler)
+        dp.callback_query(F.data.startswith("remove_link_"))(scheduled_callback_handler)
+        dp.callback_query(F.data.startswith("add_link_"))(scheduled_callback_handler)
+        dp.callback_query(F.data.startswith("remove_image_"))(scheduled_callback_handler)
+        dp.callback_query(F.data.startswith("add_image_"))(scheduled_callback_handler)
+        dp.callback_query(F.data.startswith("create_bot_profile"))(scheduled_callback_handler)
+        dp.callback_query(F.data.startswith("edit_message_text_"))(scheduled_callback_handler)
+        dp.callback_query(F.data.startswith("send_message_"))(scheduled_callback_handler)
+        dp.callback_query(F.data.startswith("recreate_bot_"))(scheduled_callback_handler)
+        dp.callback_query(F.data.startswith("delete_bot_"))(scheduled_callback_handler)
+        dp.callback_query(F.data.startswith("create_bot_link_yes_"))(scheduled_callback_handler)
+        dp.callback_query(F.data.startswith("create_bot_link_no_"))(scheduled_callback_handler)
+        dp.callback_query(F.data.startswith("select_bot_group_"))(scheduled_callback_handler)
+        dp.callback_query(F.data.startswith("recreate_bot_link_yes_"))(scheduled_callback_handler)
+        dp.callback_query(F.data.startswith("recreate_bot_link_no_"))(scheduled_callback_handler)
+        dp.callback_query(F.data.startswith("select_recreate_group_"))(scheduled_callback_handler)
+        dp.callback_query(F.data == "admin_scheduled_messages")(scheduled_callback_handler)
+        
+        # Dynamic command creator router'ını dahil et
         from handlers.dynamic_command_creator import router as dynamic_command_router
-        dp.include_router(dynamic_command_router)  # Dinamik komut oluşturucu için
+        dp.include_router(dynamic_command_router)
         
-        # BROADCAST SYSTEM ROUTER (FSM için EN ÖNCE)
-        # dp.include_router(broadcast_system_router) # Kaldırıldı
-        
-        # Admin commands router'ını dahil et - ZATEN DAHİL EDİLDİ (YUKARIDA)
-        # from handlers.admin_commands import router as admin_commands_router
-        # dp.include_router(admin_commands_router)  # Admin yetki komutları için
+        # Dynamic command creator callback'leri
+        from handlers.dynamic_command_creator import (
+            cancel_command_creation, handle_skip_button_text, handle_skip_button_url
+        )
+        dp.callback_query(F.data == "cancel_command_creation")(cancel_command_creation)
+        dp.callback_query(F.data == "skip_button_text")(handle_skip_button_text)
+        dp.callback_query(F.data == "skip_button_url")(handle_skip_button_url)
         
         # Admin permission manager router'ını dahil et
         from handlers.admin_permission_manager import router as admin_permission_router
-        dp.include_router(admin_permission_router)  # Admin yetki yönetimi için
+        dp.include_router(admin_permission_router)
 
-        # Admin panel router'ını dahil et (FSM handler'ları için)
-        dp.include_router(admin_panel_router)
+        # Admin panel router kaldırıldı - manuel handler'lar kullanılıyor
         
-        # 🔥 YENİ EKSİK SİSTEMLER - ROUTER'LAR
-        dp.include_router(balance_event_router)  # Bakiye etkinlikleri sistemi
+        # Simple events router'ını dahil et
+        dp.include_router(simple_events_router)
         
-        # 📊 İstatistikler Sistemi - ROUTER
-        from handlers.statistics_system import router as statistics_router
-        dp.include_router(statistics_router)  # İstatistikler sistemi
+        # Unknown commands router'ını dahil et
+        dp.include_router(unknown_commands_router)
         
         # 3. GRUP MESAJ MONITOR (Point kazanımı için)
         dp.message(F.chat.type.in_(["group", "supergroup"]), ~F.text.startswith("/"))(monitor_group_message)
@@ -487,6 +472,14 @@ async def main():
         # 🔧 DYNAMIC COMMAND HANDLER - GRUP MESAJLARI İÇİN
         from handlers.dynamic_command_creator import handle_custom_command as handle_custom_command_group
         dp.message(F.chat.type.in_(["group", "supergroup"]), ~F.text.startswith("/"))(handle_custom_command_group)
+        
+        # 🔧 DYNAMIC COMMAND HANDLER - ÖZEL MESAJLAR İÇİN
+        from handlers.dynamic_command_creator import handle_custom_command as handle_custom_command_private
+        dp.message(F.chat.type == "private", ~F.text.startswith("/"))(handle_custom_command_private)
+        
+        # 🔧 DYNAMIC COMMAND CREATOR INPUT HANDLER - ÖZEL MESAJLAR İÇİN
+        from handlers.dynamic_command_creator import handle_command_creation_input
+        dp.message(F.chat.type == "private", ~F.text.startswith("/"))(handle_command_creation_input)
         
         # 3.5. SOHBET SİSTEMLER - Grup sohbetlerinde doğal konuşma
         dp.message(F.chat.type.in_(["group", "supergroup"]), ~F.text.startswith("/"))(handle_group_chat)
@@ -504,17 +497,122 @@ async def main():
         # dp.message(F.chat.type == "private", ~F.text.startswith("/"))(process_broadcast_message)
         
         # 🔧 CHAT-BASED SİSTEMLER - TEK HANDLER İLE YÖNETİM
-        async def handle_all_chat_inputs(message: Message):
-            """Tüm chat-based input sistemlerini tek handler'da yönet"""
+        async def handle_all_chat_inputs(message: Message) -> None:
+            """Tüm chat input'larını işle"""
             try:
                 user_id = message.from_user.id
-                
-                # DEBUG: Input handler başlatıldı
-                # logger.info(f"🔧 INPUT HANDLER BAŞLATILDI - User: {user_id}, Text: '{message.text}'")
+                config = get_config()
                 
                 # Komut mesajlarını atla
                 if message.text.startswith("/"):
-                    logger.info(f"⏭️ Komut mesajı atlandı - User: {user_id}")
+                    return
+                
+                # Bakım modu kontrolü
+                if config.MAINTENANCE_MODE and user_id != config.ADMIN_USER_ID:
+                    await message.answer("🔧 **Bot şu anda bakım modunda!**\n\nLütfen daha sonra tekrar deneyin.")
+                    return
+                
+                from utils.memory_manager import memory_manager
+                input_state = memory_manager.get_input_state(user_id)
+                
+                logger.info(f"🎯 CHAT INPUT DEBUG - User: {user_id}, Text: '{message.text}', Input State: {input_state}")
+                
+                if not input_state:
+                    logger.info(f"🎯 NO INPUT STATE - User: {user_id}")
+                    return
+                    
+                # 1. Market input kontrolü
+                if input_state.startswith("market_"):
+                    from handlers.admin_market_management import handle_market_input
+                    await handle_market_input(message)
+                    return
+                    
+                # 2. Broadcast input kontrolü
+                if input_state.startswith("broadcast_"):
+                    from handlers.broadcast_system import handle_broadcast_input
+                    await handle_broadcast_input(message)
+                    return
+                    
+                # 3. Event input kontrolü
+                if input_state.startswith("event_"):
+                    from handlers.simple_events import handle_event_input
+                    await handle_event_input(message)
+                    return
+                    
+                # 4. Bot oluşturma input kontrolü
+                if input_state.startswith("create_bot_"):
+                    from handlers.scheduled_messages import handle_scheduled_input
+                    await handle_scheduled_input(message)
+                    return
+                # 5.2. Bot yeniden kurulum input kontrolü
+                elif input_state.startswith("recreate_bot_"):
+                    from handlers.scheduled_messages import handle_scheduled_input
+                    await handle_scheduled_input(message)
+                    return
+                    
+                # 6. Çekiliş input kontrolü
+                elif input_state.startswith("lottery_"):
+                    logger.info(f"🎯 LOTTERY INPUT HANDLER - User: {user_id}, Input State: {input_state}")
+                    from handlers.admin_panel import handle_lottery_input
+                    await handle_lottery_input(message)
+                    return
+                    
+            except Exception as e:
+                logger.error(f"❌ Chat input handler hatası: {e}")
+
+        # EN ÜSTE DEBUG HANDLER - TÜM MESAJLARI YAKALA
+        async def debug_all_messages(message: Message):
+            """Debug handler - tüm mesajları yakala"""
+            logger.info(f"🔍 DEBUG ALL: {message.text} - {message.chat.type} - User: {message.from_user.id}")
+            logger.info(f"🔍 MESSAGE OBJECT: {message}")
+            logger.info(f"🔍 MESSAGE FROM: {message.from_user}")
+            logger.info(f"🔍 MESSAGE CHAT: {message.chat}")
+            logger.info(f"🔍 MESSAGE DATE: {message.date}")
+            logger.info(f"🔍 MESSAGE MESSAGE_ID: {message.message_id}")
+        
+        # Test handler - tüm mesajları yakala
+        async def test_simple_handler(message: Message):
+            """Test handler - tüm mesajları yakala"""
+            logger.info(f"🎯 SIMPLE TEST: {message.text} - {message.chat.type} - User: {message.from_user.id}")
+            return True
+        
+        async def handle_all_chat_inputs(message: Message) -> None:
+            """Tüm chat input'larını yakala"""
+            try:
+                user_id = message.from_user.id
+                input_state = memory_manager.get_input_state(user_id)
+                
+                logger.info(f"💬 CHAT INPUT DEBUG: {message.text} - State: {input_state} - User: {user_id}")
+                
+                # Lottery input kontrolü
+                if input_state and input_state.startswith("lottery_"):
+                    logger.info(f"🎲 LOTTERY INPUT DETECTED - User: {user_id}, State: {input_state}")
+                    from handlers.admin_panel import handle_lottery_input
+                    await handle_lottery_input(message)
+                    return
+                
+                # Diğer input state'leri buraya eklenebilir
+                
+            except Exception as e:
+                logger.error(f"❌ Chat input handler hatası: {e}")
+        
+        # SİSTEMİ YENİDEN KUR - TÜM HANDLER'LARI KAYDET
+        logger.info("🔧 Sistem yeniden kuruluyor - Tüm handler'lar kaydediliyor...")
+        
+        # Router oluştur
+        from aiogram import Router
+        main_router = Router()
+        
+        # ESKİ SİSTEMDEKİ GİBİ CHAT INPUT HANDLER
+        async def handle_all_chat_inputs(message: Message):
+            """Tüm chat-based input sistemlerini tek handler'da yönet - ESKİ SİSTEM"""
+            try:
+                user_id = message.from_user.id
+                
+                logger.info(f"🔍 CHAT INPUT: {message.text} - User: {user_id}")
+                
+                # Komut mesajlarını atla
+                if message.text.startswith("/"):
                     return
                 
                 # 0. BROADCAST SİSTEMİ KONTROLÜ - EN ÖNCE
@@ -571,25 +669,15 @@ async def main():
                 await handle_recruitment_response(message)
                 
                 # 6. Çekiliş input kontrolü - çekiliş oluşturma sürecinde
-                from utils.memory_manager import memory_manager
-                lottery_data = memory_manager.get_lottery_data(user_id)
-                # logger.info(f"🎯 ÇEKİLİŞ KONTROL - User: {user_id}, lottery_data: {lottery_data}")
-                if lottery_data:
-                    logger.info(f"🎯 ÇEKİLİŞ INPUT BULUNDU - User: {user_id}, Data: {lottery_data}")
+                from handlers.simple_events import lottery_data
+                if user_id in lottery_data:
                     from handlers.simple_events import handle_lottery_input
                     await handle_lottery_input(message)
                     return
-                else:
-                    # logger.info(f"🎯 ÇEKİLİŞ DATA YOK - User: {user_id}")
-                    pass
                 
-                # 7. Scheduled Messages input kontrolü
-                input_state = memory_manager.get_input_state(user_id)
-                if input_state and (input_state.startswith("create_bot_") or input_state.startswith("recreate_bot_") or input_state.startswith("add_link_")):
-                    logger.info(f"🔍 SCHEDULED INPUT BULUNDU - User: {user_id}, State: {input_state}")
-                    from handlers.scheduled_messages import handle_scheduled_input
-                    await handle_scheduled_input(message)
-                    return
+                # 7. Admin panel lottery input kontrolü - YENİ
+                from handlers.admin_panel import handle_lottery_input
+                await handle_lottery_input(message)
                 
                 # 8. Dinamik komut çalıştırma kontrolü - en son
                 from handlers.dynamic_command_creator import handle_custom_command
@@ -597,24 +685,41 @@ async def main():
                 
             except Exception as e:
                 logger.error(f"❌ Chat input handler hatası: {e}")
-
-        # ESKİ KARMAŞIK HANDLER YERİNE BASİT HANDLER
-        @dp.message()
-        async def simple_message_handler(message: Message):
-            """Basit mesaj handler - Test bot'undaki gibi"""
-            try:
-                user_id = message.from_user.id
-                # print(f"MESAJ ALINDI: '{message.text}' - User: {user_id}")
-                
-                # Komut değilse ve özel mesajsa handle_all_chat_inputs'u çağır
-                if message.chat.type == "private" and not message.text.startswith("/"):
-                    await handle_all_chat_inputs(message)
-                    
-            except Exception as e:
-                print(f"HANDLER HATASI: {e}")
         
-        # Eski karmaşık kayıt - iptal
-        # dp.message(F.chat.type == "private", ~F.text.startswith("/"))(handle_all_chat_inputs)
+        # ESKİ SİSTEMDEKİ EXACT FORMAT
+        dp.message(F.chat.type == "private", ~F.text.startswith("/"))(handle_all_chat_inputs)
+        logger.info("✅ ESKİ FORMAT CHAT INPUT HANDLER kaydedildi")
+        
+        # DEBUG: Tüm mesajları yakala - ESKİ FORMAT
+        async def debug_all_messages_func(message: Message):
+            """Debug - tüm mesajları yakala"""
+            logger.info(f"🔍 DEBUG MESSAGE: '{message.text}' - Type: {message.chat.type} - User: {message.from_user.id}")
+        
+        dp.message()(debug_all_messages_func)
+        logger.info("✅ ESKİ FORMAT DEBUG HANDLER kaydedildi")
+        
+        # Router'ı dispatcher'a ekle
+        dp.include_router(main_router)
+        logger.info("✅ Main router dispatcher'a eklendi")
+        
+        # Admin panel router eklenmedi - sadece manuel handler'lar kullanılıyor
+        logger.info("✅ Admin panel router atlandı - manuel handler'lar kullanılıyor")
+        
+        logger.info("✅ Sistem yeniden kuruldu - Tüm handler'lar kaydedildi!")
+        
+        # POLLING DEBUG - TÜM UPDATE'LERİ YAKALA
+        async def debug_all_updates(update):
+            """Tüm update'leri yakala ve logla"""
+            logger.info(f"🔄 UPDATE RECEIVED: {update}")
+            logger.info(f"🔄 UPDATE TYPE: {type(update)}")
+            if hasattr(update, 'message'):
+                logger.info(f"🔄 UPDATE MESSAGE: {update.message}")
+            if hasattr(update, 'callback_query'):
+                logger.info(f"🔄 UPDATE CALLBACK: {update.callback_query}")
+        
+        # Update handler'ını kaydet
+        dp.update.register(debug_all_updates)
+        logger.info("✅ debug_all_updates kaydedildi")
         
         # Grup mesajları için komut oluşturucu handler'ı
         async def handle_group_command_creation(message: Message):
@@ -631,19 +736,6 @@ async def main():
                 if user_id in command_creation_states:
                     from handlers.dynamic_command_creator import handle_command_creation_input
                     await handle_command_creation_input(message)
-                    return
-                
-                # Dinamik komut handler'ı çağır
-                from handlers.dynamic_command_creator import handle_custom_command
-                await handle_custom_command(message)
-                
-                # Zamanlanmış mesajlar sistemi kontrolü - GRUP İÇİN DE
-                from utils.memory_manager import memory_manager
-                input_state = memory_manager.get_input_state(user_id)
-                if input_state and (input_state.startswith("create_bot_") or input_state.startswith("recreate_bot_") or input_state.startswith("add_link_")):
-                    logger.info(f"🔍 GRUP SCHEDULED INPUT BULUNDU - User: {user_id}, State: {input_state}")
-                    from handlers.scheduled_messages import handle_scheduled_input
-                    await handle_scheduled_input(message)
                     return
                 
                 # Market ürün düzenleme sistemi kontrolü
@@ -664,7 +756,7 @@ async def main():
                 logger.error(f"❌ Grup komut oluşturucu hatası: {e}")
         
         # Grup komut oluşturucu handler'ını kaydet
-        dp.message(F.chat.type.in_(["group", "supergroup"]), ~F.text.startswith("/"))(handle_group_command_creation)
+        dp.message.register(handle_group_command_creation, F.chat.type.in_(["group", "supergroup"]), ~F.text.startswith("/"))
         
         # Recruitment callback handler - MANUEL
         from handlers.recruitment_system import handle_recruitment_callback
@@ -677,6 +769,7 @@ async def main():
         # Admin panel callback'leri - MANUEL KAYIT (EN SON - genel)
         from handlers.admin_panel import admin_panel_callback
         dp.callback_query(F.data.startswith("admin_"))(admin_panel_callback)
+        dp.callback_query(F.data.startswith("set_"))(admin_panel_callback)
         
         # Dinamik komut oluşturucu callback'leri - MANUEL KAYIT
         from handlers.dynamic_command_creator import (
@@ -691,68 +784,16 @@ async def main():
         dp.callback_query(F.data == "list_custom_commands")(list_custom_commands_handler)
         dp.callback_query(F.data == "delete_custom_command")(delete_custom_command_handler)
         
-        # 🔥 YENİ EKSİK SİSTEMLER - CALLBACK HANDLER'LAR
-        # Zamanlanmış mesajlar sistemi callback'leri - EKSİK FONKSIYONLAR, KALDIRILDI
-        # from handlers.scheduled_messages import (
-        #     scheduled_bot_callback, start_scheduled_bot_creation, 
-        #     cancel_scheduled_bot_creation, edit_scheduled_bot_callback,
-        #     delete_scheduled_bot_callback, confirm_scheduled_bot_delete
-        # )
-        # dp.callback_query(F.data == "admin_scheduled_messages")(scheduled_bot_callback)
-        # dp.callback_query(F.data == "create_scheduled_bot")(start_scheduled_bot_creation)
-        # dp.callback_query(F.data == "cancel_scheduled_bot")(cancel_scheduled_bot_creation)
-        # dp.callback_query(F.data.startswith("edit_scheduled_"))(edit_scheduled_bot_callback)
-        # dp.callback_query(F.data.startswith("delete_scheduled_"))(delete_scheduled_bot_callback)
-        # dp.callback_query(F.data.startswith("confirm_delete_scheduled_"))(confirm_scheduled_bot_delete)
-        
-        # Bakiye etkinlikleri sistemi callback'leri
-        from handlers.balance_event import balance_event_callback_handler
-        dp.callback_query(F.data.startswith("admin_balance_event"))(balance_event_callback_handler)
-        
-        # Scheduled Messages callback'leri
-        from handlers.scheduled_messages import scheduled_callback_handler
-        dp.callback_query(F.data.startswith("scheduled_"))(scheduled_callback_handler)
-        dp.callback_query(F.data.startswith("toggle_bot_"))(scheduled_callback_handler)
-        dp.callback_query(F.data.startswith("edit_bot_"))(scheduled_callback_handler)
-        dp.callback_query(F.data.startswith("bot_toggle_"))(scheduled_callback_handler)
-        dp.callback_query(F.data.startswith("edit_messages_"))(scheduled_callback_handler)
-        dp.callback_query(F.data.startswith("edit_interval_"))(scheduled_callback_handler)
-        dp.callback_query(F.data.startswith("edit_link_"))(scheduled_callback_handler)
-        dp.callback_query(F.data.startswith("edit_image_"))(scheduled_callback_handler)
-        dp.callback_query(F.data.startswith("edit_name_"))(scheduled_callback_handler)
-        dp.callback_query(F.data.startswith("set_interval_"))(scheduled_callback_handler)
-        dp.callback_query(F.data.startswith("remove_link_"))(scheduled_callback_handler)
-        dp.callback_query(F.data.startswith("add_link_"))(scheduled_callback_handler)
-        dp.callback_query(F.data.startswith("remove_image_"))(scheduled_callback_handler)
-        dp.callback_query(F.data.startswith("add_image_"))(scheduled_callback_handler)
-        dp.callback_query(F.data.startswith("create_bot_profile"))(scheduled_callback_handler)
-        dp.callback_query(F.data.startswith("edit_message_text_"))(scheduled_callback_handler)
-        dp.callback_query(F.data.startswith("send_message_"))(scheduled_callback_handler)
-        dp.callback_query(F.data.startswith("recreate_bot_"))(scheduled_callback_handler)
-        dp.callback_query(F.data.startswith("delete_bot_"))(scheduled_callback_handler)
-        dp.callback_query(F.data.startswith("create_bot_link_yes_"))(scheduled_callback_handler)
-        dp.callback_query(F.data.startswith("create_bot_link_no_"))(scheduled_callback_handler)
-        dp.callback_query(F.data.startswith("select_bot_group_"))(scheduled_callback_handler)
-        dp.callback_query(F.data.startswith("recreate_bot_link_yes_"))(scheduled_callback_handler)
-        dp.callback_query(F.data.startswith("recreate_bot_link_no_"))(scheduled_callback_handler)
-        dp.callback_query(F.data.startswith("select_recreate_group_"))(scheduled_callback_handler)
-
-        
         # 🔥 MANUEL HANDLER KAYIT - ÇEKİLİŞ MESAJ HANDLER'ı (AKTİF)
         # Not: handle_all_chat_inputs içinde zaten kontrol ediliyor
         
         log_important("Tüm handler'lar kaydedildi!")
-        # dp.include_router(balance_management_router)  # KALDIRILDI
-        # dp.include_router(balance_event_router)  # KALDIRILDI
-        # dp.include_router(event_participation_router)  # KALDIRILDI
-        # dp.include_router(admin_panel_router)  # KALDIRILDI
-        # dp.include_router(unknown_commands_router)  # KALDIRILDI
+
         
         # Background task'ları başlat
         asyncio.create_task(start_cleanup_task())
         asyncio.create_task(start_memory_cleanup())  # Memory cleanup
         asyncio.create_task(start_recruitment_background())  # Kayıt teşvik sistemi
-        asyncio.create_task(start_scheduled_messages(bot))  # Zamanlanmış mesajlar
         log_important("Background cleanup task başlatıldı!")
         log_important("🎯 Kayıt teşvik sistemi başlatıldı!")
         
@@ -792,10 +833,31 @@ async def main():
         # Background'da çalıştır
         asyncio.create_task(delayed_startup_notification())
         
-        # Bot'u başlat
-        log_important("🚀 Bot polling başlatılıyor...")
-        log_important("✅ Bot başarıyla çalışıyor! Komutlar hazır.")
-        await dp.start_polling(bot)
+        # Bot'u başlat - MANUEL POLLING
+        logger.info("🚀 Manuel polling başlatılıyor...")
+        logger.info(f"🚀 Bot instance: {bot}")
+        logger.info(f"🚀 Dispatcher instance: {dp}")
+        
+        # AIOGRAM 3.X DOĞRU POLLING
+        logger.info("🚀 Aiogram 3.x doğru polling başlatılıyor...")
+        
+        try:
+            # Webhook'u sil
+            await bot.delete_webhook(drop_pending_updates=True)
+            logger.info("✅ Webhook silindi")
+            
+            # Polling'i başlat - AIOGRAM 3.X FORMATI
+            await dp.start_polling(
+                bot,
+                polling_timeout=30,
+                skip_updates=False,
+                allowed_updates=["message", "callback_query"]
+            )
+            logger.info("✅ Aiogram 3.x polling başarıyla başlatıldı")
+            
+        except Exception as e:
+            logger.error(f"❌ Aiogram 3.x polling hatası: {e}")
+            raise e
         
     except KeyboardInterrupt:
         log_important("Bot kullanıcı tarafından durduruldu!")
@@ -871,7 +933,7 @@ async def handle_group_command_silently(message: Message):
             from handlers.events_list import list_active_lotteries, send_lotteries_list_privately, send_group_lotteries_list
             from handlers.simple_events import create_lottery_command
             from handlers.admin_panel import admin_panel_command
-            # from handlers.admin_commands_list import admin_commands_list
+            
             from handlers.admin_panel import clean_messages_command, list_groups_command, help_command
             from handlers.admin_order_management import show_orders_list_modern
             from handlers.events_list import list_active_lotteries as list_active_events
@@ -900,7 +962,7 @@ async def handle_group_command_silently(message: Message):
             elif command == "/adminpanel":
                 await admin_panel_command(message)
             elif command == "/adminkomutlar":
-                await admin_panel_command(message)  # admin_commands_list yerine admin_panel_command
+                await admin_panel_command(message)  # admin_panel_command kullanılıyor
             elif command == "/temizle":
                 await clean_messages_command(message)
             elif command == "/gruplar":
@@ -913,19 +975,6 @@ async def handle_group_command_silently(message: Message):
                 await list_active_events(message)
             elif command == "/cekilisbitir":
                 await end_lottery_command(message)
-            elif command == "/bakiyeetkinlik":
-                # from handlers.balance_event import create_balance_event_command
-                # await create_balance_event_command(message)
-                pass # Eski komutu kaldır
-            elif command == "/bakiyeetkinlikler":
-                # from handlers.balance_event import list_balance_events_command
-                pass # Eski komutu kaldır
-            elif command == "/adminstats":
-                from handlers.statistics_system import admin_stats_command
-                await admin_stats_command(message)
-            elif command == "/sistemistatistik":
-                from handlers.statistics_system import system_stats_command
-                await system_stats_command(message)
             else:
                 # Bilinmeyen komut için uyarı
                 unknown_command_message = f"""
@@ -943,8 +992,6 @@ async def handle_group_command_silently(message: Message):
 • `/cekilisler` - Aktif çekilişler
 • `/cekilisyap` - Çekiliş oluştur (Admin)
 • `/adminpanel` - Admin paneli (Admin)
-• `/adminstats` - Admin istatistikleri (Admin)
-• `/sistemistatistik` - Sistem istatistikleri (Admin)
 
 🔔 **Not:** Komutlar grup chatinde silinir ve özel mesajda yanıtlanır.
                 """

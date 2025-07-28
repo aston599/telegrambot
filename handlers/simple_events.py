@@ -50,21 +50,14 @@ lottery_data = {}
 
 # Memory cleanup fonksiyonu
 def cleanup_lottery_data():
-    """Eski lottery data'ları temizle"""
-    global lottery_data
-    current_time = datetime.now()
-    to_remove = []
-    
-    for user_id, data in lottery_data.items():
-        # 1 saat eski verileri temizle
-        if 'created_at' in data:
-            age = current_time - data['created_at']
-            if age.total_seconds() > 3600:  # 1 saat
-                to_remove.append(user_id)
-    
-    for user_id in to_remove:
-        del lottery_data[user_id]
-        logger.info(f"🧹 Eski lottery data temizlendi: {user_id}")
+    """Eski lottery data'ları temizle - Memory manager kullan"""
+    try:
+        from utils.memory_manager import memory_manager
+        # Memory manager'ın kendi cleanup sistemi var
+        # Ek temizlik işlemi gerekirse buraya eklenebilir
+        logger.info("🧹 Lottery data cleanup completed (delegated to memory_manager)")
+    except Exception as e:
+        logger.error(f"❌ Lottery data cleanup hatası: {e}")
 
 async def create_lottery_command(message: Message):
     """Çekiliş oluşturma komutu - Hem message hem callback için"""
@@ -78,8 +71,11 @@ async def create_lottery_command(message: Message):
         user_id = message.from_user.id
         current_time = datetime.now()
         
-        if user_id in lottery_data:
-            last_activity = lottery_data[user_id].get('last_activity')
+        # Memory manager kullanarak rate limiting kontrolü
+        from utils.memory_manager import memory_manager
+        existing_data = memory_manager.get_lottery_data(user_id)
+        if existing_data:
+            last_activity = existing_data.get('last_activity')
             if last_activity and (current_time - last_activity).total_seconds() < 10:
                 await message.reply("⏳ Çok hızlı! 10 saniye bekleyin.")
                 return
@@ -129,8 +125,11 @@ async def create_lottery_callback(callback: CallbackQuery):
         user_id = callback.from_user.id
         current_time = datetime.now()
         
-        if user_id in lottery_data:
-            last_activity = lottery_data[user_id].get('last_activity')
+        # Memory manager kullanarak rate limiting kontrolü
+        from utils.memory_manager import memory_manager
+        existing_data = memory_manager.get_lottery_data(user_id)
+        if existing_data:
+            last_activity = existing_data.get('last_activity')
             if last_activity and (current_time - last_activity).total_seconds() < 10:
                 await callback.answer("⏳ Çok hızlı! 10 saniye bekleyin.", show_alert=True)
                 return
@@ -170,15 +169,20 @@ async def select_lottery_type(callback: CallbackQuery):
             await callback.answer("❌ Bu işlemi sadece admin yapabilir!", show_alert=True)
             return
         
-        # Geçici veriyi başlat
+        # Memory manager kullanarak veriyi başlat
         user_id = callback.from_user.id
-        lottery_data[user_id] = {
+        from utils.memory_manager import memory_manager
+        
+        lottery_data = {
             "type": "lottery",
             "step": "cost",
             "created_at": datetime.now()
         }
         
-        logger.info(f"🎯 LOTTERY DATA SET - User: {user_id}, Step: cost, Data: {lottery_data[user_id]}")
+        memory_manager.set_lottery_data(user_id, lottery_data)
+        memory_manager.set_input_state(user_id, "lottery_cost")
+        
+        logger.info(f"🎯 LOTTERY DATA SET - User: {user_id}, Step: cost, Data: {lottery_data}")
         
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="❌ İptal", callback_data="lottery_cancel")]
@@ -206,12 +210,18 @@ async def select_bonus_type(callback: CallbackQuery):
             await callback.answer("❌ Bu işlemi sadece admin yapabilir!", show_alert=True)
             return
         
-        # Geçici veriyi başlat
+        # Geçici veriyi başlat - Memory manager kullan
         user_id = callback.from_user.id
-        lottery_data[user_id] = {
+        from utils.memory_manager import memory_manager
+        
+        bonus_data = {
             "type": "bonus",
-            "step": "duration"
+            "step": "duration",
+            "created_at": datetime.now()
         }
+        
+        memory_manager.set_lottery_data(user_id, bonus_data)
+        logger.info(f"🎯 BONUS DATA SET - User: {user_id}, Step: duration, Data: {bonus_data}")
         
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="❌ İptal", callback_data="lottery_cancel")]
@@ -277,10 +287,14 @@ async def cancel_lottery_creation(callback: CallbackQuery):
             await callback.answer("❌ Bu işlemi sadece admin yapabilir!", show_alert=True)
             return
         
-        # Geçici veriyi temizle
+        # Geçici veriyi temizle - Memory manager kullan
         user_id = callback.from_user.id
-        if user_id in lottery_data:
-            del lottery_data[user_id]
+        from utils.memory_manager import memory_manager
+        
+        existing_data = memory_manager.get_lottery_data(user_id)
+        if existing_data:
+            memory_manager.clear_lottery_data(user_id)
+            logger.info(f"🧹 Çekiliş iptal edildi ve data temizlendi - User: {user_id}")
         
         await callback.message.edit_text(
             "❌ **Çekiliş oluşturma iptal edildi!**",
@@ -332,12 +346,13 @@ async def handle_lottery_input(message: Message):
             logger.info(f"❌ Admin değil - User: {user_id}")
             return
         
-        # Kullanıcının çekiliş oluşturma sürecinde olup olmadığını kontrol et
-        if user_id not in lottery_data:
+        # Memory manager kullanarak event info'yu al
+        from utils.memory_manager import memory_manager
+        event_info = memory_manager.get_lottery_data(user_id)
+        if not event_info:
             logger.info(f"❌ Lottery data yok - User: {user_id}")
             return  # Normal mesaj, bu handler'ı atla
         
-        event_info = lottery_data[user_id]
         step = event_info.get("step")
         
         logger.info(f"🎯 Event input - User: {user_id}, Step: {step}, Text: {message.text}")
@@ -372,8 +387,15 @@ async def handle_cost_input(message: Message, event_info: Dict):
             await message.reply("❌ Geçersiz ücret! Örnek: `10` veya `5.50`")
             return
         
+        # Event info'yu güncelle
         event_info["entry_cost"] = cost
         event_info["step"] = "winners"
+        
+        # Memory manager'a kaydet
+        from utils.memory_manager import memory_manager
+        memory_manager.set_lottery_data(user_id, event_info)
+        
+        logger.info(f"🎯 COST INPUT COMPLETED - User: {user_id}, Cost: {cost}, Next step: winners")
         
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="❌ İptal", callback_data="lottery_cancel")]
@@ -407,6 +429,12 @@ async def handle_winners_input(message: Message, event_info: Dict):
         event_info["max_winners"] = winners
         event_info["step"] = "description"
         
+        # Memory manager'a kaydet
+        from utils.memory_manager import memory_manager
+        memory_manager.set_lottery_data(user_id, event_info)
+        
+        logger.info(f"🎯 WINNERS INPUT COMPLETED - User: {user_id}, Winners: {winners}, Next step: description")
+        
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="❌ İptal", callback_data="lottery_cancel")]
         ])
@@ -434,6 +462,12 @@ async def handle_description_input(message: Message, event_info: Dict):
         
         event_info["description"] = description
         event_info["step"] = "group_selection"
+        
+        # Memory manager'a kaydet
+        from utils.memory_manager import memory_manager
+        memory_manager.set_lottery_data(user_id, event_info)
+        
+        logger.info(f"🎯 DESCRIPTION INPUT COMPLETED - User: {user_id}, Description: {description[:50]}..., Next step: group_selection")
         
         # Grup listesini getir
         from database import get_registered_groups
@@ -484,6 +518,12 @@ async def handle_duration_input(message: Message, event_info: Dict):
         event_info["duration_minutes"] = duration
         event_info["step"] = "multiplier"
         
+        # Memory manager'a kaydet
+        from utils.memory_manager import memory_manager
+        memory_manager.set_lottery_data(user_id, event_info)
+        
+        logger.info(f"🎯 DURATION INPUT COMPLETED - User: {user_id}, Duration: {duration} minutes, Next step: multiplier")
+        
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="❌ İptal", callback_data="lottery_cancel")]
         ])
@@ -514,6 +554,12 @@ async def handle_multiplier_input(message: Message, event_info: Dict):
             return
         
         event_info["bonus_multiplier"] = multiplier
+        
+        # Memory manager'a kaydet
+        from utils.memory_manager import memory_manager
+        memory_manager.set_lottery_data(user_id, event_info)
+        
+        logger.info(f"🎯 MULTIPLIER INPUT COMPLETED - User: {user_id}, Multiplier: {multiplier}x, Ready for confirmation")
         
         # Onay mesajı
         confirmation = f"""
@@ -552,14 +598,23 @@ async def select_group_for_event(callback: CallbackQuery):
             return
         
         user_id = callback.from_user.id
-        if user_id not in lottery_data:
+        
+        # Memory manager kullanarak event info'yu al
+        from utils.memory_manager import memory_manager
+        event_info = memory_manager.get_lottery_data(user_id)
+        if not event_info:
+            logger.error(f"❌ Çekiliş verisi bulunamadı - User: {user_id}")
             await callback.answer("❌ Çekiliş verisi bulunamadı!", show_alert=True)
             return
         
         # Seçilen grup ID'sini al
         group_id = int(callback.data.split("_")[-1])
-        event_info = lottery_data[user_id]
         event_info["selected_group_id"] = group_id
+        
+        # Memory manager'a geri kaydet
+        memory_manager.set_lottery_data(user_id, event_info)
+        
+        logger.info(f"🎯 GROUP SELECTED - User: {user_id}, Group ID: {group_id}")
         
         # Grup adını al
         from database import get_registered_groups
@@ -626,11 +681,16 @@ async def confirm_lottery_creation(callback: CallbackQuery):
             return
         
         user_id = callback.from_user.id
-        if user_id not in lottery_data:
+        
+        # Memory manager kullanarak event info'yu al
+        from utils.memory_manager import memory_manager
+        event_info = memory_manager.get_lottery_data(user_id)
+        if not event_info:
+            logger.error(f"❌ Çekiliş verisi bulunamadı - User: {user_id}")
             await callback.answer("❌ Çekiliş verisi bulunamadı!", show_alert=True)
             return
         
-        event_info = lottery_data[user_id]
+        logger.info(f"🎯 LOTTERY CREATION CONFIRMED - User: {user_id}, Event Info: {event_info}")
         
         # Etkinliği oluştur
         success, event_id = await create_event_in_db(event_info, user_id)
@@ -662,7 +722,7 @@ async def confirm_lottery_creation(callback: CallbackQuery):
                     group_message = f"""
 🚀 **YENİ ÇEKİLİŞ BAŞLADI!** 🚀
 
-{event_type} **{event_info.get('description', 'Çekiliş')}**
+{event_type} **{event_info.get('title', event_info.get('description', 'Çekiliş'))}**
 
 💰 **Katılım:** {event_info.get('entry_cost', 0):.2f} KP
 🏆 **Kazanan:** {event_info.get('max_winners', 1)} kişi  
@@ -672,8 +732,8 @@ async def confirm_lottery_creation(callback: CallbackQuery):
 🎮 **Katılmak için butona tıklayın!**
 🍀 **İyi şanslar!**
 
-<b>Not:</b> Kayıtlı değilseniz ve Kirve Point’iniz yoksa çekilişe katılamazsınız.
-Hala kayıtlı değilseniz, botun özel mesajına gidip <b>/kirvekayit</b> komutunu kullanın.
+**Not:** Kayıtlı değilseniz ve Kirve Point'iniz yoksa çekilişe katılamazsınız.
+Hala kayıtlı değilseniz, botun özel mesajına gidip **/kirvekayit** komutunu kullanın.
                     """
                     
                     # Grup mesajını gönder ve message_id'yi al
@@ -706,7 +766,8 @@ Hala kayıtlı değilseniz, botun özel mesajına gidip <b>/kirvekayit</b> komut
             )
         
         # Geçici veriyi temizle
-        del lottery_data[user_id]
+        memory_manager.clear_lottery_data(user_id)
+        logger.info(f"🧹 Lottery data temizlendi - User: {user_id}")
         
     except Exception as e:
         logger.error(f"❌ Event confirmation hatası: {e}")
@@ -753,10 +814,12 @@ async def create_event_in_db(event_info: Dict, admin_id: int) -> tuple[bool, int
             # Oluşturulan etkinliğin ID'sini al
             event_id = await conn.fetchval("SELECT id FROM events WHERE created_by = $1 ORDER BY created_at DESC LIMIT 1", admin_id)
             
-            # Event info'ya ID'yi ekle
+            # Event info'ya ID ve title'ı ekle
             event_info['id'] = event_id
+            event_info['title'] = title
+            event_info['event_type'] = event_info["type"]  # lottery veya bonus
             
-            logger.info(f"✅ Etkinlik başarıyla oluşturuldu: {event_info.get('description', 'Etkinlik')} - ID: {event_id}")
+            logger.info(f"✅ Etkinlik başarıyla oluşturuldu: {title} - ID: {event_id}")
             return True, event_id
             
     except Exception as e:

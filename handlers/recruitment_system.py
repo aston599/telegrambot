@@ -16,30 +16,30 @@ from config import get_config
 logger = logging.getLogger(__name__)
 
 # Sistem durumu
-recruitment_system_active = False  # Production için kapalı
-recruitment_interval = 7200  # 2 saat (saniye) - Spam önlemi
+recruitment_system_active = False  # Production için kapalı - Spam önlemi
+recruitment_interval = 14400  # 4 saat (saniye) - Daha az agresif
 
-# Spam koruması
+# Spam koruması - Daha uzun cooldown'lar
 last_recruitment_users = set()  # Son teşvik edilen kullanıcılar
 recruitment_cooldown = 86400  # 24 saat (saniye) - Aynı kullanıcıya tekrar mesaj gönderme süresi
 user_recruitment_times = {}  # Her kullanıcının son teşvik zamanı
-recruitment_message_cooldown = 60  # 1 dakika (60 saniye) - Kullanıcılar arası minimum süre
+recruitment_message_cooldown = 300  # 5 dakika (300 saniye) - Kullanıcılar arası minimum süre
 
-# Grup reply mesajları (kısa ve etkili - özelden yazmaya yönlendirici)
+# Grup reply mesajları (daha nazik ve az agresif)
 GROUP_REPLY_MESSAGES = [
-    "🎯 Kirvem! Özelden yaz, tüm bonusları anlatayım! 💎",
-    "💎 Kirve! Hala kayıtsız mısın? Özelden yaz, detayları vereyim! 🚀",
-    "🎮 Kirvem! Özelden yaz, Kirve Point sistemini anlatayım! 💎",
-    "💎 Kirve! Sistemde yoksun! Özelden yaz, her şeyi anlatayım! 🎯",
-    "🚀 Kirvem! Özelden yaz, market ve etkinlikleri anlatayım! 💎",
-    "💎 Kirve! Hala gruba kayıtlı değilsin! Özelden yaz! 🎮",
-    "🎯 Kirvem! Özelden yaz, günlük 5 KP kazanma sistemini anlatayım! 💎",
-    "💎 Kirve! Kayıt olmadan çok şey kaçırıyorsun! Özelden yaz! 🚀",
-    "🎮 Kirvem! Özelden yaz, çekiliş ve bonus sistemini anlatayım! 💎",
-    "💎 Kirve! Hala sistemde yoksun! Özelden yaz, tüm detayları vereyim! 🎯",
-    "🏆 Kirvem! Özelden yaz, sıralama sistemini anlatayım! 💎",
-    "🎯 Kirve! Özelden yaz, hızlı kazanım sistemini anlatayım! 🚀",
-    "💎 Kirvem! Özelden yaz, özel ayrıcalıkları anlatayım! 🎮"
+    "💎 Kirvem! Kayıt olmak ister misin? Özelden yazabilirsin!",
+    "🎯 Kirve! Sistemde kayıtlı değilsin. Özelden yaz, detayları vereyim!",
+    "💎 Kirvem! Kayıt olarak point kazanabilirsin. Özelden yaz!",
+    "🎮 Kirve! Hala kayıtsız mısın? Özelden yaz, sistemini anlatayım!",
+    "💎 Kirvem! Kayıt olarak etkinliklere katılabilirsin!",
+    "🎯 Kirve! Özelden yaz, market sistemini anlatayım!",
+    "💎 Kirvem! Kayıt olarak çok daha fazlasını kazanabilirsin!",
+    "🎮 Kirve! Özelden yaz, tüm özellikleri anlatayım!",
+    "💎 Kirvem! Kayıt olarak günlük point kazanabilirsin!",
+    "🎯 Kirve! Özelden yaz, bonus sistemini anlatayım!",
+    "💎 Kirvem! Kayıt olarak sıralamada yer alabilirsin!",
+    "🎮 Kirve! Özelden yaz, çekiliş sistemini anlatayım!",
+    "💎 Kirvem! Kayıt olarak özel ayrıcalıklar kazanabilirsin!"
 ]
 
 # Özel mesaj şablonları (daha etkili ve yönlendirici)

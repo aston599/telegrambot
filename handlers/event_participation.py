@@ -391,11 +391,14 @@ async def join_event_handler(callback: CallbackQuery):
         
         # Katılımcı sayısını güncelle
         try:
+            # Event type'ı belirle
+            event_type = "Genel Çekiliş" if event_info.get('event_type') == 'lottery' else "Chat Bonus"
+            
             # Grup mesajını güncelle
             group_message = f"""
-🚀 **YENİ ETKİNLİK BAŞLADI!** 🚀
+🚀 **YENİ ÇEKİLİŞ BAŞLADI!** 🚀
 
-{event_info['event_type']} **{event_info['title']}**
+{event_type} **{event_info['title']}**
 
 💰 **Katılım:** {event_info['entry_cost']:.2f} KP
 🏆 **Kazanan:** {event_info['max_winners']} kişi  
@@ -404,10 +407,13 @@ async def join_event_handler(callback: CallbackQuery):
 
 🎮 **Katılmak için butona tıklayın!**
 🍀 **İyi şanslar!**
+
+**Not:** Kayıtlı değilseniz ve Kirve Point'iniz yoksa çekilişe katılamazsınız.
+Hala kayıtlı değilseniz, botun özel mesajına gidip **/kirvekayit** komutunu kullanın.
             """
             
             keyboard = InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="🎲 Etkinliğe Katıl 🎲", callback_data=f"join_event_{event_id}")]
+                [InlineKeyboardButton(text="🎲 Çekilişe Katıl 🎲", callback_data=f"join_event_{event_id}")]
             ])
             
             await callback.message.edit_text(
@@ -636,14 +642,19 @@ async def end_event_handler(callback: CallbackQuery):
             for winner in winners:
                 try:
                     winner_message = f"""
-🎉 **Tebrikler! Kazandınız!**
+🎉 **TEBRİKLER! ÇEKİLİŞİ KAZANDINIZ!** 🎉
 
 **🎯 Etkinlik:** {event_info['title']}
 **🏆 Kazanan:** {winner['first_name']}
-**💰 Ödül:** {winner['payment_amount']:.2f} KP
+**💸 Katılım Bedeli:** {winner['payment_amount']:.2f} KP
 **📅 Tarih:** {datetime.now().strftime('%d.%m.%Y %H:%M')}
 
-**Tebrikler! Etkinlikte kazandınız!**
+🎁 **Ödülünüz Hakkında:**
+• Çekiliş ödülünüz için yöneticiler kısa süre içinde sizinle iletişime geçecek
+• Lütfen bot mesajlarını takip edin
+• Ödül teslimi için gerekli bilgiler size özel olarak gönderilecek
+
+🎊 **Tebrikler! Şanslı gününüz!** 🎊
                     """
                     
                     await _bot_instance.send_message(

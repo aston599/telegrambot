@@ -12,7 +12,7 @@ from typing import Dict, Any
 
 from config import get_config
 from database import db_pool, get_db_pool
-from utils.logger import logger
+from utils.logger import logger, log_important
 from handlers.recruitment_system import toggle_recruitment_system, get_recruitment_status, set_recruitment_interval
 
 router = Router()
@@ -79,7 +79,7 @@ async def admin_panel_command(message: Message) -> None:
         user_id = message.from_user.id
         config = get_config()
         
-        logger.info(f"🛡️ ADMIN PANEL DEBUG - User: {user_id}, Text: '{message.text}'")
+        # logger.info(f"🛡️ ADMIN PANEL DEBUG - User: {user_id}, Text: '{message.text}'")
         
         # Admin kontrolü
         if user_id != config.ADMIN_USER_ID:
@@ -176,7 +176,7 @@ async def admin_panel_callback(callback: types.CallbackQuery) -> None:
         logger.info(f"🔍 Callback data: {action} - User: {user_id}")
         
         # Debug: Tüm callback'leri logla
-        logger.info(f"🔍 CALLBACK DEBUG - Action: {action}, User: {user_id}")
+        # logger.info(f"🔍 CALLBACK DEBUG - Action: {action}, User: {user_id}")
         
         # Debug: Bilinmeyen callback'leri logla
         if action not in ["admin_settings", "admin_events_system", "admin_broadcast", "admin_market_management", 
@@ -186,7 +186,8 @@ async def admin_panel_callback(callback: types.CallbackQuery) -> None:
                          "event_commands", "system_commands", "admin_market", "admin_market_add",
                          "admin_system_management", "admin_points_settings", "admin_daily_limit", "admin_weekly_limit",
                          "set_points_custom", "set_daily_custom", "set_weekly_custom"]:
-            logger.info(f"🔍 UNKNOWN CALLBACK - Action: {action}, User: {user_id}")
+            # logger.info(f"🔍 UNKNOWN CALLBACK - Action: {action}, User: {user_id}")
+            pass
         
         # YENİ BUTON SİSTEMİ - Görseldeki düzen
         if action == "admin_settings":
@@ -314,6 +315,8 @@ async def admin_panel_callback(callback: types.CallbackQuery) -> None:
         # SİSTEM YÖNETİMİ CALLBACK'LERİ
         elif action == "admin_system_management":
             await show_system_management_menu(callback)
+        elif action == "admin_link_commands":
+            await show_link_commands_menu(callback)
         elif action == "admin_points_settings":
             await show_points_settings_menu(callback)
         elif action == "admin_daily_limit":
@@ -370,15 +373,67 @@ async def admin_panel_callback(callback: types.CallbackQuery) -> None:
             await show_admin_commands_list(callback)
 
         elif action == "admin_lottery_create":
-            await create_lottery_from_admin_commands(callback)
+            # Direkt çekiliş oluşturma işlemini başlat
+            try:
+                user_id = callback.from_user.id
+                config = get_config()
+                
+                logger.info(f"🎲 DIRECT LOTTERY CREATE - User: {user_id}")
+                
+                # Admin kontrolü
+                if user_id != config.ADMIN_USER_ID:
+                    await callback.answer("❌ Bu işlem için admin yetkisi gerekli!", show_alert=True)
+                    return
+                
+                # Memory manager kullanarak çekiliş oluşturma işlemini başlat
+                from utils.memory_manager import memory_manager
+                
+                lottery_data = {
+                    "type": "lottery",
+                    "step": "cost",
+                    "created_at": datetime.now()
+                }
+                
+                memory_manager.set_lottery_data(user_id, lottery_data)
+                memory_manager.set_input_state(user_id, "lottery_cost")
+                
+                logger.info(f"🎯 LOTTERY DATA SET FROM ADMIN - User: {user_id}, Step: cost, Data: {lottery_data}")
+                
+                keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                    [InlineKeyboardButton(text="❌ İptal", callback_data="lottery_cancel")]
+                ])
+                
+                await callback.message.edit_text(
+                    "🎲 **Çekiliş Oluşturma**\n\n"
+                    "Katılım ücreti kaç Kirve Point olsun?\n"
+                    "Örnek: `10` veya `5.50`\n\n"
+                    "**Lütfen ücreti yazın:**",
+                    parse_mode="Markdown",
+                    reply_markup=keyboard
+                )
+                
+                logger.info(f"✅ Çekiliş oluşturma başlatıldı - User: {user_id}")
+                
+            except Exception as e:
+                logger.error(f"❌ Çekiliş oluşturma hatası: {e}")
+                await callback.answer("❌ Çekiliş oluşturma sırasında hata oluştu!", show_alert=True)
         elif action == "create_lottery_command":
             await execute_lottery_create_command(callback)
         elif action == "list_lotteries_command":
             await execute_list_lotteries_command(callback)
         elif action == "admin_scheduled_messages":
             logger.info(f"🔍 SCHEDULED MESSAGES CALLBACK YAKALANDI - User: {user_id}")
-            from handlers.scheduled_messages import show_scheduled_messages_menu
-            await show_scheduled_messages_menu(callback)
+            try:
+                from handlers.scheduled_messages import show_scheduled_messages_menu
+                logger.info(f"✅ show_scheduled_messages_menu import edildi")
+                await show_scheduled_messages_menu(callback)
+                logger.info(f"✅ show_scheduled_messages_menu çalıştırıldı")
+            except Exception as e:
+                logger.error(f"❌ SCHEDULED MESSAGES HATA: {e}")
+                import traceback
+                logger.error(f"❌ TRACEBACK: {traceback.format_exc()}")
+                await callback.answer("⚠️ Zamanlanmış mesajlar menüsü açılamadı!")
+                return
         elif action == "scheduled_back":
             from handlers.scheduled_messages import show_scheduled_messages_menu
             await show_scheduled_messages_menu(callback)
@@ -386,6 +441,22 @@ async def admin_panel_callback(callback: types.CallbackQuery) -> None:
             await show_link_commands_menu(callback)
         elif action == "admin_scheduled_commands":
             await show_scheduled_commands_menu(callback)
+        elif action == "create_link_command":
+            from handlers.dynamic_command_creator import start_command_creation
+            await start_command_creation(callback)
+        elif action == "list_link_commands":
+            await show_link_commands_list(callback)
+        elif action == "manage_link_commands":
+            await show_link_commands_management(callback)
+        elif action == "link_stats":
+            await show_link_commands_stats(callback)
+        elif action == "admin_list_commands":
+            from handlers.dynamic_command_creator import list_custom_commands_handler
+            await list_custom_commands_handler(callback)
+        elif action == "lottery_confirm_create":
+            await handle_lottery_confirm_create(callback)
+        elif action == "lottery_cancel":
+            await handle_lottery_cancel(callback)
         elif action == "admin_restart_confirm":
             """Bot restart onayı"""
             try:
@@ -3985,30 +4056,34 @@ async def create_lottery_from_admin_commands(callback: types.CallbackQuery) -> N
         # Callback answer
         await callback.answer("🎲 Çekiliş oluşturma başlatılıyor...", show_alert=True)
         
-        # Çekiliş oluşturma mesajı
-        response = """
-🎲 **ÇEKİLİŞ OLUŞTURMA SİSTEMİ**
-
-**Çekiliş oluşturmak için aşağıdaki komutu kullanın:**
-
-`/cekilisyap`
-
-**Veya aşağıdaki butona tıklayın:**
-        """
+        # Memory manager kullanarak çekiliş oluşturma işlemini başlat
+        from utils.memory_manager import memory_manager
+        
+        lottery_data = {
+            "type": "lottery",
+            "step": "cost",
+            "created_at": datetime.now()
+        }
+        
+        memory_manager.set_lottery_data(user_id, lottery_data)
+        memory_manager.set_input_state(user_id, "lottery_cost")
+        
+        logger.info(f"🎯 LOTTERY DATA SET FROM ADMIN - User: {user_id}, Step: cost, Data: {lottery_data}")
         
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="🎲 Çekiliş Oluştur", callback_data="create_lottery_command")],
-            [InlineKeyboardButton(text="📋 Mevcut Çekilişler", callback_data="list_lotteries_command")],
-            [InlineKeyboardButton(text="🛡️ Admin Komutları", callback_data="admin_commands_list")]
+            [InlineKeyboardButton(text="❌ İptal", callback_data="lottery_cancel")]
         ])
         
         await callback.message.edit_text(
-            response,
+            "🎲 **Çekiliş Oluşturma**\n\n"
+            "Katılım ücreti kaç Kirve Point olsun?\n"
+            "Örnek: `10` veya `5.50`\n\n"
+            "**Lütfen ücreti yazın:**",
             parse_mode="Markdown",
             reply_markup=keyboard
         )
         
-        logger.info(f"✅ Çekiliş oluşturma menüsü gösterildi - User: {user_id}")
+        logger.info(f"✅ Çekiliş oluşturma başlatıldı - User: {user_id}")
         
     except Exception as e:
         logger.error(f"❌ Çekiliş oluşturma hatası: {e}")
@@ -5056,4 +5131,355 @@ async def show_scheduled_commands_menu(callback: types.CallbackQuery) -> None:
         
     except Exception as e:
         logger.error(f"❌ Zamanlanmış komutlar menüsü hatası: {e}")
+        await callback.answer("❌ Bir hata oluştu!", show_alert=True)
+
+async def show_link_commands_list(callback: types.CallbackQuery) -> None:
+    """Link komutları listesi"""
+    try:
+        from handlers.dynamic_command_creator import get_all_custom_commands
+        
+        commands = await get_all_custom_commands()
+        link_commands = [cmd for cmd in commands if cmd.get("type") == "link"]
+        
+        if not link_commands:
+            response = """
+🔗 **Link Komutları Listesi**
+
+❌ **Henüz link komutu oluşturulmamış!**
+
+**Yeni link komutu oluşturmak için:**
+• "➕ Yeni Link Komutu" butonuna tıklayın
+• Komut adını girin (örn: site)
+• Link URL'sini girin
+• Açıklama ekleyin (opsiyonel)
+            """
+        else:
+            response = f"""
+🔗 **Link Komutları Listesi**
+
+**Toplam:** {len(link_commands)} komut
+
+"""
+            for i, cmd in enumerate(link_commands, 1):
+                status = "✅" if cmd.get("active") else "❌"
+                response += f"""
+**{i}. {status} !{cmd['command']}**
+📝 **Açıklama:** {cmd.get('description', 'Açıklama yok')}
+🔗 **Link:** {cmd.get('content', 'Link yok')}
+📊 **Kullanım:** {cmd.get('usage_count', 0)} kez
+📅 **Oluşturulma:** {cmd.get('created_at', 'Bilinmiyor')}
+
+"""
+        
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [
+                InlineKeyboardButton(text="➕ Yeni Komut", callback_data="create_link_command"),
+                InlineKeyboardButton(text="⚙️ Yönetim", callback_data="manage_link_commands")
+            ],
+            [
+                InlineKeyboardButton(text="⬅️ Geri", callback_data="admin_link_commands")
+            ]
+        ])
+        
+        await callback.message.edit_text(response, parse_mode="Markdown", reply_markup=keyboard)
+        
+    except Exception as e:
+        logger.error(f"❌ Link komutları listesi hatası: {e}")
+        await callback.answer("❌ Bir hata oluştu!", show_alert=True)
+
+async def show_link_commands_management(callback: types.CallbackQuery) -> None:
+    """Link komutları yönetimi"""
+    try:
+        from handlers.dynamic_command_creator import get_all_custom_commands
+        
+        commands = await get_all_custom_commands()
+        link_commands = [cmd for cmd in commands if cmd.get("type") == "link"]
+        
+        if not link_commands:
+            response = """
+⚙️ **Link Komutları Yönetimi**
+
+❌ **Yönetilecek komut bulunamadı!**
+
+Önce link komutu oluşturun.
+            """
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="➕ Yeni Komut", callback_data="create_link_command")],
+                [InlineKeyboardButton(text="⬅️ Geri", callback_data="admin_link_commands")]
+            ])
+        else:
+            response = f"""
+⚙️ **Link Komutları Yönetimi**
+
+**Toplam:** {len(link_commands)} komut
+
+**Yönetim Seçenekleri:**
+            """
+            
+            # Her komut için buton oluştur
+            keyboard_buttons = []
+            for cmd in link_commands[:8]:  # Maksimum 8 komut
+                status = "🟢" if cmd.get("active") else "🔴"
+                keyboard_buttons.append([
+                    InlineKeyboardButton(
+                        text=f"{status} !{cmd['command']}", 
+                        callback_data=f"manage_link_{cmd['command']}"
+                    )
+                ])
+            
+            keyboard_buttons.extend([
+                [InlineKeyboardButton(text="⬅️ Geri", callback_data="admin_link_commands")]
+            ])
+            
+            keyboard = InlineKeyboardMarkup(inline_keyboard=keyboard_buttons)
+        
+        await callback.message.edit_text(response, parse_mode="Markdown", reply_markup=keyboard)
+        
+    except Exception as e:
+        logger.error(f"❌ Link komutları yönetimi hatası: {e}")
+        await callback.answer("❌ Bir hata oluştu!", show_alert=True)
+
+async def show_link_commands_stats(callback: types.CallbackQuery) -> None:
+    """Link komutları istatistikleri"""
+    try:
+        from handlers.dynamic_command_creator import get_all_custom_commands
+        
+        commands = await get_all_custom_commands()
+        link_commands = [cmd for cmd in commands if cmd.get("type") == "link"]
+        
+        if not link_commands:
+            response = """
+📊 **Link Komutları İstatistikleri**
+
+❌ **Henüz link komutu oluşturulmamış!**
+
+İstatistik görmek için önce link komutu oluşturun.
+            """
+        else:
+            active_commands = [cmd for cmd in link_commands if cmd.get("active")]
+            total_usage = sum(cmd.get("usage_count", 0) for cmd in link_commands)
+            most_used = max(link_commands, key=lambda x: x.get("usage_count", 0)) if link_commands else None
+            
+            response = f"""
+📊 **Link Komutları İstatistikleri**
+
+**Genel Bilgiler:**
+• **Toplam Komut:** {len(link_commands)}
+• **Aktif Komut:** {len(active_commands)}
+• **Pasif Komut:** {len(link_commands) - len(active_commands)}
+• **Toplam Kullanım:** {total_usage} kez
+
+**En Çok Kullanılan:**
+"""
+            if most_used:
+                response += f"• **!{most_used['command']}** - {most_used.get('usage_count', 0)} kez kullanıldı"
+            else:
+                response += "• Henüz kullanım yok"
+            
+            response += f"""
+
+**Kullanım Dağılımı:**
+"""
+            for cmd in link_commands[:5]:  # İlk 5 komut
+                response += f"• **!{cmd['command']}** - {cmd.get('usage_count', 0)} kez\n"
+        
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [
+                InlineKeyboardButton(text="📋 Tüm Komutlar", callback_data="list_link_commands"),
+                InlineKeyboardButton(text="⚙️ Yönetim", callback_data="manage_link_commands")
+            ],
+            [
+                InlineKeyboardButton(text="⬅️ Geri", callback_data="admin_link_commands")
+            ]
+        ])
+        
+        await callback.message.edit_text(response, parse_mode="Markdown", reply_markup=keyboard)
+        
+    except Exception as e:
+        logger.error(f"❌ Link komutları istatistikleri hatası: {e}")
+        await callback.answer("❌ Bir hata oluştu!", show_alert=True)
+
+async def handle_lottery_input(message: types.Message) -> None:
+    """Çekiliş input handler"""
+    try:
+        user_id = message.from_user.id
+        from utils.memory_manager import memory_manager
+        
+        logger.info(f"🎯 LOTTERY INPUT HANDLER CALLED - User: {user_id}, Text: '{message.text}'")
+        
+        # Input state'i al
+        input_state = memory_manager.get_input_state(user_id)
+        logger.info(f"🎯 LOTTERY INPUT DEBUG - User: {user_id}, Input State: {input_state}")
+        
+        if not input_state or not input_state.startswith("lottery_"):
+            logger.info(f"🎯 LOTTERY INPUT REJECTED - User: {user_id}, Input State: {input_state}")
+            return
+        
+        # Çekiliş verilerini al
+        lottery_data = memory_manager.get_lottery_data(user_id)
+        if not lottery_data:
+            await message.answer("❌ Çekiliş verisi bulunamadı!")
+            memory_manager.clear_input_state(user_id)
+            return
+        
+        step = lottery_data.get("step", "")
+        text = message.text.strip()
+        
+        logger.info(f"🎯 LOTTERY INPUT - User: {user_id}, Step: {step}, Text: {text}")
+        
+        # Input state'e göre işle
+        if input_state == "lottery_cost":
+            try:
+                cost = float(text)
+                if cost < 0:
+                    await message.answer("❌ Maliyet 0'dan küçük olamaz!")
+                    return
+                
+                lottery_data["cost"] = cost
+                lottery_data["step"] = "prize"
+                memory_manager.set_lottery_data(user_id, lottery_data)
+                memory_manager.set_input_state(user_id, "lottery_prize")
+                
+                await message.answer("💰 **Ödül Miktarı**\n\nÇekiliş ödülü ne kadar olsun?")
+                
+            except ValueError:
+                await message.answer("❌ Geçerli bir sayı girin!")
+                return
+                
+        elif input_state == "lottery_prize":
+            try:
+                prize = float(text)
+                if prize < 0:
+                    await message.answer("❌ Ödül 0'dan küçük olamaz!")
+                    return
+                
+                lottery_data["prize"] = prize
+                lottery_data["step"] = "duration"
+                memory_manager.set_lottery_data(user_id, lottery_data)
+                memory_manager.set_input_state(user_id, "lottery_duration")
+                
+                await message.answer("⏰ **Çekiliş Süresi**\n\nÇekiliş kaç saat sürsün? (1-168 saat)")
+                
+            except ValueError:
+                await message.answer("❌ Geçerli bir sayı girin!")
+                return
+                
+        elif input_state == "lottery_duration":
+            try:
+                duration = int(text)
+                if duration < 1 or duration > 168:
+                    await message.answer("❌ Süre 1-168 saat arasında olmalı!")
+                    return
+                
+                lottery_data["duration"] = duration
+                lottery_data["step"] = "description"
+                memory_manager.set_lottery_data(user_id, lottery_data)
+                memory_manager.set_input_state(user_id, "lottery_description")
+                
+                await message.answer("📝 **Çekiliş Açıklaması**\n\nÇekiliş açıklamasını yazın:")
+                
+            except ValueError:
+                await message.answer("❌ Geçerli bir sayı girin!")
+                return
+                
+        elif input_state == "lottery_description":
+            if len(text) < 10:
+                await message.answer("❌ Açıklama en az 10 karakter olmalı!")
+                return
+            
+            lottery_data["description"] = text
+            lottery_data["step"] = "confirm"
+            memory_manager.set_lottery_data(user_id, lottery_data)
+            
+            # Özet göster
+            cost = lottery_data.get("cost", 0)
+            prize = lottery_data.get("prize", 0)
+            duration = lottery_data.get("duration", 0)
+            description = lottery_data.get("description", "")
+            
+            summary = f"""
+🎲 **ÇEKİLİŞ ÖZETİ**
+
+💰 **Maliyet:** {cost} puan
+🏆 **Ödül:** {prize} puan
+⏰ **Süre:** {duration} saat
+📝 **Açıklama:** {description}
+
+✅ Çekilişi oluşturmak istiyor musunuz?
+            """
+            
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="✅ Oluştur", callback_data="lottery_confirm_create")],
+                [InlineKeyboardButton(text="❌ İptal", callback_data="lottery_cancel")]
+            ])
+            
+            await message.answer(summary, parse_mode="Markdown", reply_markup=keyboard)
+            
+        # Input state'i temizle
+        memory_manager.clear_input_state(user_id)
+        
+    except Exception as e:
+        logger.error(f"❌ Çekiliş input hatası: {e}")
+        await message.answer("❌ Bir hata oluştu!")
+        from utils.memory_manager import memory_manager
+        memory_manager.clear_input_state(user_id)
+
+async def handle_lottery_confirm_create(callback: types.CallbackQuery) -> None:
+    """Çekiliş oluşturma onayı"""
+    try:
+        user_id = callback.from_user.id
+        from utils.memory_manager import memory_manager
+        
+        # Çekiliş verilerini al
+        lottery_data = memory_manager.get_lottery_data(user_id)
+        if not lottery_data:
+            await callback.answer("❌ Çekiliş verisi bulunamadı!", show_alert=True)
+            return
+        
+        # Çekilişi veritabanına kaydet
+        from database import get_db_pool
+        pool = await get_db_pool()
+        async with pool.acquire() as conn:
+            await conn.execute('''
+                INSERT INTO events (name, description, entry_fee, prize_pool, duration_hours, created_by, status)
+                VALUES ($1, $2, $3, $4, $5, $6, 'active')
+            ''', 
+            f"Çekiliş - {lottery_data.get('description', '')[:30]}",
+            lottery_data.get('description', ''),
+            lottery_data.get('cost', 0),
+            lottery_data.get('prize', 0),
+            lottery_data.get('duration', 24),
+            user_id
+            )
+        
+        # Verileri temizle
+        memory_manager.clear_lottery_data(user_id)
+        memory_manager.clear_input_state(user_id)
+        
+        await callback.answer("✅ Çekiliş başarıyla oluşturuldu!", show_alert=True)
+        
+        # Ana menüye dön
+        await show_main_admin_menu(callback)
+        
+    except Exception as e:
+        logger.error(f"❌ Çekiliş oluşturma hatası: {e}")
+        await callback.answer("❌ Çekiliş oluşturulamadı!", show_alert=True)
+
+async def handle_lottery_cancel(callback: types.CallbackQuery) -> None:
+    """Çekiliş iptal"""
+    try:
+        user_id = callback.from_user.id
+        from utils.memory_manager import memory_manager
+        
+        # Verileri temizle
+        memory_manager.clear_lottery_data(user_id)
+        memory_manager.clear_input_state(user_id)
+        
+        await callback.answer("❌ Çekiliş iptal edildi!", show_alert=True)
+        
+        # Ana menüye dön
+        await show_main_admin_menu(callback)
+        
+    except Exception as e:
+        logger.error(f"❌ Çekiliş iptal hatası: {e}")
         await callback.answer("❌ Bir hata oluştu!", show_alert=True)

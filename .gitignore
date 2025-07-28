@@ -1,0 +1,9 @@
+﻿.env
+__pycache__/
+*.pyc
+venv/
+*.log
+bot_running.lock
+.DS_Store
+.vscode/
+.idea/

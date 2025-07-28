@@ -13,8 +13,8 @@ logger = logging.getLogger(__name__)
 
 def setup_logger():
     """Logger'ı kur"""
-    # Production için log seviyesini ayarla
-    log_level = logging.INFO  # DEBUG yerine INFO
+    # Production için log seviyesini ayarla - Daha az log
+    log_level = logging.INFO  # WARNING yerine INFO - Bot çalıştığını görmek için
     
     # Logger'ı yapılandır
     logging.basicConfig(
