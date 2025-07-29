@@ -317,24 +317,33 @@ async def scheduled_message_task(bot: Bot):
             logger.error(f"❌ Zamanlanmış mesaj görevinde hata: {e}")
             await asyncio.sleep(60)  # Hata durumunda 1 dakika bekle
 
-async def start_scheduled_messages(bot: Bot) -> bool:
+async def start_scheduled_messages(bot):
     """Zamanlanmış mesajları başlat"""
-    global scheduled_messages_active, scheduled_task
-    
     try:
-        if scheduled_messages_active:
-            logger.warning("⚠️ Zamanlanmış mesajlar zaten aktif!")
-            return False
-            
-        scheduled_messages_active = True
-        scheduled_task = asyncio.create_task(scheduled_message_task(bot))
+        # logger.info("✅ Zamanlanmış mesajlar başlatıldı")
         
-        logger.info("✅ Zamanlanmış mesajlar başlatıldı")
-        return True
+        # BOT_PROFILES'i yükle
+        settings = await get_scheduled_settings()
+        global BOT_PROFILES
+        BOT_PROFILES = settings.get('bot_profiles', {})
         
+        # logger.info(f"🔍 DEBUG - BOT_PROFILES güncellendi: {list(BOT_PROFILES.keys())}")
+        
+        # Active bots'ları kontrol et
+        active_bots = {}
+        for bot_id, profile in BOT_PROFILES.items():
+            active_bots[bot_id] = profile.get('active', False)
+        
+        # logger.info(f"🔍 DEBUG - Active bots: {active_bots}")
+        # logger.info(f"🔍 DEBUG - BOT_PROFILES keys: {list(BOT_PROFILES.keys())}")
+        
+        # Her bot için ayrı task başlat
+        for bot_id, profile in BOT_PROFILES.items():
+            if profile.get('active', False):
+                asyncio.create_task(scheduled_message_task(bot, bot_id, profile))
+                
     except Exception as e:
-        logger.error(f"❌ Zamanlanmış mesajlar başlatılırken hata: {e}")
-        return False
+        logger.error(f"❌ Scheduled messages başlatma hatası: {e}")
 
 async def stop_scheduled_messages() -> bool:
     """Zamanlanmış mesajları durdur"""
@@ -648,6 +657,21 @@ async def scheduled_messages_command(message: Message) -> None:
         user_id = message.from_user.id
         config = get_config()
         
+        # 🔥 GRUP SESSİZLİK: Grup chatindeyse sil ve özel mesajla yanıt ver
+        if message.chat.type != "private":
+            try:
+                await message.delete()
+                logger.info(f"🔇 Scheduled messages komutu mesajı silindi - Group: {message.chat.id}")
+                
+                # ÖZELİNDE YANIT VER
+                if _bot_instance:
+                    await _send_scheduled_messages_privately(user_id)
+                return
+                
+            except Exception as e:
+                logger.error(f"❌ Komut mesajı silinemedi: {e}")
+                return
+        
         if user_id != config.ADMIN_USER_ID:
             await message.answer("❌ Bu komutu sadece admin kullanabilir!")
             return
@@ -691,6 +715,66 @@ async def scheduled_messages_command(message: Message) -> None:
         logger.error(f"❌ Zamanlanmış mesajlar komutu hatası: {e}")
         await message.answer("❌ Bir hata oluştu!")
 
+async def _send_scheduled_messages_privately(user_id: int):
+    """Scheduled messages mesajını özel mesajla gönder"""
+    try:
+        if not _bot_instance:
+            logger.error("❌ Bot instance bulunamadı!")
+            return
+        
+        # Admin kontrolü
+        from config import get_config
+        config = get_config()
+        if user_id != config.ADMIN_USER_ID:
+            await _bot_instance.send_message(user_id, "❌ Bu komutu sadece admin kullanabilir!")
+            return
+        
+        status = await get_scheduled_status()
+        
+        response = f"""
+📅 **Zamanlanmış Mesajlar Sistemi**
+
+**Mevcut Botlar:**
+        """
+        
+        for bot_id in status.get('available_bots', []):
+            profile = status.get('bot_profiles', {}).get(bot_id, {})
+            active = status.get('active_bots', {}).get(bot_id, False)
+            active_mark = "✅" if active else "❌"
+            response += f"• {active_mark} {profile.get('name', bot_id)} ({profile.get('interval', 30)}dk)\n"
+            
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="⚙️ Bot Yönetimi",
+                    callback_data="scheduled_bot_management"
+                ),
+                InlineKeyboardButton(
+                    text="📊 Durum",
+                    callback_data="scheduled_status"
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text="⬅️ Geri",
+                    callback_data="admin_system_management"
+                )
+            ]
+        ])
+        
+        await _bot_instance.send_message(
+            user_id,
+            response,
+            parse_mode="Markdown",
+            reply_markup=keyboard
+        )
+        
+        logger.info(f"✅ Scheduled messages mesajı özel mesajla gönderildi - User: {user_id}")
+        
+    except Exception as e:
+        logger.error(f"❌ Private scheduled messages hatası: {e}")
+        await _bot_instance.send_message(user_id, "❌ Zamanlanmış mesajlar gönderilemedi!")
+
 async def scheduled_callback_handler(callback) -> None:
     """Zamanlanmış mesajlar callback handler"""
     try:
@@ -712,7 +796,7 @@ async def scheduled_callback_handler(callback) -> None:
         elif action == "scheduled_status":
             await show_scheduled_status_menu(callback)
             
-        elif action.startswith("toggle_bot_"):
+        elif action and action.startswith("toggle_bot_"):
             # Callback data formatı: toggle_bot_{bot_id}
             action_parts = action.split("_")
             if len(action_parts) < 3:
@@ -728,7 +812,7 @@ async def scheduled_callback_handler(callback) -> None:
             else:
                 await callback.answer("❌ Bot durumu değiştirme hatası!", show_alert=True)
                 
-        elif action.startswith("edit_bot_"):
+        elif action and action.startswith("edit_bot_"):
             # Callback data formatı: edit_bot_{bot_id}
             # bot_id içinde _ olabileceği için daha güvenli parsing
             action_parts = action.split("_")
@@ -739,7 +823,7 @@ async def scheduled_callback_handler(callback) -> None:
             bot_id = "_".join(action_parts[2:])  # 2. indeksten sonuna kadar
             await show_bot_edit_menu(callback, bot_id)
             
-        elif action.startswith("bot_toggle_"):
+        elif action and action.startswith("bot_toggle_"):
             # Callback data formatı: bot_toggle_{bot_id}
             # bot_id içinde _ olabileceği için daha güvenli parsing
             action_parts = action.split("_")
@@ -767,7 +851,7 @@ async def scheduled_callback_handler(callback) -> None:
         elif action == "scheduled_back":
             await show_scheduled_messages_menu(callback)
             
-        elif action.startswith("add_link_"):
+        elif action and action.startswith("add_link_"):
             # Link ekleme işlemi
             bot_id = action.replace("add_link_", "")
             logger.info(f"🔍 Link ekleme başlatıldı - bot_id: {bot_id}")
@@ -794,7 +878,7 @@ async def scheduled_callback_handler(callback) -> None:
             await callback.message.edit_text(response, parse_mode="Markdown", reply_markup=keyboard)
             await callback.answer()
             
-        elif action.startswith("create_bot_profile"):
+        elif action and action.startswith("create_bot_profile"):
             # Bot oluşturma input state'ini başlat
             from utils.memory_manager import memory_manager
             memory_manager.set_input_state(user_id, "create_bot_name")
@@ -815,7 +899,7 @@ async def scheduled_callback_handler(callback) -> None:
             await callback.message.edit_text(response, parse_mode="Markdown", reply_markup=keyboard)
             await callback.answer("Bot adı bekleniyor...")
             
-        elif action.startswith("create_bot_link_yes_"):
+        elif action and action.startswith("create_bot_link_yes_"):
             # Link evet seçildi
             # Callback data formatı: create_bot_link_yes_{bot_id}
             # bot_id içinde _ olabileceği için daha güvenli parsing
@@ -850,7 +934,7 @@ async def scheduled_callback_handler(callback) -> None:
             await callback.message.edit_text(response, parse_mode="Markdown", reply_markup=keyboard)
             await callback.answer("Link URL bekleniyor...")
             
-        elif action.startswith("create_bot_link_no_"):
+        elif action and action.startswith("create_bot_link_no_"):
             # Link hayır seçildi - Grup seçimine geç
             # Callback data formatı: create_bot_link_no_{bot_id}
             # bot_id içinde _ olabileceği için daha güvenli parsing
@@ -902,7 +986,7 @@ async def scheduled_callback_handler(callback) -> None:
             
             await callback.message.edit_text(response, parse_mode="Markdown", reply_markup=keyboard)
             
-        elif action.startswith("select_bot_group_"):
+        elif action and action.startswith("select_bot_group_"):
             # Grup seçildi
             # Callback data formatı: select_bot_group_{bot_id}_{group_id}
             # bot_id içinde _ olabileceği için daha güvenli parsing
@@ -964,7 +1048,7 @@ async def scheduled_callback_handler(callback) -> None:
             
             await callback.message.edit_text(confirmation, parse_mode="Markdown", reply_markup=keyboard)
                 
-        elif action.startswith("edit_messages_"):
+        elif action and action.startswith("edit_messages_"):
             # Callback data formatı: edit_messages_{bot_id}
             action_parts = action.split("_")
             if len(action_parts) < 3:
@@ -973,7 +1057,7 @@ async def scheduled_callback_handler(callback) -> None:
             bot_id = "_".join(action_parts[2:])
             await show_edit_messages_menu(callback, bot_id)
             
-        elif action.startswith("edit_interval_"):
+        elif action and action.startswith("edit_interval_"):
             # Callback data formatı: edit_interval_{bot_id}
             action_parts = action.split("_")
             if len(action_parts) < 3:
@@ -982,7 +1066,7 @@ async def scheduled_callback_handler(callback) -> None:
             bot_id = "_".join(action_parts[2:])
             await show_edit_interval_menu(callback, bot_id)
             
-        elif action.startswith("edit_link_"):
+        elif action and action.startswith("edit_link_"):
             # Callback data formatı: edit_link_{bot_id}
             action_parts = action.split("_")
             if len(action_parts) < 3:
@@ -991,7 +1075,7 @@ async def scheduled_callback_handler(callback) -> None:
             bot_id = "_".join(action_parts[2:])
             await show_edit_link_menu(callback, bot_id)
             
-        elif action.startswith("edit_image_"):
+        elif action and action.startswith("edit_image_"):
             # Callback data formatı: edit_image_{bot_id}
             action_parts = action.split("_")
             if len(action_parts) < 3:
@@ -1000,7 +1084,7 @@ async def scheduled_callback_handler(callback) -> None:
             bot_id = "_".join(action_parts[2:])
             await show_edit_image_menu(callback, bot_id)
             
-        elif action.startswith("edit_name_"):
+        elif action and action.startswith("edit_name_"):
             # Callback data formatı: edit_name_{bot_id}
             action_parts = action.split("_")
             if len(action_parts) < 3:
@@ -1009,7 +1093,7 @@ async def scheduled_callback_handler(callback) -> None:
             bot_id = "_".join(action_parts[2:])
             await show_edit_name_menu(callback, bot_id)
             
-        elif action.startswith("set_interval_"):
+        elif action and action.startswith("set_interval_"):
             # Callback data formatı: set_interval_{bot_id}_{interval}
             action_parts = action.split("_")
             if len(action_parts) < 4:
@@ -1025,7 +1109,7 @@ async def scheduled_callback_handler(callback) -> None:
             else:
                 await callback.answer("❌ Aralık ayarlama hatası!", show_alert=True)
                 
-        elif action.startswith("send_message_"):
+        elif action and action.startswith("send_message_"):
             # Callback data formatı: send_message_{bot_id}
             action_parts = action.split("_")
             if len(action_parts) < 3:
@@ -1034,7 +1118,7 @@ async def scheduled_callback_handler(callback) -> None:
             bot_id = "_".join(action_parts[2:])
             await send_immediate_message(callback, bot_id)
             
-        elif action.startswith("recreate_bot_"):
+        elif action and action.startswith("recreate_bot_"):
             # Callback data formatı: recreate_bot_{bot_id}
             action_parts = action.split("_")
             if len(action_parts) < 3:
@@ -1044,7 +1128,7 @@ async def scheduled_callback_handler(callback) -> None:
             logger.info(f"🔍 Recreate bot callback - action: {action}, bot_id: {bot_id}, BOT_PROFILES keys: {list(BOT_PROFILES.keys())}")
             await start_bot_recreation(callback, bot_id)
             
-        elif action.startswith("delete_bot_"):
+        elif action and action.startswith("delete_bot_"):
             # Callback data formatı: delete_bot_{bot_id}
             action_parts = action.split("_")
             if len(action_parts) < 3:
@@ -1055,7 +1139,7 @@ async def scheduled_callback_handler(callback) -> None:
             await callback.answer(f"✅ Bot {bot_id} silindi!", show_alert=True)
             await show_scheduled_bot_management_menu(callback)
             
-        elif action.startswith("remove_link_"):
+        elif action and action.startswith("remove_link_"):
             # Callback data formatı: remove_link_{bot_id}
             action_parts = action.split("_")
             if len(action_parts) < 3:
@@ -1069,7 +1153,7 @@ async def scheduled_callback_handler(callback) -> None:
             else:
                 await callback.answer("❌ Link kaldırma hatası!", show_alert=True)
                 
-        elif action.startswith("add_link_"):
+        elif action and action.startswith("add_link_"):
             # Callback data formatı: add_link_{bot_id}
             action_parts = action.split("_")
             if len(action_parts) < 3:
@@ -1092,7 +1176,7 @@ async def scheduled_callback_handler(callback) -> None:
             await callback.message.edit_text(response, parse_mode="Markdown", reply_markup=keyboard)
             await callback.answer("Link bekleniyor...")
             
-        elif action.startswith("remove_image_"):
+        elif action and action.startswith("remove_image_"):
             # Callback data formatı: remove_image_{bot_id}
             action_parts = action.split("_")
             if len(action_parts) < 3:
@@ -1106,7 +1190,7 @@ async def scheduled_callback_handler(callback) -> None:
             else:
                 await callback.answer("❌ Görsel kaldırma hatası!", show_alert=True)
                 
-        elif action.startswith("add_image_"):
+        elif action and action.startswith("add_image_"):
             # Callback data formatı: add_image_{bot_id}
             action_parts = action.split("_")
             if len(action_parts) < 3:
@@ -1134,7 +1218,7 @@ Fotoğraf yükleyin
             await callback.message.edit_text(response, parse_mode="Markdown", reply_markup=keyboard)
             await callback.answer("Görsel bekleniyor...")
             
-        elif action.startswith("add_image_confirm_"):
+        elif action and action.startswith("add_image_confirm_"):
             # Callback data formatı: add_image_confirm_{bot_id}
             action_parts = action.split("_")
             if len(action_parts) < 3:
@@ -1161,7 +1245,7 @@ Fotoğraf yükleyin
             await callback.message.edit_text(response, parse_mode="Markdown", reply_markup=keyboard)
             await callback.answer("Görsel onayı bekleniyor...")
             
-        elif action.startswith("add_image_confirmed_"):
+        elif action and action.startswith("add_image_confirmed_"):
             # Callback data formatı: add_image_confirmed_{bot_id}
             action_parts = action.split("_")
             if len(action_parts) < 3:
@@ -1188,7 +1272,7 @@ Fotoğraf yükleyin
             await callback.message.edit_text(response, parse_mode="Markdown", reply_markup=keyboard)
             await callback.answer("Görsel onayı bekleniyor...")
             
-        elif action.startswith("select_recreate_group_"):
+        elif action and action.startswith("select_recreate_group_"):
             # Callback data formatı: select_recreate_group_{bot_id}_{group_id}
             action_parts = action.split("_")
             if len(action_parts) < 5:
@@ -1243,7 +1327,7 @@ Fotoğraf yükleyin
             else:
                 await callback.answer("❌ Bot aktifleştirme hatası!", show_alert=True)
                 
-        elif action.startswith("recreate_bot_skip_interval_"):
+        elif action and action.startswith("recreate_bot_skip_interval_"):
             # Aralık aşamasını geç
             bot_id = action.replace("recreate_bot_skip_interval_", "")
             logger.info(f"🔍 Aralık aşaması geçildi - bot_id: {bot_id}")
@@ -1276,7 +1360,7 @@ Fotoğraf yükleyin
             await callback.message.edit_text(response, parse_mode="Markdown", reply_markup=keyboard)
             await callback.answer("Aralık aşaması geçildi!")
             
-        elif action.startswith("recreate_bot_skip_message_"):
+        elif action and action.startswith("recreate_bot_skip_message_"):
             # Mesaj aşamasını geç
             # Callback data formatı: recreate_bot_skip_message_bot_1753628023
             action_parts = action.split("_")
@@ -1312,7 +1396,7 @@ Fotoğraf yükleyin
             await callback.message.edit_text(response, parse_mode="Markdown", reply_markup=keyboard)
             await callback.answer("Mesaj aşaması geçildi!")
             
-        elif action.startswith("recreate_bot_skip_link_"):
+        elif action and action.startswith("recreate_bot_skip_link_"):
             # Link aşamasını geç
             # Callback data formatı: recreate_bot_skip_link_bot_1753628023
             action_parts = action.split("_")
@@ -1362,7 +1446,7 @@ Fotoğraf yükleyin
             await callback.message.edit_text(response, parse_mode="Markdown", reply_markup=keyboard)
             await callback.answer("Link aşaması geçildi!")
             
-        elif action.startswith("recreate_bot_skip_link_text_"):
+        elif action and action.startswith("recreate_bot_skip_link_text_"):
             # Link text aşamasını geç
             # Callback data formatı: recreate_bot_skip_link_text_bot_1753628023
             action_parts = action.split("_")
@@ -1973,7 +2057,7 @@ async def handle_bot_recreation_input(message) -> None:
         if not input_state or not input_state.startswith("recreate_bot_"):
             return
             
-        if input_state.startswith("recreate_bot_name_"):
+        if input_state and input_state.startswith("recreate_bot_name_"):
             # AŞAMA 1: Bot adı alındı
             # Bot ID'yi doğru parse et - recreate_bot_name_bot_1753628023 formatından
             bot_id = input_state.replace("recreate_bot_name_", "")
@@ -2034,7 +2118,7 @@ async def handle_bot_recreation_input(message) -> None:
             await message.answer(response, parse_mode="Markdown", reply_markup=keyboard)
             logger.info(f"🔍 AŞAMA 2'ye geçildi - bot_id: {bot_id}")
             
-        elif input_state.startswith("recreate_bot_interval_"):
+        elif input_state and input_state.startswith("recreate_bot_interval_"):
             # AŞAMA 2: Aralık alındı
             # Bot ID'yi doğru parse et - recreate_bot_interval_bot_1753628023 formatından
             bot_id = input_state.replace("recreate_bot_interval_", "")
@@ -2101,7 +2185,7 @@ async def handle_bot_recreation_input(message) -> None:
             await message.answer(response, parse_mode="Markdown", reply_markup=keyboard)
             logger.info(f"🔍 AŞAMA 3'e geçildi - bot_id: {bot_id}")
             
-        elif input_state.startswith("recreate_bot_message_"):
+        elif input_state and input_state.startswith("recreate_bot_message_"):
             # AŞAMA 3: Mesaj içeriği alındı
             # Bot ID'yi doğru parse et - recreate_bot_message_bot_1753628023 formatından
             bot_id = input_state.replace("recreate_bot_message_", "")
@@ -3010,7 +3094,6 @@ Bot artık kullanıma hazır! Bot yönetimi menüsünden aktifleştirebilirsiniz
                 
                 # AŞAMA 4'e geç: Link ekleme
                 memory_manager.set_input_state(user_id, f"recreate_bot_link_{bot_id}")
-                logger.info(f"🔍 Input state güncellendi: recreate_bot_link_{bot_id}")
                 
                 response = f"""
 🖼️ **Görsel Yüklendi!**
@@ -3049,7 +3132,6 @@ Bot artık kullanıma hazır! Bot yönetimi menüsünden aktifleştirebilirsiniz
             
             # AŞAMA 4'e geç: Link ekleme
             memory_manager.set_input_state(user_id, f"recreate_bot_link_{bot_id}")
-            logger.info(f"🔍 Input state güncellendi: recreate_bot_link_{bot_id}")
             
             response = f"""
 🔄 **Bot Yeniden Kurulumu - Aşama 4**

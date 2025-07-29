@@ -178,7 +178,7 @@ async def list_active_events(message: Message):
             if _bot_instance:
                 await _bot_instance.send_message(message.from_user.id, "❌ Bir hata oluştu!")
 
-@router.callback_query(F.data.startswith("join_event_"))
+@router.callback_query(lambda c: c.data and c.data.startswith("join_event_"))
 async def join_event_handler(callback: CallbackQuery):
     """Etkinliğe katılım"""
     try:
@@ -457,7 +457,7 @@ Hala kayıtlı değilseniz, botun özel mesajına gidip **/kirvekayit** komutunu
         logger.error(f"❌ Join event hatası: {e}")
         await callback.answer("❌ Bir hata oluştu!", show_alert=True)
 
-@router.callback_query(F.data.startswith("withdraw_event_"))
+@router.callback_query(lambda c: c.data and c.data.startswith("withdraw_event_"))
 async def withdraw_event_handler(callback: CallbackQuery):
     """Etkinlikten çekilme"""
     try:
@@ -512,7 +512,7 @@ async def withdraw_event_handler(callback: CallbackQuery):
         logger.error(f"❌ Withdraw event hatası: {e}")
         await callback.answer("❌ Bir hata oluştu!", show_alert=True)
 
-@router.callback_query(F.data.startswith("end_event_"))
+@router.callback_query(lambda c: c.data and c.data.startswith("end_event_"))
 async def end_event_handler(callback: CallbackQuery):
     """Etkinlik bitirme - Admin only"""
     try:

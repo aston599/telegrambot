@@ -33,14 +33,10 @@ async def unknown_command_handler(message: Message):
         # Komut metnini al
         command = message.text.split()[0].lower()
         
-        # Bilinen komutlar listesi (Türkçe güncellenmiş)
+        # Bilinen komutlar listesi (Sadece oyuncuların kullanabileceği komutlar)
         known_commands = [
-            "/start", "/menu", "/kirvekayit", "/kayitsil", "/yardim",
-            "/adminpanel", "/adminkomut", "/bakiyee", "/bakiyec",
-            "/bakiyeeid", "/bakiyecid", "/sürpriz", "/etkinlik",
-            "/etkinlikbitir", "/etkinlikdurum", "/etkinlikler",
-            "/temizle", "/sistemistatistik", "/topluduyuru", "/gruplar", "/testgrup",
-            "/kirvegrup", "/grupbilgi", "/adminyap"
+            "/start", "/menu", "/kirvekayit", "/kayitsil", "/yardim", "/komutlar",
+            "/etkinlikler", "/market", "/siparislerim", "/siralama", "/profil"
         ]
         
         # Eğer bilinmeyen bir komut ise

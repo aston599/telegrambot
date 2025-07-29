@@ -75,7 +75,7 @@ async def add_balance_command(message: Message) -> None:
                 return
         
         # 2. Etiket ile kullanım: /bakiyee @username MIKTAR
-        elif len(parts) == 3 and parts[1].startswith('@'):
+        elif len(parts) == 3 and parts[1] and parts[1].startswith('@'):
             try:
                 username = parts[1][1:]  # @ işaretini kaldır
                 amount = float(parts[2])
@@ -214,7 +214,7 @@ async def remove_balance_command(message: Message) -> None:
                 return
         
         # 2. Etiket ile kullanım: /bakiyec @username MIKTAR
-        elif len(parts) == 3 and parts[1].startswith('@'):
+        elif len(parts) == 3 and parts[1] and parts[1].startswith('@'):
             try:
                 username = parts[1][1:]  # @ işaretini kaldır
                 amount = float(parts[2])

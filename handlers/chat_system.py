@@ -12,13 +12,13 @@ from aiogram.types import Message
 
 from database import is_user_registered, save_user_info
 from config import get_config
+from utils.cooldown_manager import cooldown_manager
 
 logger = logging.getLogger(__name__)
 
 # Sohbet sistemi durumu
 chat_system_active = True
-chat_probability = 0.8  # %80 ihtimalle cevap ver (daha aktif)
-# Chat sistemi ayarları
+chat_probability = 0.5  # %50 ihtimalle cevap ver (cooldown manager ile kontrol edilecek)
 min_message_length = 5  # Production için 5 harf minimum
 
 # Selamlaşma kalıpları ve cevapları - Genişletilmiş ve samimi
@@ -480,36 +480,39 @@ async def handle_chat_message(message: Message) -> Optional[str]:
     Sohbet mesajını analiz et ve uygun cevabı döndür
     """
     try:
-        logger.info(f"handle_chat_message tetiklendi - User: {message.from_user.id}, Text: {message.text}")
-        logger.info(f"🔍 Chat system active: {chat_system_active}")
-        logger.info(f"🔍 Chat probability: {chat_probability}")
-        logger.info(f"🔍 Message type: {message.chat.type}")
-        logger.info(f"🔍 Random check: {random.random()}")
+        user_id = message.from_user.id
+        text = message.text.lower().strip()
         
+        # Temel kontroller
         if not chat_system_active:
             logger.info("❌ Chat system inactive")
             return None
+            
         if message.chat.type == "private":
             logger.info("❌ Private message, skipping")
             return None
-        if random.random() > chat_probability:
-            logger.info("❌ Random check failed")
-            return None
-        text = message.text.lower().strip()
-        logger.info(f"🔍 Processed text: '{text}', Length: {len(text)}, Min: {min_message_length}")
+            
         if not text or len(text) < min_message_length:
             logger.info("❌ Text too short or empty")
             return None
-        user_id = message.from_user.id
+            
+        # Cooldown kontrolü
+        can_respond = await cooldown_manager.can_respond_to_user(user_id)
+        if not can_respond:
+            logger.info(f"❌ Cooldown aktif - User: {user_id}")
+            return None
+            
+        # Kayıt kontrolü - Kayıtlı olmayan kullanıcılar için de cevap ver
         is_registered = await is_user_registered(user_id)
-
+        
+        # Mesajı kaydet
+        await cooldown_manager.record_user_message(user_id)
+        
         # Jargonlara özel cevap
         jargon_reply = find_jargon_reply(text)
         if jargon_reply:
             yanit = jargon_reply
-            if not is_registered:
-                yanit += "\n\n💡 İpucu: Kayıt olarak point kazanabilirsin!"
-            logger.info(f"handle_chat_message cevap: {yanit}")
+            logger.info(f"✅ Jargon cevabı: {yanit}")
             return yanit
 
         # Kısaltma tespiti (diğerleri)
@@ -527,92 +530,82 @@ async def handle_chat_message(message: Message) -> Optional[str]:
                 else:
                     responses.append(f"'{sc}' = {acilim} ({anlam})")
             yanit = "\n".join(responses)
-            if not is_registered:
-                yanit += "\n\n💡 İpucu: Kayıt olarak point kazanabilirsin!"
-            logger.info(f"handle_chat_message cevap: {yanit}")
+            logger.info(f"✅ Kısaltma cevabı: {yanit}")
             return yanit
 
         # Selamlaşma kontrolü
-        logger.info(f"🔍 Selamlaşma kontrolü - Text: '{text}'")
         for greeting, responses in GREETINGS.items():
-            logger.info(f"🔍 Kontrol edilen greeting: '{greeting}'")
             if greeting in text:
-                logger.info(f"✅ Selamlaşma bulundu: '{greeting}'")
                 response = random.choice(responses)
-                if not is_registered:
-                    response += "\n\n💡 İpucu: Kayıt olarak point kazanabilirsin!"
-                logger.info(f"handle_chat_message cevap: {response}")
+                logger.info(f"✅ Selamlaşma cevabı: {response}")
                 return response
+                
         # Soru kontrolü
         for question, responses in QUESTIONS.items():
             if question in text:
                 response = random.choice(responses)
-                if not is_registered:
-                    response += "\n\n💡 İpucu: Kayıt olarak point kazanabilirsin!"
-                logger.info(f"handle_chat_message cevap: {response}")
+                logger.info(f"✅ Soru cevabı: {response}")
                 return response
+                
         # Emoji kontrolü
         for emoji in EMOTIONS:
             if emoji in text:
                 response_emoji = random.choice(EMOTIONS[emoji])
                 response = f"{response_emoji}"
-                if not is_registered:
-                    response += "\n\n💡 İpucu: Kayıt olarak point kazanabilirsin!"
-                logger.info(f"handle_chat_message cevap: {response}")
+                logger.info(f"✅ Emoji cevabı: {response}")
                 return response
+                
         # KirveHub kelimesi kontrolü
         if "kirve" in text or "kirvehub" in text:
             response = random.choice(KIRVEHUB_RESPONSES)
-            if not is_registered:
-                response += "\n\n💡 İpucu: Kayıt olarak point kazanabilirsin!"
-            logger.info(f"handle_chat_message cevap: {response}")
+            logger.info(f"✅ KirveHub cevabı: {response}")
             return response
+            
         # Point kelimesi kontrolü
         if "point" in text or "puan" in text or "kp" in text:
             response = random.choice(POINT_RESPONSES)
-            if not is_registered:
-                response += "\n\n💡 İpucu: Kayıt olarak point kazanabilirsin!"
-            logger.info(f"handle_chat_message cevap: {response}")
+            logger.info(f"✅ Point cevabı: {response}")
             return response
             
         # Günlük hayat kelimeleri kontrolü
         if any(word in text for word in ["hayat", "gün", "yaşam", "dünya"]):
             response = random.choice(DAILY_LIFE_RESPONSES)
-            if not is_registered:
-                response += "\n\n💡 İpucu: Kayıt olarak point kazanabilirsin!"
-            logger.info(f"handle_chat_message cevap: {response}")
+            logger.info(f"✅ Günlük hayat cevabı: {response}")
             return response
             
         # Motivasyon kelimeleri kontrolü
         if any(word in text for word in ["güzel", "harika", "mükemmel", "süper", "muhteşem"]):
             response = random.choice(MOTIVATION_RESPONSES)
-            if not is_registered:
-                response += "\n\n💡 İpucu: Kayıt olarak point kazanabilirsin!"
-            logger.info(f"handle_chat_message cevap: {response}")
+            logger.info(f"✅ Motivasyon cevabı: {response}")
             return response
             
         # Genel cevaplar (düşük ihtimalle)
         if random.random() < 0.1:
             response = random.choice(GENERAL_RESPONSES)
-            if not is_registered:
-                response += "\n\n💡 İpucu: Kayıt olarak point kazanabilirsin!"
-            logger.info(f"handle_chat_message cevap: {response}")
+            logger.info(f"✅ Genel cevap: {response}")
             return response
-        logger.info("handle_chat_message: cevap yok")
+            
+        logger.info("❌ Uygun cevap bulunamadı")
         return None
+        
     except Exception as e:
-        logger.error(f"❌ Chat system hatası: {e}")
+        logger.error(f"❌ Chat message handler hatası: {e}")
         return None
 
 async def send_chat_response(message: Message, response: str):
-    """
-    Sohbet cevabını gönder
-    """
+    """Sohbet cevabını gönder"""
     try:
         config = get_config()
         bot = Bot(token=config.BOT_TOKEN)
         
-        # Mesajı gönder
+        # Kayıt kontrolü ve yönlendirme
+        user_id = message.from_user.id
+        is_registered = await is_user_registered(user_id)
+        
+        if not is_registered:
+            # Kayıtlı olmayan kullanıcıya kayıt yönlendirmesi
+            response += "\n\n💡 İpucu: Kayıt olarak point kazanabilirsin!"
+        
         await bot.send_message(
             chat_id=message.chat.id,
             text=response,
@@ -620,7 +613,7 @@ async def send_chat_response(message: Message, response: str):
         )
         
         await bot.session.close()
-        logger.info(f"💬 Chat response gönderildi - User: {message.from_user.id}")
+        logger.info(f"💬 Chat response gönderildi - User: {message.from_user.id}, Registered: {is_registered}")
         
     except Exception as e:
         logger.error(f"❌ Chat response hatası: {e}")
@@ -677,6 +670,21 @@ async def bot_write_command(message: Message):
         if user_id != config.ADMIN_USER_ID:
             return
         
+        # 🔥 GRUP SESSİZLİK: Grup chatindeyse sil ve özel mesajla yanıt ver
+        if message.chat.type != "private":
+            try:
+                await message.delete()
+                logger.info(f"🔇 Botyaz komutu mesajı silindi - Group: {message.chat.id}")
+                
+                # ÖZELİNDE YANIT VER
+                if _bot_instance:
+                    await _send_bot_write_privately(user_id, message.text)
+                return
+                
+            except Exception as e:
+                logger.error(f"❌ Komut mesajı silinemedi: {e}")
+                return
+        
         # Komut metnini parse et
         command_text = message.text.strip()
         parts = command_text.split(' ', 2)  # En fazla 2 parçaya böl
@@ -713,4 +721,64 @@ async def bot_write_command(message: Message):
             
     except Exception as e:
         logger.error(f"❌ Bot write command hatası: {e}")
-        await message.reply("❌ Bir hata oluştu!") 
+        await message.reply("❌ Bir hata oluştu!")
+
+async def _send_bot_write_privately(user_id: int, command_text: str):
+    """Botyaz mesajını özel mesajla gönder"""
+    try:
+        if not _bot_instance:
+            logger.error("❌ Bot instance bulunamadı!")
+            return
+        
+        # Admin kontrolü
+        from config import get_config
+        config = get_config()
+        if user_id != config.ADMIN_USER_ID:
+            await _bot_instance.send_message(user_id, "❌ Bu komutu sadece admin kullanabilir!")
+            return
+        
+        # Komut metnini parse et
+        parts = command_text.strip().split(' ', 2)  # En fazla 2 parçaya böl
+        
+        if len(parts) < 3:
+            await _bot_instance.send_message(
+                user_id,
+                "❌ Kullanım: `/botyaz <grup_id> <mesaj>`\nÖrnek: `/botyaz -1001234567890 Merhaba kirvem!`"
+            )
+            return
+        
+        try:
+            group_id = int(parts[1])
+            bot_message = parts[2]
+        except ValueError:
+            await _bot_instance.send_message(
+                user_id,
+                "❌ Geçersiz grup ID! Örnek: `/botyaz -1001234567890 Merhaba kirvem!`"
+            )
+            return
+        
+        # Bot instance'ını al
+        bot = Bot(token=config.BOT_TOKEN)
+        
+        try:
+            # Mesajı gönder
+            await bot.send_message(chat_id=group_id, text=bot_message)
+            
+            # Başarı mesajı
+            await _bot_instance.send_message(
+                user_id,
+                f"✅ Bot mesajı gönderildi!\n\n**Grup ID:** {group_id}\n**Mesaj:** {bot_message}"
+            )
+            
+            logger.info(f"🤖 Bot mesajı gönderildi - Group: {group_id}, Message: {bot_message[:50]}...")
+            
+        except Exception as e:
+            await _bot_instance.send_message(user_id, f"❌ Mesaj gönderilemedi: {str(e)}")
+            logger.error(f"❌ Bot mesaj gönderme hatası: {e}")
+            
+        finally:
+            await bot.session.close()
+            
+    except Exception as e:
+        logger.error(f"❌ Private bot write hatası: {e}")
+        await _bot_instance.send_message(user_id, "❌ Bot yazma mesajı gönderilemedi!") 

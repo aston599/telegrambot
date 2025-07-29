@@ -247,7 +247,7 @@ async def make_admin_command(message: Message) -> None:
                 return
         
         # 2. Etiket ile kullanım: /adminyap @username SEVİYE
-        elif len(parts) == 3 and parts[1].startswith('@'):
+        elif len(parts) == 3 and parts[1] and parts[1].startswith('@'):
             try:
                 username = parts[1][1:]  # @ işaretini kaldır
                 admin_level = int(parts[2])
@@ -321,7 +321,7 @@ async def remove_admin_command(message: Message) -> None:
             user_id = message.reply_to_message.from_user.id
         
         # 2. Etiket ile kullanım: /adminçıkar @username
-        elif len(parts) == 2 and parts[1].startswith('@'):
+        elif len(parts) == 2 and parts[1] and parts[1].startswith('@'):
             username = parts[1][1:]  # @ işaretini kaldır
             
             # Username'den user_id bul

@@ -16,8 +16,8 @@ logger = logging.getLogger(__name__)
 db_pool: Optional[asyncpg.Pool] = None
 
 # Connection pool ayarları - Performance optimized
-POOL_MIN_SIZE = 5  # Artırıldı - Daha hızlı connection
-POOL_MAX_SIZE = 15  # Artırıldı - Daha fazla connection
+POOL_MIN_SIZE = 10  # Artırıldı - 100-200 kullanıcı için
+POOL_MAX_SIZE = 25  # Artırıldı - Daha fazla concurrent connection
 POOL_TIMEOUT = 10.0  # Düşürüldü - Hızlı timeout
 POOL_COMMAND_TIMEOUT = 5.0  # Düşürüldü - Hızlı query timeout
 POOL_STATEMENT_CACHE_SIZE = 0  # PgBouncer için zorunlu
@@ -251,106 +251,15 @@ async def create_tables() -> None:
     if not db_pool:
         return
     
-    async with db_pool.acquire() as conn:
-        try:
-            # Bot status tablosu
-            await conn.execute("""
-                CREATE TABLE IF NOT EXISTS bot_status (
-                    id SERIAL PRIMARY KEY,
-                    status TEXT NOT NULL,
-                    created_at TIMESTAMP DEFAULT NOW()
-                )
-            """)
-            
-            # Etkinlikler tablosu
-            await conn.execute("""
-                CREATE TABLE IF NOT EXISTS events (
-                    id SERIAL PRIMARY KEY,
-                    event_type VARCHAR(50) NOT NULL,
-                    title VARCHAR(255) NOT NULL,
-                    description TEXT,
-                    entry_cost DECIMAL(10,2) DEFAULT 0.00,
-                    max_winners INTEGER DEFAULT 1,
-                    duration_minutes INTEGER DEFAULT 0,
-                    bonus_multiplier DECIMAL(3,2) DEFAULT 1.00,
-                    status VARCHAR(20) DEFAULT 'active',
-                    created_by BIGINT NOT NULL,
-                    group_id BIGINT DEFAULT 0,
-                    created_at TIMESTAMP DEFAULT NOW(),
-                    ended_at TIMESTAMP,
-                    participants JSONB DEFAULT '[]',
-                    winners JSONB DEFAULT '[]'
-                )
-            """)
-            
-            # group_id kolonu yoksa ekle
-            try:
-                await conn.execute("ALTER TABLE events ADD COLUMN IF NOT EXISTS group_id BIGINT DEFAULT 0")
-                await conn.execute("ALTER TABLE events ADD COLUMN IF NOT EXISTS completed_at TIMESTAMP")
-                await conn.execute("ALTER TABLE events ADD COLUMN IF NOT EXISTS message_id BIGINT DEFAULT 0")
-            except:
-                pass
-            
-            # Etkinlik katılımcıları tablosu
-            await conn.execute("""
-                CREATE TABLE IF NOT EXISTS event_participants (
-                    id SERIAL PRIMARY KEY,
-                    event_id INTEGER REFERENCES events(id) ON DELETE CASCADE,
-                    user_id BIGINT NOT NULL,
-                    payment_amount DECIMAL(10,2) DEFAULT 0.00,
-                    joined_at TIMESTAMP DEFAULT NOW(),
-                    withdrew_at TIMESTAMP,
-                    status VARCHAR(20) DEFAULT 'active',
-                    is_winner BOOLEAN DEFAULT FALSE,
-                    UNIQUE(event_id, user_id)
-                )
-            """)
-            
-            # Event participants tablosuna eksik kolonları ekle
-            try:
-                await conn.execute("""
-                    ALTER TABLE event_participants 
-                    ADD COLUMN IF NOT EXISTS payment_amount DECIMAL(10,2) DEFAULT 0.00
-                """)
-                await conn.execute("""
-                    ALTER TABLE event_participants 
-                    ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'active'
-                """)
-                await conn.execute("""
-                    ALTER TABLE event_participants 
-                    ADD COLUMN IF NOT EXISTS is_winner BOOLEAN DEFAULT FALSE
-                """)
-                logger.info("✅ Event participants tablosuna yeni kolonlar eklendi")
-            except Exception as e:
-                logger.error(f"❌ Event participants tablosu güncelleme hatası: {e}")
-
-            # Etkinlik katılımları tablosu (yeni)
-            await conn.execute("""
-                CREATE TABLE IF NOT EXISTS event_participations (
-                    id SERIAL PRIMARY KEY,
-                    event_id INTEGER REFERENCES events(id) ON DELETE CASCADE,
-                    user_id BIGINT NOT NULL,
-                    payment_amount DECIMAL(10,2) DEFAULT 0.00,
-                    joined_at TIMESTAMP DEFAULT NOW(),
-                    withdrew_at TIMESTAMP,
-                    status VARCHAR(20) DEFAULT 'active',
-                    can_withdraw BOOLEAN DEFAULT TRUE,
-                    UNIQUE(event_id, user_id)
-                )
-            """)
-            
-            # Users tablosu - Point sistemi ile genişletilmiş
+    try:
+        async with db_pool.acquire() as conn:
+            # Kullanıcılar tablosu
             await conn.execute("""
                 CREATE TABLE IF NOT EXISTS users (
                     user_id BIGINT PRIMARY KEY,
-                    username VARCHAR(255),
-                    first_name VARCHAR(255),
-                    last_name VARCHAR(255),
-                    created_at TIMESTAMP DEFAULT NOW(),
-                    last_activity TIMESTAMP DEFAULT NOW(),
-                    is_registered BOOLEAN DEFAULT FALSE,
-                    registration_date TIMESTAMP,
-                    age INTEGER,
+                    username VARCHAR(100),
+                    first_name VARCHAR(100),
+                    last_name VARCHAR(100),
                     phone VARCHAR(20),
                     email VARCHAR(255),
                     interests TEXT[],
@@ -360,9 +269,21 @@ async def create_tables() -> None:
                     daily_points DECIMAL(10,2) DEFAULT 0.00,
                     last_point_date DATE,
                     rank_id INTEGER DEFAULT 1,
-                    total_messages INTEGER DEFAULT 0
+                    total_messages INTEGER DEFAULT 0,
+                    is_registered BOOLEAN DEFAULT FALSE,
+                    registration_date TIMESTAMP,
+                    last_activity TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
+            
+            # Eksik kolonları ekle (eğer yoksa)
+            try:
+                await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_registered BOOLEAN DEFAULT FALSE")
+                await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS registration_date TIMESTAMP")
+                await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS last_activity TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+                logger.info("✅ Users tablosu kolonları güncellendi")
+            except Exception as e:
+                logger.info(f"ℹ️ Users tablosu kolonları zaten mevcut: {e}")
             
             # Kayıtlı gruplar tablosu
             await conn.execute("""
@@ -395,42 +316,44 @@ async def create_tables() -> None:
                     setting_value DECIMAL(10,2),
                     description TEXT,
                     updated_by BIGINT,
-                    updated_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
             
-            # Kayıt teşvik sistemi ayarları tablosu
+            # Sistem ayarları tablosu - YENİ EKLENDİ
             await conn.execute("""
-                CREATE TABLE IF NOT EXISTS recruitment_settings (
-                    setting_key VARCHAR(50) PRIMARY KEY,
-                    setting_value TEXT,
-                    description TEXT,
-                    updated_by BIGINT,
-                    updated_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                CREATE TABLE IF NOT EXISTS system_settings (
+                    id SERIAL PRIMARY KEY,
+                    points_per_message DECIMAL(5,2) DEFAULT 0.04,
+                    daily_limit DECIMAL(5,2) DEFAULT 5.00,
+                    weekly_limit DECIMAL(5,2) DEFAULT 20.00,
+                    created_at TIMESTAMP DEFAULT NOW(),
+                    updated_at TIMESTAMP DEFAULT NOW()
                 )
             """)
             
-            # Günlük mesaj istatistikleri
+            # Günlük istatistikler tablosu
             await conn.execute("""
                 CREATE TABLE IF NOT EXISTS daily_stats (
                     id SERIAL PRIMARY KEY,
-                    user_id BIGINT,
-                    group_id BIGINT,
-                    message_date DATE,
+                    user_id BIGINT NOT NULL,
+                    group_id BIGINT NOT NULL,
+                    message_date DATE NOT NULL,
                     message_count INTEGER DEFAULT 0,
                     points_earned DECIMAL(10,2) DEFAULT 0.00,
-                    character_count INTEGER DEFAULT 0,
-                    UNIQUE(user_id, group_id, message_date)
+                    created_at TIMESTAMP DEFAULT NOW(),
+                    UNIQUE(user_id, group_id, message_date),
+                    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
                 )
             """)
             
-            # Bakiye işlem logları
+            # Bakiye logları tablosu
             await conn.execute("""
                 CREATE TABLE IF NOT EXISTS balance_logs (
                     id SERIAL PRIMARY KEY,
                     user_id BIGINT NOT NULL,
-                    admin_id BIGINT NOT NULL,
-                    action VARCHAR(10) NOT NULL CHECK (action IN ('add', 'remove')),
+                    admin_id BIGINT,
+                    action VARCHAR(20) NOT NULL,
                     amount DECIMAL(10,2) NOT NULL,
                     reason TEXT,
                     created_at TIMESTAMP DEFAULT NOW(),
@@ -438,105 +361,57 @@ async def create_tables() -> None:
                 )
             """)
             
-            # Sistem logları tablosu (yeni)
+            # Etkinlikler tablosu
             await conn.execute("""
-                CREATE TABLE IF NOT EXISTS system_logs (
+                CREATE TABLE IF NOT EXISTS events (
                     id SERIAL PRIMARY KEY,
-                    log_level VARCHAR(10) NOT NULL,
-                    module VARCHAR(50),
-                    message TEXT NOT NULL,
-                    user_id BIGINT,
-                    created_at TIMESTAMP DEFAULT NOW()
-                )
-            """)
-            
-            # Event participation tablosu
-            await conn.execute("""
-                CREATE TABLE IF NOT EXISTS event_participations (
-                    id SERIAL PRIMARY KEY,
-                    user_id BIGINT NOT NULL,
-                    event_id INTEGER NOT NULL,
-                    joined_at TIMESTAMP DEFAULT NOW(),
-                    withdrew_at TIMESTAMP NULL,
-                    can_withdraw BOOLEAN DEFAULT TRUE,
-                    payment_amount DECIMAL(10,2) NOT NULL,
-                    status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'withdrawn', 'completed')),
-                    is_winner BOOLEAN DEFAULT FALSE,
-                    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
-                    FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE,
-                    UNIQUE(user_id, event_id)
-                )
-            """)
-            
-            # Mevcut users tablosuna yeni kolonları ekle (eğer yoksa)
-            await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_registered BOOLEAN DEFAULT FALSE")
-            await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS registration_date TIMESTAMP")
-            await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS age INTEGER")
-            await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(20)")
-            await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR(255)")
-            await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS interests TEXT[]")
-            await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'active'")
-            await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS notes TEXT")
-            await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS kirve_points DECIMAL(10,2) DEFAULT 0.00")
-            await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS daily_points DECIMAL(10,2) DEFAULT 0.00")
-            await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS last_point_date DATE")
-            await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS total_messages INTEGER DEFAULT 0")
-            await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS rank_id INTEGER DEFAULT 1")
-            
-            # Market kategorileri tablosu
-            await conn.execute("""
-                CREATE TABLE IF NOT EXISTS market_categories (
-                    id SERIAL PRIMARY KEY,
-                    name VARCHAR(100) NOT NULL,
+                    title VARCHAR(200) NOT NULL,
                     description TEXT,
-                    emoji VARCHAR(10),
-                    is_active BOOLEAN DEFAULT TRUE,
-                    created_at TIMESTAMP DEFAULT NOW()
+                    event_type VARCHAR(50) DEFAULT 'lottery',
+                    cost DECIMAL(10,2) DEFAULT 0.00,
+                    max_participants INTEGER,
+                    current_participants INTEGER DEFAULT 0,
+                    status VARCHAR(20) DEFAULT 'active',
+                    created_by BIGINT NOT NULL,
+                    created_at TIMESTAMP DEFAULT NOW(),
+                    ends_at TIMESTAMP,
+                    winner_count INTEGER DEFAULT 1,
+                    group_id BIGINT
                 )
             """)
             
-            # Market ürünleri tablosu - BIGINT admin_id ile
+            # Etkinlik katılımları tablosu
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS event_participants (
+                    id SERIAL PRIMARY KEY,
+                    event_id INTEGER NOT NULL,
+                    user_id BIGINT NOT NULL,
+                    payment_amount DECIMAL(10,2) NOT NULL,
+                    status VARCHAR(20) DEFAULT 'active',
+                    joined_at TIMESTAMP DEFAULT NOW(),
+                    FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE,
+                    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+                    UNIQUE(event_id, user_id)
+                )
+            """)
+            
+            # Market ürünleri tablosu
             await conn.execute("""
                 CREATE TABLE IF NOT EXISTS market_products (
                     id SERIAL PRIMARY KEY,
-                    name VARCHAR(255) NOT NULL,
-                    description TEXT,
-                    company_name VARCHAR(255) DEFAULT NULL,
-                    site_link VARCHAR(500) DEFAULT NULL,
-                    category_id INTEGER REFERENCES market_categories(id),
+                    company_name VARCHAR(100) NOT NULL,
+                    company_link VARCHAR(500),
+                    product_name VARCHAR(200) NOT NULL,
+                    category VARCHAR(100),
                     price DECIMAL(10,2) NOT NULL,
                     stock INTEGER DEFAULT 0,
-                    delivery_content TEXT,
-                    created_by BIGINT NOT NULL,
                     is_active BOOLEAN DEFAULT TRUE,
-                    created_at TIMESTAMP DEFAULT NOW(),
-                    updated_at TIMESTAMP DEFAULT NOW()
+                    created_by BIGINT NOT NULL,
+                    created_at TIMESTAMP DEFAULT NOW()
                 )
             """)
             
-            # Yeni kolonları ekle (eğer yoksa)
-            try:
-                await conn.execute("ALTER TABLE market_products ADD COLUMN IF NOT EXISTS site_link VARCHAR(500) DEFAULT NULL")
-                await conn.execute("ALTER TABLE market_products ADD COLUMN IF NOT EXISTS site_name VARCHAR(255) DEFAULT NULL")
-                logger.info("✅ Market products tablosuna yeni kolonlar eklendi")
-            except Exception as e:
-                logger.info(f"ℹ️ Kolonlar zaten mevcut: {e}")
-            
-            # product_type kolonunu kaldır (eğer varsa)
-            try:
-                await conn.execute("ALTER TABLE market_products DROP COLUMN IF EXISTS product_type")
-                logger.info("✅ product_type kolonu kaldırıldı")
-            except Exception as e:
-                logger.info(f"ℹ️ product_type kolonu zaten yok: {e}")
-            
-            # company_name kolonunu NULL yap (eğer NOT NULL ise)
-            try:
-                await conn.execute("ALTER TABLE market_products ALTER COLUMN company_name DROP NOT NULL")
-                logger.info("✅ company_name kolonu NULL yapıldı")
-            except Exception as e:
-                logger.info(f"ℹ️ company_name kolonu zaten NULL: {e}")
-            
-            # Market siparişleri tablosu - BIGINT user_id ile
+            # Market siparişleri tablosu
             await conn.execute("""
                 CREATE TABLE IF NOT EXISTS market_orders (
                     id SERIAL PRIMARY KEY,
@@ -582,75 +457,27 @@ async def create_tables() -> None:
                 ON CONFLICT (setting_key) DO NOTHING
             """)
             
-            # Varsayılan recruitment ayarlarını ekle
+            # Bot status tablosu
             await conn.execute("""
-                INSERT INTO recruitment_settings (setting_key, setting_value, description) 
-                VALUES 
-                    ('system_active', 'true', 'Kayıt teşvik sistemi aktif/pasif'),
-                    ('message_interval', '3600', 'Mesaj gönderme aralığı (saniye)'),
-                    ('main_group_id', '-1002746043354', 'Ana grup ID (kayıt teşvik mesajları için)'),
-                    ('max_unregistered_users', '50', 'Maksimum kayıtsız kullanıcı sayısı')
-                ON CONFLICT (setting_key) DO NOTHING
-            """)
-            
-            # Market kategorileri tablosuna eksik kolonları ekle (eğer yoksa)
-            await conn.execute("ALTER TABLE market_categories ADD COLUMN IF NOT EXISTS emoji VARCHAR(10)")
-            await conn.execute("ALTER TABLE market_categories ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE")
-            await conn.execute("ALTER TABLE market_categories ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW()")
-            
-            # Market kategorilerini ekle
-            await conn.execute("""
-                INSERT INTO market_categories (name, description, emoji) 
-                VALUES 
-                    ('Freespin', 'Ücretsiz döndürme paketleri', '🎰'),
-                    ('Bonus', 'Para yatırma bonusları', '💰'),
-                    ('Hediye Kartı', 'Dijital hediye kartları', '🎁'),
-                    ('Özel', 'Özel kategoriye ait ürünler', '⭐')
-                ON CONFLICT (name) DO NOTHING
-            """)
-            
-            # System settings tablosu
-            await conn.execute("""
-                CREATE TABLE IF NOT EXISTS system_settings (
+                CREATE TABLE IF NOT EXISTS bot_status (
                     id SERIAL PRIMARY KEY,
-                    points_per_message DECIMAL(5,2) DEFAULT 0.04,
-                    daily_limit DECIMAL(5,2) DEFAULT 5.00,
-                    weekly_limit DECIMAL(5,2) DEFAULT 20.00,
-                    created_at TIMESTAMP DEFAULT NOW(),
-                    updated_at TIMESTAMP DEFAULT NOW()
+                    status TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
             
-            # İlk system settings kaydını oluştur
+            # Varsayılan sistem ayarlarını ekle - YENİ EKLENDİ
             await conn.execute("""
                 INSERT INTO system_settings (id, points_per_message, daily_limit, weekly_limit)
                 VALUES (1, 0.04, 5.00, 20.00)
                 ON CONFLICT (id) DO NOTHING
             """)
             
-            # Zamanlanmış mesajlar ayarları tablosu
-            await conn.execute("""
-                CREATE TABLE IF NOT EXISTS scheduled_messages_settings (
-                    id INTEGER PRIMARY KEY DEFAULT 1,
-                    settings JSONB NOT NULL DEFAULT '{}',
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """)
+            logger.info("✅ Tüm tablolar başarıyla oluşturuldu/güncellendi")
             
-            # Varsayılan zamanlanmış mesaj ayarlarını ekle
-            await conn.execute("""
-                INSERT INTO scheduled_messages_settings (id, settings) 
-                VALUES (1, '{"active_bots": {}, "groups": [], "last_message_time": {}, "bot_profiles": {"test_bot": {"name": "Test Bot", "message": "💎 KirveHub''da point kazanmak çok kolay!", "link": null, "image": null, "interval": 30, "active": false}}}')
-                ON CONFLICT (id) DO NOTHING
-            """)
-            
-            logger.info("✅ Database tabloları ve varsayılan veriler hazırlandı!")
-            logger.info("✅ System settings tablosu oluşturuldu")
-            logger.info("✅ Scheduled messages settings tablosu oluşturuldu")
-            
-        except Exception as e:
-            logger.error(f"⚠️ Tablo oluşturma hatası: {e}")
+    except Exception as e:
+        logger.error(f"❌ Tablo oluşturma hatası: {e}")
+        raise
 
 
 async def insert_test_data() -> None:
@@ -826,6 +653,48 @@ async def unregister_user(user_id: int) -> bool:
 # ==============================================
 # POINT SİSTEMİ FONKSİYONLARI
 # ==============================================
+
+async def get_user_info(user_id: int) -> Dict[str, Any]:
+    """Kullanıcının tüm bilgilerini al"""
+    if not db_pool:
+        return {}
+    
+    try:
+        async with db_pool.acquire() as conn:
+            result = await conn.fetchrow("""
+                SELECT user_id, username, first_name, last_name, phone, email, 
+                       interests, status, notes, kirve_points, daily_points, 
+                       last_point_date, rank_id, total_messages, is_registered, 
+                       registration_date, last_activity
+                FROM users 
+                WHERE user_id = $1
+            """, user_id)
+            
+            if result:
+                return {
+                    "user_id": result["user_id"],
+                    "username": result["username"],
+                    "first_name": result["first_name"],
+                    "last_name": result["last_name"],
+                    "phone": result["phone"],
+                    "email": result["email"],
+                    "interests": result["interests"],
+                    "status": result["status"],
+                    "notes": result["notes"],
+                    "kirve_points": float(result["kirve_points"]) if result["kirve_points"] else 0.0,
+                    "daily_points": float(result["daily_points"]) if result["daily_points"] else 0.0,
+                    "last_point_date": result["last_point_date"],
+                    "rank_id": result["rank_id"] or 1,
+                    "total_messages": result["total_messages"] or 0,
+                    "is_registered": result["is_registered"],
+                    "registration_date": result["registration_date"],
+                    "last_activity": result["last_activity"]
+                }
+            return {}
+            
+    except Exception as e:
+        logger.error(f"❌ Get user info hatası: {e}")
+        return {}
 
 async def get_user_points(user_id: int) -> Dict[str, Any]:
     """Kullanıcının point bilgilerini al"""
@@ -2343,3 +2212,23 @@ async def get_system_stats() -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"❌ System stats hatası: {e}")
         return {'total_users': 0, 'registered_users': 0, 'active_groups': 0}
+
+async def get_all_active_products() -> list:
+    """Aktif tüm ürünleri getir"""
+    if not db_pool:
+        return []
+    
+    try:
+        async with db_pool.acquire() as conn:
+            products = await conn.fetch("""
+                SELECT id, name, description, company_name, price, stock, is_active
+                FROM market_products 
+                WHERE is_active = TRUE
+                ORDER BY created_at DESC
+            """)
+            
+            return [dict(product) for product in products]
+            
+    except Exception as e:
+        logger.error(f"❌ Get all active products hatası: {e}")
+        return []

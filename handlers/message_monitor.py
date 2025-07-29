@@ -76,140 +76,128 @@ DAILY_POINT_LIMIT = 5.0  # Günlük limit
 WEEKLY_POINT_LIMIT = 20.0  # Haftalık limit
 
 
+async def update_daily_stats(user_id: int, group_id: int):
+    """Günlük istatistikleri güncelle"""
+    try:
+        from database import db_pool
+        if not db_pool:
+            return
+        
+        async with db_pool.acquire() as conn:
+            # Günlük mesaj sayısını artır
+            await conn.execute("""
+                UPDATE users 
+                SET daily_messages = daily_messages + 1,
+                    last_activity = NOW()
+                WHERE user_id = $1
+            """, user_id)
+            
+            # Haftalık mesaj sayısını artır
+            await conn.execute("""
+                UPDATE users 
+                SET weekly_messages = weekly_messages + 1
+                WHERE user_id = $1
+            """, user_id)
+            
+            logger.debug(f"📊 Daily stats güncellendi - User: {user_id}, Group: {group_id}")
+            
+    except Exception as e:
+        logger.error(f"❌ Daily stats güncelleme hatası: {e}")
+
 async def monitor_group_message(message: Message) -> None:
     """Grup mesajlarını monitör et - Performance optimized"""
     
-    # DEBUG: Grup mesajı yakalandı
-    # text_preview = message.text[:50] if message.text else "No text"
-    # logger.info(f"🔍 Grup mesajı yakalandı - User: {message.from_user.id}, Text: {text_preview}...")
-    
-    # Temel kontroller - Hızlı
-    if not message.text or not message.from_user or not message.chat:
-        logger.info("❌ Temel kontroller başarısız")
-        return
-        
-    user = message.from_user
-    chat = message.chat
-    message_text = message.text.strip()
-    
-    # Bot mesajlarını ignore et
-    if user.is_bot:
-        return
-        
-    # Sadece grup ve supergroup'larda çalış
-    if chat.type not in ['group', 'supergroup']:
-        return
-        
-    # Komutları ignore et (/ ile başlayanlar)
-    if message_text.startswith('/'):
-        return
-        
-    # Mesaj uzunluğu kontrolü (sadece harf sayısı) - Hızlı
-    letter_count = sum(1 for c in message_text if c.isalpha())
-    logger.info(f"📏 Mesaj uzunluğu kontrolü - User: {user.id}, Length: {letter_count}, Min: {MIN_MESSAGE_LENGTH}")
-    if letter_count < MIN_MESSAGE_LENGTH:
-        logger.info(f"❌ Mesaj çok kısa - User: {user.id}, Length: {letter_count}")
-        return
-        
-    # Kelime tekrarı kontrolü - YENİ KORUMA
-    uniqueness_check = await check_message_uniqueness(user.id, message_text)
-    logger.info(f"🔄 Kelime tekrarı kontrolü - User: {user.id}, Unique: {uniqueness_check}")
-    if not uniqueness_check:
-        logger.info(f"❌ Mesaj tekrarı - User: {user.id}")
-        return
-        
-    # Database işlemleri - Optimized
     try:
-        # Kullanıcı bilgilerini kaydet/güncelle - Hızlı
-        await save_user_info(user.id, user.username, user.first_name, user.last_name)
-        
-        # Kullanıcının son aktivite zamanını güncelle
-        pool = await get_db_pool()
-        if pool:
-            async with pool.acquire() as conn:
-                await conn.execute("""
-                    UPDATE users 
-                    SET last_activity = NOW() 
-                    WHERE user_id = $1
-                """, user.id)
-                
-                # Kayıtsız kullanıcılar için aktivite sayacını artır
-                if not await is_user_registered(user.id):
-                    await conn.execute("""
-                        INSERT INTO daily_stats (user_id, group_id, message_date, message_count, character_count)
-                        VALUES ($1, $2, CURRENT_DATE, 1, $3)
-                        ON CONFLICT (user_id, group_id, message_date) 
-                        DO UPDATE SET 
-                            message_count = daily_stats.message_count + 1,
-                            character_count = daily_stats.character_count + $3
-                    """, user.id, chat.id, letter_count)
-        
-        # Kullanıcı kayıtlı mı kontrol et - Cache ile
-        is_registered = await is_user_registered(user.id)
-        logger.info(f"📊 Kullanıcı kayıt durumu - User: {user.id}, Registered: {is_registered}")
-        
-        if not is_registered:
-            # YENİ KULLANICI TESPİTİ: İlk defa mesaj atan kullanıcıları tespit et
-            logger.info(f"🎯 Kayıtsız kullanıcı tespit edildi - User: {user.id}, Name: {user.first_name}")
-            await check_new_user_recruitment(user.id, user.first_name, chat.title, letter_count, message)
+        # Temel kontroller - Hızlı
+        if not message.text or not message.from_user or not message.chat:
             return
             
-        # Grup kayıtlı mı kontrol et - Hızlı
+        user = message.from_user
+        chat = message.chat
+        message_text = message.text.strip()
+        
+        # Sadece kayıtlı gruplarda aktif ol
         if not await is_group_registered(chat.id):
             return
             
-        # Flood kontrolü - Hızlı
-        if not await check_flood_protection(user.id):
+        # Bot mesajlarını ignore et
+        if user.is_bot:
             return
             
-        # Sistem ayarlarını al
-        system_settings = await get_system_settings()
-        daily_limit = system_settings.get('daily_limit', DAILY_POINT_LIMIT)
-        weekly_limit = system_settings.get('weekly_limit', WEEKLY_POINT_LIMIT)
-        point_per_message = system_settings.get('points_per_message', DEFAULT_POINT_PER_MESSAGE)
-        
-        # Günlük ve haftalık limit kontrolleri
-        user_points = await get_user_points_cached(user.id)
-        if user_points:
-            daily_points = user_points.get('daily_points', 0)
-            weekly_points = user_points.get('weekly_points', 0)
+        # Sadece grup ve supergroup'larda çalış
+        if chat.type not in ['group', 'supergroup']:
+            return
             
-            # Günlük limit kontrolü (kullanıcı başına 1 kez) - PRODUCTION İÇİN AÇIK
-            if daily_points >= DAILY_POINT_LIMIT:
-                logger.info(f"📊 Günlük limit doldu - User: {user.id}, Daily: {daily_points}, Limit: {DAILY_POINT_LIMIT}")
-                return
-                
+        # Komutları ignore et (/ ile başlayanlar)
+        if message_text and message_text.startswith('/'):
+            return
+            
+        # Mesaj uzunluğu kontrolü
+        message_length = len(message_text)
+        min_length = MIN_MESSAGE_LENGTH
+        
+        if message_length < min_length:
+            return
+            
+        # Kelime tekrarı kontrolü
+        words = message_text.split()
+        unique_words = len(set(words))
+        
+        if unique_words < len(words):
+            return
+            
+        # Kullanıcı kayıt durumu kontrolü
+        is_registered = await is_user_registered(user.id)
+        
+        if not is_registered:
+            # Recruitment sistemi kontrolü
+            if await check_recruitment_eligibility(user.id, user.username, user.first_name, chat.title):
+                await send_recruitment_message(user.id, user.username, user.first_name, chat.title)
+        else:
+            # Kayıtlı kullanıcılar için point sistemi
+            point_per_message = await get_dynamic_point_amount()
+            
+            # Mevcut bakiyeyi al
+            current_balance = await get_user_points_cached(user.id)
+            old_balance = current_balance.get('kirve_points', 0.0) if current_balance else 0.0
+            
+            # Point ekle
+            await add_points_to_user(user.id, point_per_message)
+            
+            # Yeni bakiyeyi al
+            new_balance = old_balance + point_per_message
+            
+            # Milestone kontrolü - 1.00 KP'ye ulaştı mı?
+            if old_balance < 1.0 and new_balance >= 1.0:
+                await send_milestone_notification(user.id, user.first_name, new_balance)
+            
             # Haftalık limit kontrolü
-            if weekly_points >= weekly_limit:
-                logger.info(f"📊 Haftalık limit dolu - User: {user.id}, Weekly: {weekly_points}/{weekly_limit}")
-                # Haftalık limit dolu bildirimi gönder
-                await send_weekly_limit_notification(user.id, user.first_name, weekly_limit)
-                return
+            weekly_points = current_balance.get('weekly_points', 0.0) if current_balance else 0.0
+            new_weekly_points = weekly_points + point_per_message
             
-        # Point ekle - Dinamik ayarlarla
-        success = await add_points_to_user(user.id, point_per_message, chat.id)
-        
-        if success:
-            # Point bildirimi - SADECE MILESTONE'LARDA (1.00, 2.00, 3.00...)
-            total_points = user_points.get('kirve_points', 0) + point_per_message if user_points else point_per_message
+            # Haftalık limit kontrolü (20.00 KP)
+            if weekly_points < 20.0 and new_weekly_points >= 20.0:
+                await send_weekly_limit_notification(user.id, user.first_name, 20.0)
             
-            # Milestone kontrolü (1.00, 2.00, 3.00...)
-            if total_points >= 1.0 and int(total_points) == total_points:
-                await send_private_point_notification(
-                    user.id, user.first_name, total_points, 
-                    user_points.get('total_messages', 0) + 1, 
-                    chat.title, point_per_message, is_milestone=True
-                )
-                
+            # Günlük istatistikleri güncelle
+            await update_daily_stats(user.id, chat.id)
+            
     except Exception as e:
-        logger.error(f"❌ Message monitor hatası: {e}")
+        logger.error(f"❌ Group message handler hatası: {e}")
 
     # --- SOHBET ZEKASI ENTEGRE ---
     try:
         from handlers.chat_system import handle_chat_message, send_chat_response
-        response = await handle_chat_message(message)
-        if response:
-            await send_chat_response(message, response)
+        from utils.cooldown_manager import cooldown_manager
+        
+        # Cooldown kontrolü
+        can_respond = await cooldown_manager.can_respond_to_user(message.from_user.id)
+        if can_respond:
+            response = await handle_chat_message(message)
+            if response:
+                await send_chat_response(message, response)
+                # Mesajı kaydet
+                await cooldown_manager.record_user_message(message.from_user.id)
     except Exception as e:
         logger.error(f"❌ Chat system (entegre) hatası: {e}")
 
@@ -716,3 +704,82 @@ async def mark_recruitment_sent_today(user_id: int) -> None:
             
     except Exception as e:
         logger.error(f"❌ Recruitment marking hatası: {e}") 
+
+async def send_milestone_notification(user_id: int, first_name: str, new_balance: float) -> None:
+    """Milestone bildirimi gönder (1.00 KP'ye ulaşınca)"""
+    try:
+        from config import get_config
+        from aiogram import Bot
+        
+        config = get_config()
+        bot = Bot(token=config.BOT_TOKEN)
+        
+        # Milestone mesajları
+        milestone_messages = [
+            f"""
+🎉 **TEBRİKLER! İLK MİLESTONE'A ULAŞTIN!** 🎉
+
+Merhaba {first_name}! 
+
+💰 **Yeni Bakiyen:** {new_balance:.2f} KP
+🎯 **Milestone:** 1.00 KP'ye ulaştın!
+
+🚀 **Artık şunları yapabilirsin:**
+✅ Market'ten ürün alabilirsin
+✅ Etkinliklere katılabilirsin
+✅ Sıralamada yer alabilirsin
+
+💡 **İpucu:** Günlük 5.00 KP limitini doldurmaya devam et!
+
+🎮 **Devam et ve daha fazla kazan!** 💎
+            """,
+            f"""
+🏆 **MİLESTONE BAŞARISI!** 🏆
+
+Merhaba {first_name}! 
+
+💰 **Bakiyen:** {new_balance:.2f} KP
+🎯 **Başarı:** İlk 1.00 KP'ye ulaştın!
+
+🎉 **Bu başarının anlamı:**
+✅ Sistemde aktif kullanıcısın
+✅ Point kazanma sistemini öğrendin
+✅ Topluluğa katkı sağlıyorsun
+
+💎 **Devam et ve daha fazla kazan!**
+
+🎮 **İyi şanslar!** 🚀
+            """,
+            f"""
+💎 **1.00 KP MİLESTONE!** 💎
+
+Merhaba {first_name}! 
+
+💰 **Yeni Bakiyen:** {new_balance:.2f} KP
+🎯 **Başarı:** İlk milestone'a ulaştın!
+
+🌟 **Bu ne anlama geliyor:**
+✅ Point sistemini anladın
+✅ Aktif bir üyesin
+✅ Market'e erişim kazandın
+
+🎮 **Şimdi market'ten ürün alabilirsin!**
+
+💫 **Devam et ve daha fazla kazan!** 🚀
+            """
+        ]
+        
+        # Rastgele mesaj seç
+        message = random.choice(milestone_messages)
+        
+        await bot.send_message(
+            user_id,
+            message,
+            parse_mode="Markdown"
+        )
+        
+        await bot.session.close()
+        logger.info(f"🎉 Milestone bildirimi gönderildi - User: {user_id}, Balance: {new_balance}")
+        
+    except Exception as e:
+        logger.error(f"❌ Milestone bildirimi hatası: {e}") 

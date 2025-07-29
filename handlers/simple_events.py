@@ -587,7 +587,7 @@ async def handle_multiplier_input(message: Message, event_info: Dict):
     except Exception as e:
         logger.error(f"❌ Multiplier input hatası: {e}")
 
-@router.callback_query(F.data.startswith("select_group_"))
+@router.callback_query(lambda c: c.data and c.data.startswith("select_group_"))
 async def select_group_for_event(callback: CallbackQuery):
     """Çekiliş için grup seçimi"""
     try:

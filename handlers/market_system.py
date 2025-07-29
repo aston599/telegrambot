@@ -504,3 +504,144 @@ async def get_user_market_history(user_id: int) -> dict:
     except Exception as e:
         logger.error(f"❌ Kullanıcı market geçmişi getirme hatası: {e}")
         return {} 
+
+
+async def show_market_empty_message(callback: types.CallbackQuery) -> None:
+    """Market'te ürün yoksa gösterilecek mesaj"""
+    try:
+        empty_message = f"""
+╔═══════════════════════════════════╗
+║        🛍️ MARKET SİSTEMİ 🛍️        ║
+╚═══════════════════════════════════╝
+
+📦 **Ürün Durumu:**
+❌ **Şu anda market'te ürün bulunmuyor**
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+💎 **Point Kazanmaya Devam Et:**
+✅ **Mesaj atarak point kazanabilirsin**
+✅ **Etkinliklere katılarak bonus alabilirsin**
+✅ **Günlük limitlerin dolmamış**
+✅ **Sistem tamamen aktif**
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📢 **Yakında Eklenecek:**
+• 🎰 **Freespinler** - Slot siteleri için
+• 💰 **Site Bakiyeleri** - Casino siteleri için
+• 🎁 **Bonus Paketleri** - Çeşitli siteler için
+• 🏆 **VIP Ürünler** - Özel ayrıcalıklar
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎯 **Şimdi Yapabileceklerin:**
+• 💬 **Sohbette mesaj at** - Point kazan
+• 🎮 **Etkinliklere katıl** - Bonus al
+• 📊 **Profilini kontrol et** - İstatistiklerini gör
+• 🏆 **Sıralamada yüksel** - Daha fazla point kazan
+
+💎 **Point kazanmaya devam et, ürünler yakında eklenecek!**
+        """
+        
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="📊 Profilim", callback_data="profile_refresh")],
+            [InlineKeyboardButton(text="🎮 Etkinlikler", callback_data="profile_events")],
+            [InlineKeyboardButton(text="⬅️ Geri", callback_data="profile_back")]
+        ])
+        
+        await callback.message.edit_text(
+            empty_message,
+            parse_mode="Markdown",
+            reply_markup=keyboard
+        )
+        
+        logger.info(f"🛍️ Market boş mesajı gösterildi - User: {callback.from_user.id}")
+        
+    except Exception as e:
+        logger.error(f"❌ Market boş mesajı hatası: {e}")
+        await callback.answer("❌ Mesaj gösterilemedi!", show_alert=True) 
+
+
+async def show_market_menu_modern(callback: types.CallbackQuery) -> None:
+    """Modern market menüsü - Ürün kontrolü ile"""
+    try:
+        from database import get_all_active_products
+        products = await get_all_active_products()
+        
+        # Ürün yoksa boş mesaj göster
+        if not products:
+            await show_market_empty_message(callback)
+            return
+        
+        # Ürünler varsa normal market menüsünü göster
+        await show_market_products_modern(callback, products)
+        
+    except Exception as e:
+        logger.error(f"❌ Market menü hatası: {e}")
+        await callback.answer("❌ Market menüsü yüklenemedi!", show_alert=True)
+
+async def show_market_products_modern(callback: types.CallbackQuery, products: list) -> None:
+    """Ürünlerle birlikte market menüsü"""
+    try:
+        user_id = callback.from_user.id
+        user_points = await get_user_points(user_id)
+        user_balance = float(user_points.get('kirve_points', 0))
+        
+        # Market menü mesajı
+        market_message = f"""
+╔═══════════════════════════════════╗
+║        🛍️ MARKET SİSTEMİ 🛍️        ║
+╚═══════════════════════════════════╝
+
+💰 **Bakiyeniz:** {user_balance:.2f} KP
+📦 **Mevcut Ürünler:** {len(products)} adet
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+**Ürünler:**
+        """
+        
+        # Ürün butonları
+        keyboard_buttons = []
+        
+        for product in products[:10]:  # İlk 10 ürünü göster
+            product_price = float(product['price'])
+            stock_status = "✅ Stokta" if product['stock'] > 0 else "❌ Tükendi"
+            
+            button_text = f"{product['name']} - {product_price:.2f} KP - {stock_status}"
+            
+            if product['stock'] > 0:
+                keyboard_buttons.append([
+                    InlineKeyboardButton(
+                        text=button_text,
+                        callback_data=f"view_product_{product['id']}"
+                    )
+                ])
+            else:
+                keyboard_buttons.append([
+                    InlineKeyboardButton(
+                        text=button_text,
+                        callback_data="product_sold_out"
+                    )
+                ])
+        
+        # Alt butonlar
+        keyboard_buttons.append([
+            InlineKeyboardButton(text="📋 Siparişlerim", callback_data="profile_orders"),
+            InlineKeyboardButton(text="⬅️ Geri", callback_data="profile_refresh")
+        ])
+        
+        keyboard = InlineKeyboardMarkup(inline_keyboard=keyboard_buttons)
+        
+        await callback.message.edit_text(
+            market_message,
+            parse_mode="Markdown",
+            reply_markup=keyboard
+        )
+        
+        logger.info(f"🛍️ Market menüsü gösterildi - User: {user_id}, Products: {len(products)}")
+        
+    except Exception as e:
+        logger.error(f"❌ Market ürün menü hatası: {e}")
+        await callback.answer("❌ Market menüsü yüklenemedi!", show_alert=True) 

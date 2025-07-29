@@ -30,6 +30,21 @@ async def menu_command(message: types.Message) -> None:
             )
             return
         
+        # 🔥 GRUP SESSİZLİK: Grup chatindeyse sil ve özel mesajla yanıt ver
+        if message.chat.type != "private":
+            try:
+                await message.delete()
+                logger.info(f"🔇 Menu komutu mesajı silindi - Group: {message.chat.id}")
+                
+                # ÖZELİNDE YANIT VER
+                if _bot_instance:
+                    await _send_menu_privately(user.id)
+                return
+                
+            except Exception as e:
+                logger.error(f"❌ Komut mesajı silinemedi: {e}")
+                return
+        
         logger.info(f"/menu komutu - User: {user.first_name} ({user.id})")
         
         # Kullanici verilerini al
@@ -39,15 +54,22 @@ async def menu_command(message: types.Message) -> None:
         market_history = await get_market_history(user.id)
         system_stats = await get_system_stats()
         
-        # Profil butonları
+        # Ana menü butonları
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
             [
-                InlineKeyboardButton(text="📊 Detaylı İstatistikler", callback_data="profile_detailed"),
+                InlineKeyboardButton(text="📊 Profil Detayları", callback_data="profile_detailed"),
                 InlineKeyboardButton(text="🏆 Sıralama", callback_data="profile_ranking")
             ],
             [
-                InlineKeyboardButton(text="🛒 Market", callback_data="profile_market"),
-                InlineKeyboardButton(text="📦 Siparişlerim", callback_data="my_orders")
+                InlineKeyboardButton(text="🛍️ Market", callback_data="profile_market"),
+                InlineKeyboardButton(text="📋 Komutlar", callback_data="profile_commands")
+            ],
+            [
+                InlineKeyboardButton(text="🎮 Etkinlikler", callback_data="profile_events"),
+                InlineKeyboardButton(text="📈 İstatistikler", callback_data="profile_stats")
+            ],
+            [
+                InlineKeyboardButton(text="❌ Kapat", callback_data="profile_close")
             ]
         ])
         
@@ -103,6 +125,93 @@ _Profilinizi geliştirmek için grup sohbetlerine katılın!_
             reply_to_message_id=message.message_id
         )
 
+async def _send_menu_privately(user_id: int):
+    """Menu'yu özel mesajla gönder"""
+    try:
+        if not _bot_instance:
+            logger.error("❌ Bot instance bulunamadı!")
+            return
+        
+        # Kullanici verilerini al
+        user_points = await get_user_points(user_id)
+        user_rank = await get_user_rank(user_id)
+        today_stats = await get_today_stats(user_id)
+        market_history = await get_market_history(user_id)
+        system_stats = await get_system_stats()
+        
+        # Kullanıcı bilgilerini al
+        from database import get_user_info
+        user_info = await get_user_info(user_id)
+        user_name = user_info.get('first_name', 'Kullanıcı') if user_info else 'Kullanıcı'
+        
+        # Ana menü butonları
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [
+                InlineKeyboardButton(text="📊 Profil Detayları", callback_data="profile_detailed"),
+                InlineKeyboardButton(text="🏆 Sıralama", callback_data="profile_ranking")
+            ],
+            [
+                InlineKeyboardButton(text="🛍️ Market", callback_data="profile_market"),
+                InlineKeyboardButton(text="📋 Komutlar", callback_data="profile_commands")
+            ],
+            [
+                InlineKeyboardButton(text="🎮 Etkinlikler", callback_data="profile_events"),
+                InlineKeyboardButton(text="📈 İstatistikler", callback_data="profile_stats")
+            ],
+            [
+                InlineKeyboardButton(text="❌ Kapat", callback_data="profile_close")
+            ]
+        ])
+        
+        # Ana profil mesajı
+        profile_response = f"""
+**{user_name}'IN PROFİLİ**
+
+**💎 POINT DURUMU**
+
+**💰 Toplam Point:** `{user_points.get('kirve_points', 0):.2f} KP`
+
+**🏆 RÜTBE BİLGİLERİ**
+
+**👑 Rütbe:** {user_rank.get('rank_name', 'Üye')}
+**⭐ Seviye:** {user_rank.get('rank_level', 1)}
+
+**📊 AKTİVİTE İSTATİSTİKLERİ**
+
+**💬 Toplam Mesaj:** {user_points.get('total_messages', 0)}
+**📅 Bugünkü Mesaj:** {today_stats.get('message_count', 0)}
+**⏰ Son Aktivite:** {today_stats.get('last_activity', 'Bilinmiyor')}
+
+**🛒 MARKET GEÇMİŞİ**
+
+**📦 Toplam Sipariş:** {market_history.get('total_orders', 0)} adet
+**💸 Toplam Harcama:** {market_history.get('total_spent', 0):.2f} KP
+**✅ Onaylanan Sipariş:** {market_history.get('approved_orders', 0)} adet
+**📋 Son Sipariş:** {market_history.get('last_order_date', 'Hiç sipariş yok')}
+
+**🔧 SİSTEM DURUMU**
+
+**👥 Toplam Üye:** {system_stats.get('total_users', 0)}
+**📝 Kayıtlı:** {system_stats.get('registered_users', 0)}
+**🏠 Aktif Grup:** {system_stats.get('active_groups', 0)}
+
+---
+_Profilinizi geliştirmek için grup sohbetlerine katılın!_
+        """
+        
+        await _bot_instance.send_message(
+            user_id,
+            profile_response,
+            parse_mode="Markdown",
+            reply_markup=keyboard
+        )
+        
+        logger.info(f"Profil menüsü özel mesajla gönderildi - User: {user_id}")
+        
+    except Exception as e:
+        logger.error(f"❌ Private menu hatası: {e}")
+        await _bot_instance.send_message(user_id, "❌ Profil bilgileri yüklenemedi!")
+
 
 async def profile_callback_handler(callback: types.CallbackQuery) -> None:
     """
@@ -138,15 +247,30 @@ async def profile_callback_handler(callback: types.CallbackQuery) -> None:
         elif data == "profile_ranking":
             await show_ranking(callback)
         elif data == "profile_market":
-            await show_market_menu(callback)
-        elif data.startswith("view_product_"):
+            logger.info(f"Market butonu tıklandı - User: {callback.from_user.id}")
+            from handlers.market_system import show_market_menu_modern
+            await show_market_menu_modern(callback)
+        elif data == "profile_commands":
+            logger.info(f"Komutlar butonu tıklandı - User: {callback.from_user.id}")
+            from handlers.register_handler import komutlar_command
+            # Komutlar mesajını gönder
+            await komutlar_command(callback.message)
+        elif data == "profile_events":
+            logger.info(f"Etkinlikler butonu tıklandı - User: {callback.from_user.id}")
+            from handlers.events_list import list_active_lotteries
+            await list_active_lotteries(callback.message)
+        elif data == "profile_stats":
+            logger.info(f"İstatistikler butonu tıklandı - User: {callback.from_user.id}")
+            from handlers.statistics_system import system_stats_command
+            await system_stats_command(callback.message)
+        elif data and data.startswith("view_product_"):
             logger.info(f"VIEW PRODUCT CALLBACK - Data: {data}")
             from handlers.market_system import show_product_details_modern
             await show_product_details_modern(callback, data)
-        elif data.startswith("buy_product_"):
+        elif data and data.startswith("buy_product_"):
             from handlers.market_system import handle_buy_product_modern
             await handle_buy_product_modern(callback, data)
-        elif data.startswith("confirm_buy_"):
+        elif data and data.startswith("confirm_buy_"):
             from handlers.market_system import confirm_buy_product_modern
             await confirm_buy_product_modern(callback, data)
         elif data == "my_orders":
@@ -301,3 +425,132 @@ async def get_user_ranking(user_id: int) -> Dict[str, Any]:
             'next_competitor': 'Yok',
             'points_needed': 0.0
         } 
+
+async def siparislerim_command(message: types.Message) -> None:
+    """Siparişlerim komutu"""
+    try:
+        user = message.from_user
+        
+        # 🔥 GRUP SESSİZLİK: Grup chatindeyse sil ve özel mesajla yanıt ver
+        if message.chat.type != "private":
+            try:
+                await message.delete()
+                logger.info(f"🔇 Siparişlerim komutu mesajı silindi - Group: {message.chat.id}")
+                if _bot_instance:
+                    await _send_siparislerim_privately(user.id)
+                return
+            except Exception as e:
+                logger.error(f"❌ Komut mesajı silinemedi: {e}")
+                return
+        
+        await _send_siparislerim_privately(user.id)
+        
+    except Exception as e:
+        logger.error(f"❌ Siparişlerim komutu hatası: {e}")
+        await message.reply("❌ Siparişler yüklenirken hata oluştu!")
+
+
+async def _send_siparislerim_privately(user_id: int):
+    """Siparişlerim bilgisini özel mesajla gönder"""
+    try:
+        from handlers.market_system import show_my_orders
+        from aiogram.types import CallbackQuery
+        
+        # Mock callback oluştur
+        mock_callback = type('MockCallback', (), {
+            'from_user': type('MockUser', (), {'id': user_id})(),
+            'message': type('MockMessage', (), {'edit_text': lambda *args, **kwargs: None})()
+        })()
+        
+        await show_my_orders(mock_callback)
+        
+    except Exception as e:
+        logger.error(f"❌ Özel siparişlerim gönderme hatası: {e}")
+        if _bot_instance:
+            await _bot_instance.send_message(
+                user_id,
+                "❌ Siparişler yüklenirken hata oluştu!"
+            )
+
+
+async def siralama_command(message: types.Message) -> None:
+    """Sıralama komutu"""
+    try:
+        user = message.from_user
+        
+        # 🔥 GRUP SESSİZLİK: Grup chatindeyse sil ve özel mesajla yanıt ver
+        if message.chat.type != "private":
+            try:
+                await message.delete()
+                logger.info(f"🔇 Sıralama komutu mesajı silindi - Group: {message.chat.id}")
+                if _bot_instance:
+                    await _send_siralama_privately(user.id)
+                return
+            except Exception as e:
+                logger.error(f"❌ Komut mesajı silinemedi: {e}")
+                return
+        
+        await _send_siralama_privately(user.id)
+        
+    except Exception as e:
+        logger.error(f"❌ Sıralama komutu hatası: {e}")
+        await message.reply("❌ Sıralama yüklenirken hata oluştu!")
+
+
+async def _send_siralama_privately(user_id: int):
+    """Sıralama bilgisini özel mesajla gönder"""
+    try:
+        # Mock callback oluştur
+        mock_callback = type('MockCallback', (), {
+            'from_user': type('MockUser', (), {'id': user_id})(),
+            'message': type('MockMessage', (), {'edit_text': lambda *args, **kwargs: None})()
+        })()
+        
+        await show_ranking(mock_callback)
+        
+    except Exception as e:
+        logger.error(f"❌ Özel sıralama gönderme hatası: {e}")
+        if _bot_instance:
+            await _bot_instance.send_message(
+                user_id,
+                "❌ Sıralama yüklenirken hata oluştu!"
+            )
+
+
+async def profil_command(message: types.Message) -> None:
+    """Profil komutu (menu ile aynı)"""
+    try:
+        user = message.from_user
+        
+        # 🔥 GRUP SESSİZLİK: Grup chatindeyse sil ve özel mesajla yanıt ver
+        if message.chat.type != "private":
+            try:
+                await message.delete()
+                logger.info(f"🔇 Profil komutu mesajı silindi - Group: {message.chat.id}")
+                if _bot_instance:
+                    await _send_profil_privately(user.id)
+                return
+            except Exception as e:
+                logger.error(f"❌ Komut mesajı silinemedi: {e}")
+                return
+        
+        await _send_profil_privately(user.id)
+        
+    except Exception as e:
+        logger.error(f"❌ Profil komutu hatası: {e}")
+        await message.reply("❌ Profil yüklenirken hata oluştu!")
+
+
+async def _send_profil_privately(user_id: int):
+    """Profil bilgisini özel mesajla gönder"""
+    try:
+        if _bot_instance:
+            await _send_menu_privately(user_id)
+        
+    except Exception as e:
+        logger.error(f"❌ Özel profil gönderme hatası: {e}")
+        if _bot_instance:
+            await _bot_instance.send_message(
+                user_id,
+                "❌ Profil yüklenirken hata oluştu!"
+            ) 

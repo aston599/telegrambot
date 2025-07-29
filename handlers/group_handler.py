@@ -12,25 +12,43 @@ from config import get_config
 
 logger = logging.getLogger(__name__)
 
+# Global bot instance
+_bot_instance = None
+
+def set_bot_instance(bot):
+    """Bot instance'ını ayarla"""
+    global _bot_instance
+    _bot_instance = bot
+
 
 async def kirvegrup_command(message: Message) -> None:
     """
-    /kirvegrup komutu - Grubu sisteme kayıt et
-    Sadece Üst Yetkili - Admin 2 ve üstü kullanabilir
+    /kirvegrup komutunu işle
     """
     try:
         user = message.from_user
         chat = message.chat
         
-        logger.info(f"🏛️ /kirvegrup komutu - User: {user.first_name} ({user.id}) - Chat: {chat.id}")
+        logger.info(f"👥 /kirvegrup komutu - User: {user.first_name} ({user.id}), Chat: {chat.title} ({chat.id})")
         
-        # Chat tipi kontrolü - sadece grup/supergroup
-        if chat.type not in ['group', 'supergroup']:
-            # Private'daysa normal cevap ver
-            await message.answer(
-                "❌ Bu komut sadece gruplarda kullanılabilir!",
-                reply_to_message_id=message.message_id
-            )
+        # 🔥 GRUP SESSİZLİK: Grup chatindeyse sil ve özel mesajla yanıt ver
+        if message.chat.type != "private":
+            try:
+                await message.delete()
+                logger.info(f"🔇 Kirvegrup komutu mesajı silindi - Group: {message.chat.id}")
+                
+                # ÖZELİNDE YANIT VER
+                if _bot_instance:
+                    await _send_kirvegrup_privately(user.id, chat.id)
+                return
+                
+            except Exception as e:
+                logger.error(f"❌ Komut mesajı silinemedi: {e}")
+                return
+        
+        # Sadece grup/supergroup'da çalış
+        if chat.type not in ["group", "supergroup"]:
+            await message.reply("❌ Bu komut sadece gruplarda kullanılabilir!")
             return
         
         # Yetki kontrolü - Üst Yetkili - Admin 2 veya üstü
@@ -390,3 +408,103 @@ _Lütfen daha sonra tekrar deneyin._
             
         except:
             pass  # Çifte hata durumunda sessiz kal 
+
+
+async def _send_kirvegrup_privately(user_id: int, chat_id: int):
+    """Kirvegrup mesajını özel mesajla gönder"""
+    try:
+        if not _bot_instance:
+            logger.error("❌ Bot instance bulunamadı!")
+            return
+        
+        # Kullanıcı bilgilerini al
+        from database import get_user_info
+        user_info = await get_user_info(user_id)
+        user_name = user_info.get('first_name', 'Kullanıcı') if user_info else 'Kullanıcı'
+        
+        # Grup bilgilerini al
+        try:
+            chat = await _bot_instance.get_chat(chat_id)
+            chat_title = chat.title if chat.title else f"Grup {chat_id}"
+        except:
+            chat_title = f"Grup {chat_id}"
+        
+        # Admin kontrolü
+        from config import get_config
+        config = get_config()
+        is_admin = user_id == config.ADMIN_USER_ID
+        
+        if not is_admin:
+            response = f"""
+❌ **Yetkisiz İşlem!**
+
+Merhaba {user_name}! 
+
+Bu komutu sadece admin kullanabilir.
+Grup kayıt işlemi için admin ile iletişime geçin.
+            """
+        else:
+            # Grup zaten kayıtlı mı kontrol et
+            from database import is_group_registered
+            is_registered = await is_group_registered(chat_id)
+            
+            if is_registered:
+                response = f"""
+✅ **Grup Zaten Kayıtlı!**
+
+Merhaba {user_name}! 
+
+**Grup:** {chat_title}
+**ID:** `{chat_id}`
+
+Bu grup zaten KirveHub sistemine kayıtlı.
+Bot bu grupta aktif olarak çalışıyor.
+            """
+            else:
+                # Grubu kayıt et
+                from database import register_group
+                success = await register_group(
+                    group_id=chat_id,
+                    group_name=chat_title,
+                    group_username=None,  # Bot API'den alamayız
+                    registered_by=user_id
+                )
+                
+                if success:
+                    response = f"""
+✅ **Grup Başarıyla Kayıt Edildi!**
+
+Merhaba {user_name}! 
+
+**Grup:** {chat_title}
+**ID:** `{chat_id}`
+
+✅ **Kayıt sonrası:**
+• Bot bu grupta aktif olacak
+• Kullanıcılar point kazanabilecek
+• Etkinlikler bu grupta çalışacak
+• Market sistemi aktif olacak
+• Grup sessizlik modu aktif
+
+🎉 **Grup artık sisteme kayıtlı!**
+                    """
+                else:
+                    response = f"""
+❌ **Grup Kayıt Hatası!**
+
+Merhaba {user_name}! 
+
+**Grup:** {chat_title}
+**ID:** `{chat_id}`
+
+Grup kayıt işlemi başarısız oldu.
+Lütfen daha sonra tekrar deneyin.
+                    """
+        
+        await _bot_instance.send_message(user_id, response, parse_mode="Markdown")
+        logger.info(f"✅ Kirvegrup mesajı özel mesajla gönderildi - User: {user_id}, Chat: {chat_id}")
+        
+    except Exception as e:
+        logger.error(f"❌ Private kirvegrup hatası: {e}")
+        if _bot_instance:
+            await _bot_instance.send_message(user_id, "❌ Grup kayıt mesajı gönderilemedi!") 

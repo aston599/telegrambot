@@ -1,0 +1,19 @@
+# DIGITALOCEAN DEPLOYMENT KOMUTLARI
+# Bu komutları sırayla yazın
+
+cd telegrambot
+
+python3.12 -m venv venv
+
+source venv/bin/activate
+
+pip install -r requirements.txt
+
+nano .env
+
+# .env dosyasında şunları yazın:
+# BOT_TOKEN=7633083532:AAFG8ba4h...
+# ADMIN_ID=8154732274
+# DATABASE_URL=postgresql://postgres.yfbyyuej...
+
+python3 main.py

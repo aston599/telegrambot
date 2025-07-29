@@ -3,7 +3,7 @@
 
 # Core Bot Framework
 aiogram==3.21.0
-asyncpg==0.31.0
+asyncpg==0.30.0
 
 # Database & Environment
 python-dotenv==1.0.0

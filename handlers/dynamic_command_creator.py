@@ -721,16 +721,11 @@ async def handle_custom_command(message: types.Message) -> None:
         # Komut adını al
         command_name = command_text.split()[0] if command_text else ""
         
-        logger.info(f"🔍 COMMAND NAME DEBUG - Command: '{command_name}'")
-        
         if not command_name.startswith('!'):
-            logger.info(f"❌ Komut ! ile başlamıyor: '{command_name}'")
             return
         
         # Scope belirle ve komut ara
         current_scope = 1 if message.chat.type != "private" else 2
-        
-        logger.info(f"🔍 SCOPE DEBUG - Chat type: {message.chat.type}, Current scope: {current_scope}")
         
         # Komutu veritabanından al
         from database import get_custom_command
@@ -741,15 +736,9 @@ async def handle_custom_command(message: types.Message) -> None:
         # Eğer bulunamadıysa, scope 3 (her ikisi) için de ara
         if not command:
             command = await get_custom_command(command_name, 3)
-            logger.info(f"🔍 DATABASE DEBUG - Command: '{command_name}', Scope 3, Result: {command}")
-        else:
-            logger.info(f"🔍 DATABASE DEBUG - Command: '{command_name}', Scope: {current_scope}, Result: {command}")
         
         if not command:
-            logger.info(f"❌ Komut bulunamadı: '{command_name}' scope: {current_scope} veya 3")
             return  # Komut bulunamadı, normal handler'lara geç
-        
-        logger.info(f"🔧 Dinamik komut çalıştırıldı: {command_name} - User: {message.from_user.id}")
         
         # Yanıt oluştur
         reply_text = command.get("reply_text", "Yanıt bulunamadı")

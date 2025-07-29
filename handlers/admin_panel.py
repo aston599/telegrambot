@@ -12,7 +12,7 @@ from typing import Dict, Any
 
 from config import get_config
 from database import db_pool, get_db_pool
-from utils.logger import logger, log_important
+from utils.logger import logger, log_system, log_bot, log_error, log_info, log_warning
 from handlers.recruitment_system import toggle_recruitment_system, get_recruitment_status, set_recruitment_interval
 
 router = Router()
@@ -101,7 +101,7 @@ async def admin_panel_command(message: Message) -> None:
         if message.chat.type != "private":
             try:
                 await message.delete()
-                log_important(f"🔇 Admin panel komutu mesajı silindi - Group: {message.chat.id}")
+                log_system(f"🔇 Admin panel komutu mesajı silindi - Group: {message.chat.id}")
                 
                 # ÖZELİNDE YANIT VER
                 if _bot_instance:
@@ -112,7 +112,7 @@ async def admin_panel_command(message: Message) -> None:
                 logger.error(f"❌ Komut mesajı silinemedi: {e}")
                 return
         
-        log_important(f"🛡️ Admin panel komutu ÖZELİNDE - User: {message.from_user.first_name} ({user_id})")
+        log_system(f"🛡️ Admin panel komutu ÖZELİNDE - User: {message.from_user.first_name} ({user_id})")
         
         # Görseldeki admin panel buton düzeni
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
@@ -167,6 +167,12 @@ async def admin_panel_callback(callback: types.CallbackQuery) -> None:
         user_id = callback.from_user.id
         config = get_config()
         
+        # YENİ: EN BAŞTA DETAYLI LOGLAMA
+        logger.info(f"🔍 CALLBACK RECEIVED - Raw data: {callback.data}")
+        logger.info(f"🔍 CALLBACK RECEIVED - Type: {type(callback.data)}")
+        logger.info(f"🔍 CALLBACK RECEIVED - Length: {len(callback.data) if callback.data else 0}")
+        logger.info(f"🔍 CALLBACK RECEIVED - User: {user_id}")
+        
         # Admin kontrolü
         if user_id != config.ADMIN_USER_ID:
             await callback.answer("❌ Bu işlemi sadece admin yapabilir!", show_alert=True)
@@ -175,8 +181,10 @@ async def admin_panel_callback(callback: types.CallbackQuery) -> None:
         action = callback.data
         logger.info(f"🔍 Callback data: {action} - User: {user_id}")
         
-        # Debug: Tüm callback'leri logla
-        # logger.info(f"🔍 CALLBACK DEBUG - Action: {action}, User: {user_id}")
+        # YENİ: DETAYLI LOGLAMA
+        logger.info(f"🔍 CALLBACK DEBUG - Action: {action}, User: {user_id}")
+        logger.info(f"🔍 CALLBACK DATA TYPE - Type: {type(action)}")
+        logger.info(f"🔍 CALLBACK DATA LENGTH - Length: {len(action) if action else 0}")
         
         # Debug: Bilinmeyen callback'leri logla
         if action not in ["admin_settings", "admin_events_system", "admin_broadcast", "admin_market_management", 
@@ -186,40 +194,71 @@ async def admin_panel_callback(callback: types.CallbackQuery) -> None:
                          "event_commands", "system_commands", "admin_market", "admin_market_add",
                          "admin_system_management", "admin_points_settings", "admin_daily_limit", "admin_weekly_limit",
                          "set_points_custom", "set_daily_custom", "set_weekly_custom"]:
-            # logger.info(f"🔍 UNKNOWN CALLBACK - Action: {action}, User: {user_id}")
-            pass
+            logger.info(f"🔍 UNKNOWN CALLBACK - Action: {action}, User: {user_id}")
         
+        # YENİ: SET_POINTS_ CALLBACK'LERİNİ KONTROL ET
+        if action and action.startswith("set_points_"):
+            logger.info(f"💰 SET POINTS CALLBACK DETECTED - Action: {action}, User: {user_id}")
+            await handle_points_setting(callback, action)
+            return
+        elif action and action.startswith("set_daily_"):
+            logger.info(f"📅 SET DAILY CALLBACK DETECTED - Action: {action}, User: {user_id}")
+            await handle_daily_limit_setting(callback, action)
+            return
+        elif action and action.startswith("set_weekly_"):
+            logger.info(f"📊 SET WEEKLY CALLBACK DETECTED - Action: {action}, User: {user_id}")
+            await handle_weekly_limit_setting(callback, action)
+            return
+
         # YENİ BUTON SİSTEMİ - Görseldeki düzen
         if action == "admin_settings":
+            logger.info(f"🔍 ADMIN SETTINGS CALLBACK - User: {user_id}")
             await show_settings_menu(callback)
         elif action == "admin_events_system":
-            await show_events_system_menu(callback)
-        elif action == "admin_broadcast":
-            logger.info(f"🎯 ADMIN BROADCAST CALLBACK - User: {user_id}, Action: {action}")
-            await show_broadcast_menu(callback)
+            logger.info(f"🔍 ADMIN EVENTS SYSTEM CALLBACK - User: {user_id}")
         elif action == "admin_market_management":
+            logger.info(f"🔍 ADMIN MARKET MANAGEMENT CALLBACK - User: {user_id}")
             await show_market_management_menu(callback)
         elif action == "admin_market_orders":
+            logger.info(f"🔍 ADMIN MARKET ORDERS CALLBACK - User: {user_id}")
             # Sipariş yönetimi - callback için özel fonksiyon
             await show_orders_list_callback(callback)
         elif action == "admin_balance_management":
+            logger.info(f"🔍 ADMIN BALANCE MANAGEMENT CALLBACK - User: {user_id}")
             await show_balance_management_menu(callback)
-        elif action.startswith("admin_balance_"):
+        elif action and action.startswith("admin_balance_"):
+            logger.info(f"🔍 ADMIN BALANCE CALLBACK - User: {user_id}, Action: {action}")
             # Bakiye yönetimi callback'leri - balance_management.py'den çağır
             from handlers.balance_management import handle_balance_callback
             await handle_balance_callback(callback)
         elif action == "admin_recruitment_system":
+            logger.info(f"🔍 ADMIN RECRUITMENT SYSTEM CALLBACK - User: {user_id}")
             await show_recruitment_system_menu(callback)
         elif action == "admin_reports":
             logger.info(f"📊 Admin reports callback tetiklendi - User: {user_id}")
             await show_reports_menu(callback)
         elif action == "admin_statistics":
+            logger.info(f"🔍 ADMIN STATISTICS CALLBACK - User: {user_id}")
             await show_statistics_menu(callback)
-        elif action.startswith("admin_stats_"):
+        elif action == "bonus_stats":
+            logger.info(f"🎁 BONUS STATS CALLBACK - User: {user_id}")
+            from handlers.admin_bonus_stats import show_bonus_stats
+            await show_bonus_stats(callback)
+        elif action == "refresh_bonus_stats":
+            logger.info(f"🔄 REFRESH BONUS STATS CALLBACK - User: {user_id}")
+            from handlers.admin_bonus_stats import refresh_bonus_stats
+            await refresh_bonus_stats(callback)
+        elif action == "detailed_bonus_stats":
+            logger.info(f"📊 DETAILED BONUS STATS CALLBACK - User: {user_id}")
+            from handlers.admin_bonus_stats import show_detailed_bonus_stats
+            await show_detailed_bonus_stats(callback)
+        elif action and action.startswith("admin_stats_"):
+            logger.info(f"🔍 ADMIN STATS CALLBACK - User: {user_id}, Action: {action}")
             # İstatistik callback'leri - statistics_system.py'den çağır
             from handlers.statistics_system import handle_stats_callback
             await handle_stats_callback(callback)
         elif action == "admin_restart_bot":
+            logger.info(f"🔍 ADMIN RESTART BOT CALLBACK - User: {user_id}")
             """Bot restart onay menüsü"""
             try:
                 user_id = callback.from_user.id
@@ -235,64 +274,80 @@ async def admin_panel_callback(callback: types.CallbackQuery) -> None:
 
 **⚠️ Dikkat:**
 • Bot yeniden başlatılacak
-• Tüm aktif işlemler durdurulacak
-• Kullanıcılar geçici olarak bot'a erişemeyecek
+• Tüm bağlantılar kesilecek
 • ~10-15 saniye sürecek
 
-**Devam etmek istiyor musun?**
+**Onaylıyor musunuz?**
                 """
                 
                 keyboard = InlineKeyboardMarkup(inline_keyboard=[
                     [
-                        InlineKeyboardButton(text="✅ Evet, Restart", callback_data="admin_restart_confirm"),
-                        InlineKeyboardButton(text="❌ İptal", callback_data="admin_restart_bot")
+                        InlineKeyboardButton(text="✅ Evet, Yeniden Başlat", callback_data="admin_restart_confirm"),
+                        InlineKeyboardButton(text="❌ İptal", callback_data="admin_system_management")
                     ]
                 ])
                 
-                await callback.message.edit_text(
-                    response,
-                    parse_mode="Markdown",
-                    reply_markup=keyboard
-                )
+                await callback.message.edit_text(response, parse_mode="Markdown", reply_markup=keyboard)
                 
             except Exception as e:
-                logger.error(f"❌ Restart bot hatası: {e}")
-                await callback.answer("❌ Bir hata oluştu!", show_alert=True)
+                logger.error(f"❌ Bot restart callback hatası: {e}")
+                await callback.answer("❌ Restart menüsü yüklenirken hata oluştu!", show_alert=True)
+        elif action == "admin_broadcast":
+            logger.info(f"🎯 BROADCAST CALLBACK YAKALANDI - User: {user_id}, Data: {action}")
+            # Broadcast sistemi callback'i
+            from handlers.broadcast_system import start_broadcast
+            await start_broadcast(callback)
+        elif action == "admin_broadcast_cancel":
+            logger.info(f"🎯 BROADCAST CANCEL CALLBACK YAKALANDI - User: {user_id}, Data: {action}")
+            # Broadcast iptal callback'i
+            from handlers.broadcast_system import cancel_broadcast
+            await cancel_broadcast(callback)
         elif action == "admin_command_creator":
+            logger.info(f"🔍 ADMIN COMMAND CREATOR CALLBACK - User: {user_id}")
             await show_command_creator_menu(callback)
         elif action == "admin_main_menu":
+            logger.info(f"🔍 ADMIN MAIN MENU CALLBACK - User: {user_id}")
             await show_main_admin_menu(callback)
         elif action == "admin_back":
-            # Ana admin paneline geri dön
-            await _send_admin_panel_privately(user_id)
-            await callback.answer("✅ Ana menüye döndünüz!")
-        # ESKİ BUTON SİSTEMİ - Geriye uyumluluk
+            logger.info(f"🔍 ADMIN BACK CALLBACK - User: {user_id}")
+            await show_back_menu(callback)
         elif action == "admin_panel_main":
+            logger.info(f"🔍 ADMIN PANEL MAIN CALLBACK - User: {user_id}")
             await show_main_admin_functions(callback)
         elif action == "balance_commands":
+            logger.info(f"🔍 BALANCE COMMANDS CALLBACK - User: {user_id}")
             await show_balance_commands_menu(callback)
         elif action == "event_commands":
+            logger.info(f"🔍 EVENT COMMANDS CALLBACK - User: {user_id}")
             await show_event_commands_menu(callback)
         elif action == "system_commands":
+            logger.info(f"🔍 SYSTEM COMMANDS CALLBACK - User: {user_id}")
             await show_system_commands_menu(callback)
         # Market callback'leri
         elif action == "admin_market":
+            logger.info(f"🔍 ADMIN MARKET CALLBACK - User: {user_id}")
             await show_market_menu(callback)
         elif action == "admin_market_add":
+            logger.info(f"🔍 ADMIN MARKET ADD CALLBACK - User: {user_id}")
             from handlers.admin_market_management import start_product_creation
             await start_product_creation(callback)
         # Diğer callback'ler
-        elif action.startswith("category_"):
+        elif action and action.startswith("category_"):
+            logger.info(f"🔍 CATEGORY CALLBACK - User: {user_id}, Action: {action}")
             await handle_category_callback(callback, action)
-        elif action.startswith("price_"):
+        elif action and action.startswith("price_"):
+            logger.info(f"🔍 PRICE CALLBACK - User: {user_id}, Action: {action}")
             await handle_price_callback(callback, action)
-        elif action.startswith("admin_recruitment_"):
+        elif action and action.startswith("admin_recruitment_"):
+            logger.info(f"🔍 ADMIN RECRUITMENT CALLBACK - User: {user_id}, Action: {action}")
             # Kayıt teşvik sistemi işlemleri
             await handle_recruitment_callback(callback, action)
-        elif action.startswith("recruitment_interval_"):
+        elif action and action.startswith("recruitment_interval_"):
+            logger.info(f"🔍 RECRUITMENT INTERVAL CALLBACK - User: {user_id}, Action: {action}")
             # Mesaj aralığı ayarlama
             await handle_recruitment_interval_callback(callback, action)
-        elif action.startswith("admin_order_"):
+        elif action and action.startswith("admin_order_"):
+            logger.info(f"🔍 ADMIN ORDER CALLBACK - User: {user_id}, Action: {action}")
             # Sipariş işlemleri
             parts = action.split("_")
             if len(parts) >= 4:
@@ -301,38 +356,47 @@ async def admin_panel_callback(callback: types.CallbackQuery) -> None:
                 await handle_order_action(callback, order_action, order_id)
         # Komut oluşturucu callback'leri
         elif action == "admin_create_command":
+            logger.info(f"🔍 ADMIN CREATE COMMAND CALLBACK - User: {user_id}")
             # Dinamik komut oluşturucuyu başlat
             from handlers.dynamic_command_creator import start_command_creation
             await start_command_creation(callback)
         elif action == "admin_list_commands":
-            # Komutları listele
+            logger.info(f"🔍 ADMIN LIST COMMANDS CALLBACK - User: {user_id}")
             from handlers.dynamic_command_creator import list_custom_commands_handler
             await list_custom_commands_handler(callback)
         elif action == "admin_delete_command":
+            logger.info(f"🔍 ADMIN DELETE COMMAND CALLBACK - User: {user_id}")
             await callback.answer("🗑️ Komut silme özelliği yakında eklenecek!", show_alert=True)
         elif action == "admin_command_stats":
+            logger.info(f"🔍 ADMIN COMMAND STATS CALLBACK - User: {user_id}")
             await callback.answer("📊 Komut istatistikleri yakında eklenecek!", show_alert=True)
         # SİSTEM YÖNETİMİ CALLBACK'LERİ
         elif action == "admin_system_management":
+            logger.info(f"🔍 ADMIN SYSTEM MANAGEMENT CALLBACK - User: {user_id}")
             await show_system_management_menu(callback)
         elif action == "admin_link_commands":
+            logger.info(f"🔍 ADMIN LINK COMMANDS CALLBACK - User: {user_id}")
             await show_link_commands_menu(callback)
         elif action == "admin_points_settings":
+            logger.info(f"🔍 ADMIN POINTS SETTINGS CALLBACK - User: {user_id}")
             await show_points_settings_menu(callback)
         elif action == "admin_daily_limit":
+            logger.info(f"🔍 ADMIN DAILY LIMIT CALLBACK - User: {user_id}")
             await show_daily_limit_menu(callback)
         elif action == "admin_weekly_limit":
+            logger.info(f"🔍 ADMIN WEEKLY LIMIT CALLBACK - User: {user_id}")
             await show_weekly_limit_menu(callback)
         elif action == "admin_system_status":
+            logger.info(f"🔍 ADMIN SYSTEM STATUS CALLBACK - User: {user_id}")
             await show_system_status_menu(callback)
         # SİSTEM YÖNETİMİ CALLBACK'LERİ - YENİ YAKLAŞIM
-        elif action.startswith("set_points_"):
+        elif action and action.startswith("set_points_"):
             logger.info(f"💰 SET POINTS CALLBACK - Action: {action}, User: {user_id}")
             await handle_points_setting(callback, action)
-        elif action.startswith("set_daily_"):
+        elif action and action.startswith("set_daily_"):
             logger.info(f"📅 SET DAILY CALLBACK - Action: {action}, User: {user_id}")
             await handle_daily_limit_setting(callback, action)
-        elif action.startswith("set_weekly_"):
+        elif action and action.startswith("set_weekly_"):
             logger.info(f"📊 SET WEEKLY CALLBACK - Action: {action}, User: {user_id}")
             await handle_weekly_limit_setting(callback, action)
         elif action == "set_points_custom":
@@ -855,6 +919,9 @@ async def show_statistics_menu(callback: types.CallbackQuery) -> None:
             InlineKeyboardButton(text="🎯 Performans İstatistikleri", callback_data="admin_stats_performance")
         ],
         [
+            InlineKeyboardButton(text="🎁 Bonus İstatistikleri", callback_data="bonus_stats")
+        ],
+        [
             InlineKeyboardButton(text="🔄 Yenile", callback_data="admin_statistics"),
             InlineKeyboardButton(text="⬅️ Geri", callback_data="admin_back")
         ]
@@ -868,12 +935,14 @@ async def show_statistics_menu(callback: types.CallbackQuery) -> None:
 • Sistem performans istatistikleri
 • Kullanıcı aktivite istatistikleri
 • Performans analizi
+• 🎁 Bonus sistemi istatistikleri
 
 **Özellikler:**
 • Gerçek zamanlı veriler
 • Detaylı analizler
 • Grafik ve tablolar
 • Export özellikleri
+• Bonus dağıtım takibi
 
 Hangi istatistiği görüntülemek istiyorsun?
     """
@@ -1809,8 +1878,9 @@ async def clean_messages_command(message: types.Message) -> None:
         if message.chat.type != "private":
             try:
                 await message.delete()
-            except:
-                pass
+                log_system(f"🔇 Admin panel komutu mesajı silindi - Group: {message.chat.id}")
+            except Exception as e:
+                log_error(f"❌ Admin panel mesajı silinemedi: {e}")
         
         # Sadece grup chatinde çalışsın
         if message.chat.type == "private":
@@ -1914,8 +1984,9 @@ async def list_groups_command(message: types.Message):
         if message.chat.type != "private":
             try:
                 await message.delete()
-            except:
-                pass
+                log_system(f"🔇 Admin panel komutu mesajı silindi - Group: {message.chat.id}")
+            except Exception as e:
+                log_error(f"❌ Admin panel mesajı silinemedi: {e}")
             return
         
         from database import get_registered_groups
@@ -1969,7 +2040,7 @@ async def approve_order_command(message: types.Message) -> None:
         if message.chat.type != "private":
             try:
                 await message.delete()
-                logger.info(f"🔇 Sipariş onaylama komutu mesajı silindi - Group: {message.chat.id}")
+                log_system(f"🔇 Sipariş onaylama komutu mesajı silindi - Group: {message.chat.id}")
                 
                 # ÖZELİNDE YANIT VER
                 if _bot_instance:
@@ -2072,7 +2143,7 @@ async def list_orders_command(message: types.Message) -> None:
         if message.chat.type != "private":
             try:
                 await message.delete()
-                logger.info(f"🔇 Sipariş listesi komutu mesajı silindi - Group: {message.chat.id}")
+                log_system(f"🔇 Sipariş listesi komutu mesajı silindi - Group: {message.chat.id}")
                 
                 # ÖZELİNDE YANIT VER
                 if _bot_instance:
@@ -2472,8 +2543,9 @@ async def help_command(message: types.Message) -> None:
         if message.chat.type != "private":
             try:
                 await message.delete()
-            except:
-                pass
+                log_system(f"🔇 Admin panel komutu mesajı silindi - Group: {message.chat.id}")
+            except Exception as e:
+                log_error(f"❌ Admin panel mesajı silinemedi: {e}")
         
         help_text = """
 ╔══════════════════════╗
@@ -2815,8 +2887,9 @@ async def test_market_system_command(message: types.Message) -> None:
         if message.chat.type != "private":
             try:
                 await message.delete()
-            except:
-                pass
+                log_system(f"🔇 Admin panel komutu mesajı silindi - Group: {message.chat.id}")
+            except Exception as e:
+                log_error(f"❌ Admin panel mesajı silinemedi: {e}")
         
         logger.info(f"🧪 Market sistemi test komutu - User: {message.from_user.first_name} ({user_id})")
         
@@ -2911,8 +2984,9 @@ async def test_sql_queries_command(message: types.Message) -> None:
         if message.chat.type != "private":
             try:
                 await message.delete()
-            except:
-                pass
+                log_system(f"🔇 Admin panel komutu mesajı silindi - Group: {message.chat.id}")
+            except Exception as e:
+                log_error(f"❌ Admin panel mesajı silinemedi: {e}")
         
         logger.info(f"🔍 SQL sorguları test komutu - User: {message.from_user.first_name} ({user_id})")
         
@@ -3038,8 +3112,9 @@ async def test_user_orders_command(message: types.Message) -> None:
         if message.chat.type != "private":
             try:
                 await message.delete()
-            except:
-                pass
+                log_system(f"🔇 Admin panel komutu mesajı silindi - Group: {message.chat.id}")
+            except Exception as e:
+                log_error(f"❌ Admin panel mesajı silinemedi: {e}")
             return
         
         # Test kullanıcı ID'si
@@ -3913,7 +3988,7 @@ async def admin_commands_list_command(message: Message) -> None:
         if message.chat.type != "private":
             try:
                 await message.delete()
-                logger.info(f"🔇 Admin commands list komutu mesajı silindi - Group: {message.chat.id}")
+                log_system(f"🔇 Admin commands list komutu mesajı silindi - Group: {message.chat.id}")
                 
                 # ÖZELİNDE YANIT VER
                 if _bot_instance:
@@ -4229,13 +4304,6 @@ async def show_system_management_menu(callback: types.CallbackQuery) -> None:
                 InlineKeyboardButton(text="📋 Sistem Durumu", callback_data="admin_system_status")
             ],
             [
-                InlineKeyboardButton(text="⏰ Zamanlanmış Mesajlar", callback_data="admin_scheduled_messages"),
-                InlineKeyboardButton(text="🔗 Link Komutları", callback_data="admin_link_commands")
-            ],
-            [
-                InlineKeyboardButton(text="⚙️ Zamanlanmış Komutlar", callback_data="admin_scheduled_commands")
-            ],
-            [
                 InlineKeyboardButton(text="🛡️ Admin Panel", callback_data="admin_back")
             ]
         ])
@@ -4297,6 +4365,13 @@ async def show_points_settings_menu(callback: types.CallbackQuery) -> None:
                 InlineKeyboardButton(text="⚙️ Sistem Yönetimi", callback_data="admin_system_management")
             ]
         ])
+        
+        # Keyboard debug sistemi pasife çekildi
+        # logger.info(f"🔍 KEYBOARD DEBUG - Keyboard created for user: {user_id}")
+        # logger.info(f"🔍 KEYBOARD DEBUG - Keyboard structure:")
+        # for row in keyboard.inline_keyboard:
+        #     for button in row:
+        #         logger.info(f"🔍 KEYBOARD DEBUG - Button: '{button.text}' -> '{button.callback_data}'")
         
         await callback.message.edit_text(
             response,
@@ -4467,12 +4542,20 @@ async def get_system_settings() -> Dict[str, Any]:
 async def update_system_setting(setting_name: str, new_value: float) -> bool:
     """Sistem ayarını güncelle"""
     try:
+        logger.info(f"🔧 UPDATE SYSTEM SETTING - Setting: {setting_name}, Value: {new_value}")
+        
         pool = await get_db_pool()
         if not pool:
+            logger.error(f"❌ UPDATE SYSTEM SETTING - No database pool available")
             return False
             
+        logger.info(f"🔧 UPDATE SYSTEM SETTING - Database pool acquired")
+        
         async with pool.acquire() as conn:
+            logger.info(f"🔧 UPDATE SYSTEM SETTING - Database connection acquired")
+            
             # Önce sistem ayarları tablosunu oluştur (eğer yoksa)
+            logger.info(f"🔧 UPDATE SYSTEM SETTING - Creating table if not exists")
             await conn.execute("""
                 CREATE TABLE IF NOT EXISTS system_settings (
                     id SERIAL PRIMARY KEY,
@@ -4485,6 +4568,7 @@ async def update_system_setting(setting_name: str, new_value: float) -> bool:
             """)
             
             # İlk kayıt yoksa oluştur
+            logger.info(f"🔧 UPDATE SYSTEM SETTING - Inserting default record if not exists")
             await conn.execute("""
                 INSERT INTO system_settings (id, points_per_message, daily_limit, weekly_limit)
                 VALUES (1, 0.04, 5.00, 20.00)
@@ -4492,17 +4576,27 @@ async def update_system_setting(setting_name: str, new_value: float) -> bool:
             """)
             
             # Ayarı güncelle
-            await conn.execute(f"""
+            logger.info(f"🔧 UPDATE SYSTEM SETTING - Updating setting: {setting_name} = {new_value}")
+            result = await conn.execute(f"""
                 UPDATE system_settings 
                 SET {setting_name} = $1, updated_at = NOW()
                 WHERE id = 1
             """, new_value)
             
-            logger.info(f"✅ Sistem ayarı güncellendi: {setting_name} = {new_value}")
-            return True
+            logger.info(f"🔧 UPDATE SYSTEM SETTING - Update result: {result}")
+            
+            # Güncelleme başarılı mı kontrol et
+            if result == "UPDATE 1":
+                logger.info(f"✅ UPDATE SYSTEM SETTING - Successfully updated {setting_name} to {new_value}")
+                return True
+            else:
+                logger.error(f"❌ UPDATE SYSTEM SETTING - Update failed, result: {result}")
+                return False
             
     except Exception as e:
-        logger.error(f"❌ Sistem ayarı güncelleme hatası: {e}")
+        logger.error(f"❌ UPDATE SYSTEM SETTING - Error: {e}")
+        logger.error(f"❌ UPDATE SYSTEM SETTING - Exception type: {type(e)}")
+        logger.error(f"❌ UPDATE SYSTEM SETTING - Exception args: {e.args}")
         return False
 
 
@@ -4521,8 +4615,11 @@ async def handle_points_setting(callback: types.CallbackQuery, action: str) -> N
             return
         
         logger.info(f"💰 POINTS SETTING DEBUG - Action: {action}, User: {user_id}")
+        logger.info(f"💰 POINTS SETTING ACTION TYPE - Type: {type(action)}")
+        logger.info(f"💰 POINTS SETTING ACTION LENGTH - Length: {len(action) if action else 0}")
         
         if action == "set_points_custom":
+            logger.info(f"💰 SET POINTS CUSTOM TRIGGERED - User: {user_id}")
             # Özel değer için input iste
             await callback.message.edit_text(
                 "💰 **ÖZEL KAZANIM DEĞERİ**\n\n"
@@ -4549,20 +4646,45 @@ async def handle_points_setting(callback: types.CallbackQuery, action: str) -> N
             return
         
         # Değeri al
+        logger.info(f"💰 EXTRACTING VALUE FROM ACTION - Action: {action}")
         new_value = float(action.replace("set_points_", ""))
+        logger.info(f"💰 EXTRACTED VALUE - New Value: {new_value}")
         
         # Ayarı güncelle
+        logger.info(f"💰 UPDATING SYSTEM SETTING - Setting: points_per_message, Value: {new_value}")
         success = await update_system_setting('points_per_message', new_value)
+        logger.info(f"💰 UPDATE RESULT - Success: {success}")
         
         if success:
+            logger.info(f"💰 SUCCESS - Sending callback answer")
+            # Başarılı bildirim gönder
             await callback.answer(f"✅ Kazanım ayarı güncellendi: {new_value} KP", show_alert=True)
-            # Sistem yönetimi menüsüne geri dön
-            await show_system_management_menu(callback)
+            
+            logger.info(f"💰 SUCCESS - Showing updated menu")
+            # Güncellenmiş menüyü göster
+            await show_points_settings_menu(callback)
+            
+            logger.info(f"💰 SUCCESS - Sending detailed notification")
+            # Ek bildirim mesajı gönder
+            if _bot_instance:
+                await _bot_instance.send_message(
+                    user_id,
+                    f"💰 **KAZANIM AYARI GÜNCELLENDİ!**\n\n"
+                    f"**Yeni Değer:** {new_value} KP (mesaj başına)\n"
+                    f"**Durum:** ✅ Aktif\n\n"
+                    f"🔄 **Değişiklik anında uygulandı!**",
+                    parse_mode="Markdown"
+                )
+                logger.info(f"💰 SUCCESS - Detailed notification sent")
+            else:
+                logger.error(f"❌ BOT INSTANCE NOT AVAILABLE")
         else:
+            logger.error(f"❌ UPDATE FAILED - Sending error callback answer")
             await callback.answer("❌ Ayar güncellenirken hata oluştu!", show_alert=True)
             
     except Exception as e:
         logger.error(f"❌ Kazanım ayarı hatası: {e}")
+        logger.error(f"❌ EXCEPTION DETAILS - Type: {type(e)}, Args: {e.args}")
         await callback.answer("❌ Kazanım ayarı güncellenirken hata oluştu!", show_alert=True)
 
 
@@ -4608,9 +4730,22 @@ async def handle_daily_limit_setting(callback: types.CallbackQuery, action: str)
         success = await update_system_setting('daily_limit', new_value)
         
         if success:
+            # Başarılı bildirim gönder
             await callback.answer(f"✅ Günlük limit güncellendi: {new_value} KP", show_alert=True)
-            # Sistem yönetimi menüsüne geri dön
-            await show_system_management_menu(callback)
+            
+            # Güncellenmiş menüyü göster
+            await show_daily_limit_menu(callback)
+            
+            # Ek bildirim mesajı gönder
+            if _bot_instance:
+                await _bot_instance.send_message(
+                    user_id,
+                    f"📅 **GÜNLÜK LİMİT GÜNCELLENDİ!**\n\n"
+                    f"**Yeni Limit:** {new_value} KP (günlük)\n"
+                    f"**Durum:** ✅ Aktif\n\n"
+                    f"🔄 **Değişiklik anında uygulandı!**",
+                    parse_mode="Markdown"
+                )
         else:
             await callback.answer("❌ Limit güncellenirken hata oluştu!", show_alert=True)
             
@@ -4634,25 +4769,24 @@ async def handle_weekly_limit_setting(callback: types.CallbackQuery, action: str
             return
         
         if action == "set_weekly_custom":
-            # Özel değer için input iste
-            await callback.message.edit_text(
-                "📊 **ÖZEL HAFTALIK LİMİT**\n\n"
-                "Yeni haftalık limit değerini girin (örn: 35.0):\n\n"
-                "**Format:** 10.0 - 500.0 arası\n"
-                "**Örnek:** 20.0, 50.0, 100.0",
-                parse_mode="Markdown",
-                reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                    [InlineKeyboardButton(text="❌ İptal", callback_data="admin_system_management")]
-                ])
-            )
-            
-            # Input state'i kaydet
-            from utils.memory_manager import memory_manager
-            cache_manager = memory_manager.get_cache_manager()
-            cache_manager.set_cache(f"input_state_{user_id}", "custom_weekly", ttl=300)
-            
-            logger.info(f"✅ Özel haftalık limit input başlatıldı - User: {user_id}")
-            return
+            logger.info(f"📊 SET WEEKLY CUSTOM CALLBACK - User: {user_id}")
+            await start_custom_weekly_input(callback)
+        # YENİ: SET_POINTS_ CALLBACK'LERİNİ YAKALA
+        elif action and action.startswith("set_points_"):
+            logger.info(f"💰 SET POINTS CALLBACK - Action: {action}, User: {user_id}")
+            await handle_points_setting(callback, action)
+        elif action and action.startswith("set_daily_"):
+            logger.info(f"📅 SET DAILY CALLBACK - Action: {action}, User: {user_id}")
+            await handle_daily_limit_setting(callback, action)
+        elif action and action.startswith("set_weekly_"):
+            logger.info(f"📊 SET WEEKLY CALLBACK - Action: {action}, User: {user_id}")
+            await handle_weekly_limit_setting(callback, action)
+        else:
+            logger.info(f"🔍 UNHANDLED CALLBACK - Action: {action}, User: {user_id}")
+            logger.info(f"🔍 CALLBACK DATA DEBUG - Raw data: {callback.data}")
+            logger.info(f"🔍 CALLBACK DATA TYPE - Type: {type(callback.data)}")
+            logger.info(f"🔍 CALLBACK DATA LENGTH - Length: {len(callback.data) if callback.data else 0}")
+            await callback.answer("❌ Bilinmeyen admin işlemi!", show_alert=True)
         
         # Değeri al
         new_value = float(action.replace("set_weekly_", ""))
@@ -4661,9 +4795,22 @@ async def handle_weekly_limit_setting(callback: types.CallbackQuery, action: str
         success = await update_system_setting('weekly_limit', new_value)
         
         if success:
+            # Başarılı bildirim gönder
             await callback.answer(f"✅ Haftalık limit güncellendi: {new_value} KP", show_alert=True)
-            # Sistem yönetimi menüsüne geri dön
-            await show_system_management_menu(callback)
+            
+            # Güncellenmiş menüyü göster
+            await show_weekly_limit_menu(callback)
+            
+            # Ek bildirim mesajı gönder
+            if _bot_instance:
+                await _bot_instance.send_message(
+                    user_id,
+                    f"📊 **HAFTALIK LİMİT GÜNCELLENDİ!**\n\n"
+                    f"**Yeni Limit:** {new_value} KP (haftalık)\n"
+                    f"**Durum:** ✅ Aktif\n\n"
+                    f"🔄 **Değişiklik anında uygulandı!**",
+                    parse_mode="Markdown"
+                )
         else:
             await callback.answer("❌ Limit güncellenirken hata oluştu!", show_alert=True)
             
@@ -4831,7 +4978,20 @@ async def handle_custom_input(message: types.Message) -> None:
                 # Ayarı güncelle
                 success = await update_system_setting('points_per_message', numeric_value)
                 if success:
+                    # Başarılı bildirim
                     await message.reply(f"✅ Kazanım ayarı güncellendi: {numeric_value} KP")
+                    
+                    # Ek bildirim mesajı gönder
+                    if _bot_instance:
+                        await _bot_instance.send_message(
+                            user_id,
+                            f"💰 **KAZANIM AYARI GÜNCELLENDİ!**\n\n"
+                            f"**Yeni Değer:** {numeric_value} KP (mesaj başına)\n"
+                            f"**Durum:** ✅ Aktif\n\n"
+                            f"🔄 **Değişiklik anında uygulandı!**",
+                            parse_mode="Markdown"
+                        )
+                    
                     # Sistem yönetimi menüsüne geri dön
                     await show_system_management_menu_from_message(message)
                 else:
@@ -4845,7 +5005,20 @@ async def handle_custom_input(message: types.Message) -> None:
                 # Ayarı güncelle
                 success = await update_system_setting('daily_limit', numeric_value)
                 if success:
+                    # Başarılı bildirim
                     await message.reply(f"✅ Günlük limit güncellendi: {numeric_value} KP")
+                    
+                    # Ek bildirim mesajı gönder
+                    if _bot_instance:
+                        await _bot_instance.send_message(
+                            user_id,
+                            f"📅 **GÜNLÜK LİMİT GÜNCELLENDİ!**\n\n"
+                            f"**Yeni Limit:** {numeric_value} KP (günlük)\n"
+                            f"**Durum:** ✅ Aktif\n\n"
+                            f"🔄 **Değişiklik anında uygulandı!**",
+                            parse_mode="Markdown"
+                        )
+                    
                     # Sistem yönetimi menüsüne geri dön
                     await show_system_management_menu_from_message(message)
                 else:
@@ -4859,7 +5032,20 @@ async def handle_custom_input(message: types.Message) -> None:
                 # Ayarı güncelle
                 success = await update_system_setting('weekly_limit', numeric_value)
                 if success:
+                    # Başarılı bildirim
                     await message.reply(f"✅ Haftalık limit güncellendi: {numeric_value} KP")
+                    
+                    # Ek bildirim mesajı gönder
+                    if _bot_instance:
+                        await _bot_instance.send_message(
+                            user_id,
+                            f"📊 **HAFTALIK LİMİT GÜNCELLENDİ!**\n\n"
+                            f"**Yeni Limit:** {numeric_value} KP (haftalık)\n"
+                            f"**Durum:** ✅ Aktif\n\n"
+                            f"🔄 **Değişiklik anında uygulandı!**",
+                            parse_mode="Markdown"
+                        )
+                    
                     # Sistem yönetimi menüsüne geri dön
                     await show_system_management_menu_from_message(message)
                 else:
@@ -4907,13 +5093,6 @@ async def show_system_management_menu_from_message(message: types.Message) -> No
             [
                 InlineKeyboardButton(text="📊 Haftalık Limit", callback_data="admin_weekly_limit"),
                 InlineKeyboardButton(text="📋 Sistem Durumu", callback_data="admin_system_status")
-            ],
-            [
-                InlineKeyboardButton(text="⏰ Zamanlanmış Mesajlar", callback_data="admin_scheduled_messages"),
-                InlineKeyboardButton(text="🔗 Link Komutları", callback_data="admin_link_commands")
-            ],
-            [
-                InlineKeyboardButton(text="⚙️ Zamanlanmış Komutlar", callback_data="admin_scheduled_commands")
             ],
             [
                 InlineKeyboardButton(text="🛡️ Admin Panel", callback_data="admin_back")
@@ -5483,3 +5662,59 @@ async def handle_lottery_cancel(callback: types.CallbackQuery) -> None:
     except Exception as e:
         logger.error(f"❌ Çekiliş iptal hatası: {e}")
         await callback.answer("❌ Bir hata oluştu!", show_alert=True)
+
+async def update_bot_command(message: types.Message) -> None:
+    """Bot güncelleme komutu - Sadece admin"""
+    try:
+        user_id = message.from_user.id
+        config = get_config()
+        
+        # Admin kontrolü
+        if user_id != config.ADMIN_USER_ID:
+            await message.reply("❌ Bu komut sadece admin için!")
+            return
+        
+        # Grup chatindeyse sil
+        if message.chat.type != "private":
+            try:
+                await message.delete()
+            except:
+                pass
+            return
+        
+        # Güncelleme mesajı
+        await message.reply("🔄 Bot güncelleniyor... Bu işlem 30 saniye sürebilir.")
+        
+        # Güncelleme işlemi
+        import subprocess
+        import asyncio
+        
+        try:
+            # Git pull
+            result = subprocess.run(
+                ["git", "pull", "origin", "main"], 
+                capture_output=True, 
+                text=True, 
+                cwd="/root/telegrambot"
+            )
+            
+            if result.returncode == 0:
+                # Bot'u yeniden başlat
+                subprocess.run(["pkill", "-f", "python3 main.py"], cwd="/root/telegrambot")
+                await asyncio.sleep(2)
+                
+                # Yeni bot'u başlat
+                subprocess.Popen([
+                    "nohup", "python3", "main.py", ">", "bot.log", "2>&1", "&"
+                ], cwd="/root/telegrambot")
+                
+                await message.reply("✅ Bot başarıyla güncellendi ve yeniden başlatıldı!")
+            else:
+                await message.reply(f"❌ Git pull hatası: {result.stderr}")
+                
+        except Exception as e:
+            await message.reply(f"❌ Güncelleme hatası: {e}")
+            
+    except Exception as e:
+        logger.error(f"❌ Bot güncelleme hatası: {e}")
+        await message.reply("❌ Güncelleme sırasında hata oluştu!")

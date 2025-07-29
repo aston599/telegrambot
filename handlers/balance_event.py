@@ -25,7 +25,7 @@ class BalanceEventStates(StatesGroup):
     waiting_for_confirmation = State()
 
 
-@router.callback_query(lambda c: c.data.startswith("admin_balance_event_"))
+@router.callback_query(lambda c: c.data and c.data.startswith("admin_balance_event_"))
 async def balance_event_callback_handler(callback: types.CallbackQuery, state: FSMContext) -> None:
     """Bakiye etkinliği callback handler"""
     try:
@@ -340,6 +340,21 @@ async def surprise_command(message: Message) -> None:
         if message.from_user.id != config.ADMIN_USER_ID:
             return
         
+        # 🔥 GRUP SESSİZLİK: Grup chatindeyse sil ve özel mesajla yanıt ver
+        if message.chat.type != "private":
+            try:
+                await message.delete()
+                logger.info(f"🔇 Sürpriz komutu mesajı silindi - Group: {message.chat.id}")
+                
+                # ÖZELİNDE YANIT VER
+                if _bot_instance:
+                    await _send_surprise_result_privately(message.from_user.id)
+                return
+                
+            except Exception as e:
+                logger.error(f"❌ Komut mesajı silinemedi: {e}")
+                return
+        
         # Hızlı sürpriz etkinlik başlat
         amount = 1.00  # 1 KP
         reason = "🎉 Sürpriz Etkinlik Bonusu!"
@@ -370,6 +385,44 @@ async def surprise_command(message: Message) -> None:
     except Exception as e:
         logger.error(f"❌ Surprise command hatası: {e}")
         await message.reply("❌ Bir hata oluştu!")
+
+async def _send_surprise_result_privately(user_id: int):
+    """Sürpriz sonucunu özel mesajla gönder"""
+    try:
+        if not _bot_instance:
+            logger.error("❌ Bot instance bulunamadı!")
+            return
+        
+        # Hızlı sürpriz etkinlik başlat
+        amount = 1.00  # 1 KP
+        reason = "🎉 Sürpriz Etkinlik Bonusu!"
+        
+        result = await process_surprise_event(amount, reason, user_id)
+        
+        if result["success"]:
+            response = f"""
+🎉 **Sürpriz Etkinlik Başarılı!**
+
+**💰 Dağıtılan Miktar:** {amount:.2f} KP
+**👥 Etkilenen Kullanıcı:** {result["affected_users"]} kişi
+**📝 Sebep:** {reason}
+**⏰ Tarih:** {datetime.now().strftime('%d.%m.%Y %H:%M')}
+
+**✅ İşlem tamamlandı!**
+            """
+        else:
+            response = f"""
+❌ **Sürpriz Etkinlik Başarısız!**
+
+**Hata:** {result["error"]}
+**Etkilenen Kullanıcı:** {result["affected_users"]} kişi
+            """
+        
+        await _bot_instance.send_message(user_id, response, parse_mode="Markdown")
+        
+    except Exception as e:
+        logger.error(f"❌ Private surprise result hatası: {e}")
+        await _bot_instance.send_message(user_id, "❌ Sürpriz etkinlik hatası!")
 
 
 # Yardımcı fonksiyonlar

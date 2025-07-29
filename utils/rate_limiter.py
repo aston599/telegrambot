@@ -15,9 +15,9 @@ class RateLimiter:
         self.global_limits: List[float] = []
         
         # Limit ayarları
-        self.user_message_limit = 1.0  # Kullanıcı başına 1 saniye
-        self.user_callback_limit = 0.5  # Callback başına 0.5 saniye
-        self.global_limit = 0.1  # Global 0.1 saniye
+        self.user_message_limit = 0.5  # Kullanıcı başına 0.5 saniye (hızlandırıldı)
+        self.user_callback_limit = 0.2  # Callback başına 0.2 saniye (hızlandırıldı)
+        self.global_limit = 0.05  # Global 0.05 saniye (hızlandırıldı)
         
     async def check_user_message_limit(self, user_id: int) -> bool:
         """Kullanıcı mesaj limitini kontrol et"""
@@ -29,7 +29,7 @@ class RateLimiter:
         self.user_limits[user_id] = user_times
         
         # Limit kontrolü
-        if len(user_times) >= 5:  # 5 saniyede maksimum 5 mesaj
+        if len(user_times) >= 10:  # 5 saniyede maksimum 10 mesaj (artırıldı)
             return False
             
         # Yeni kayıt ekle
@@ -46,7 +46,7 @@ class RateLimiter:
         self.user_limits[f"{user_id}_callback"] = user_times
         
         # Limit kontrolü
-        if len(user_times) >= 10:  # 2 saniyede maksimum 10 callback
+        if len(user_times) >= 20:  # 2 saniyede maksimum 20 callback (artırıldı)
             return False
             
         # Yeni kayıt ekle
@@ -61,7 +61,7 @@ class RateLimiter:
         self.global_limits = [t for t in self.global_limits if current_time - t < 1.0]
         
         # Limit kontrolü
-        if len(self.global_limits) >= 100:  # 1 saniyede maksimum 100 işlem
+        if len(self.global_limits) >= 200:  # 1 saniyede maksimum 200 işlem (artırıldı)
             return False
             
         # Yeni kayıt ekle

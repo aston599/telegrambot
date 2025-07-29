@@ -571,7 +571,7 @@ async def send_system_stats_to_user(user_id: int, message_obj) -> None:
 # CALLBACK HANDLER'LARI
 # ==============================================
 
-@router.callback_query(lambda c: c.data.startswith("stats_"))
+@router.callback_query(lambda c: c.data and c.data.startswith("stats_"))
 async def handle_stats_callback(callback: types.CallbackQuery) -> None:
     """İstatistik callback handler"""
     try:
