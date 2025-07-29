@@ -11,10 +11,10 @@ from logging.handlers import RotatingFileHandler
 # Global logger instance
 logger = logging.getLogger(__name__)
 
-def setup_logger():
+def setup_logger(name="bot", log_level=logging.WARNING):
     """Logger'ı kur"""
     # Production için log seviyesini ayarla - Daha az log
-    log_level = logging.INFO  # WARNING yerine INFO - Bot çalıştığını görmek için
+    # log_level = logging.INFO  # WARNING yerine INFO - Bot çalıştığını görmek için
     
     # Logger'ı yapılandır
     logging.basicConfig(

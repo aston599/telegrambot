@@ -5,6 +5,8 @@ Otomatik kayıt teşvik mesajları ve özel bilgilendirme
 
 import logging
 import asyncio
+import time
+import random
 from datetime import datetime, timedelta
 from typing import Dict, List, Set
 from aiogram import Bot, types
@@ -15,15 +17,12 @@ from config import get_config
 
 logger = logging.getLogger(__name__)
 
-# Sistem durumu
-recruitment_system_active = False  # Production için kapalı - Spam önlemi
-recruitment_interval = 14400  # 4 saat (saniye) - Daha az agresif
-
-# Spam koruması - Daha uzun cooldown'lar
-last_recruitment_users = set()  # Son teşvik edilen kullanıcılar
-recruitment_cooldown = 86400  # 24 saat (saniye) - Aynı kullanıcıya tekrar mesaj gönderme süresi
-user_recruitment_times = {}  # Her kullanıcının son teşvik zamanı
-recruitment_message_cooldown = 300  # 5 dakika (300 saniye) - Kullanıcılar arası minimum süre
+# Teşvik sistemi ayarları
+recruitment_system_active = False  # Production'da kapalı
+recruitment_interval = 120  # 2 dakika (saniye)
+recruitment_message_cooldown = 120  # 2 dakika (saniye)
+last_recruitment_time = 0
+last_recruited_user = None
 
 # Grup reply mesajları (daha nazik ve az agresif)
 GROUP_REPLY_MESSAGES = [
@@ -56,7 +55,7 @@ RECRUITMENT_MESSAGES = [
     "💎 **Kirve!** Hala sistemde yoksun! Özelden yaz, tüm detayları vereyim! 🎯",
     "🏆 **Kirvem!** Özelden yaz, sıralama sistemini anlatayım! 💎",
     "🎯 **Kirve!** Özelden yaz, hızlı kazanım sistemini anlatayım! 🚀",
-    "💎 **Kirvem!** Özelden yaz, özel ayrıcalıkları anlatayım! 🎮"
+    "💎 **Kirve!** Özelden yaz, özel ayrıcalıkları anlatayım! 🎮"
 ]
 
 # Özel bilgilendirme mesajları
@@ -129,7 +128,6 @@ async def send_recruitment_messages():
         target_user = available_users[0]
         
         # Rastgele mesaj seç
-        import random
         message = random.choice(RECRUITMENT_MESSAGES)
         
         # Mesajı gönder
@@ -215,7 +213,6 @@ async def send_recruitment_info(user_id: int, first_name: str):
         bot = Bot(token=config.BOT_TOKEN)
         
         # Rastgele bilgilendirme mesajı seç
-        import random
         info_message = random.choice(INFO_MESSAGES)
         
         # Ana bilgilendirme mesajı
@@ -407,3 +404,67 @@ async def handle_recruitment_callback(callback: CallbackQuery):
     except Exception as e:
         logger.error(f"❌ Recruitment callback hatası: {e}")
         await callback.answer("❌ Bir hata oluştu!", show_alert=True) 
+
+async def check_recruitment_eligibility(user_id: int, username: str, first_name: str, group_name: str) -> bool:
+    """Kullanıcının teşvik için uygun olup olmadığını kontrol et"""
+    global last_recruitment_time, last_recruited_user
+    
+    # Sistem kapalıysa False döndür
+    if not recruitment_system_active:
+        return False
+    
+    current_time = time.time()
+    
+    # Son teşvik zamanından 2 dakika geçmemişse False döndür
+    if current_time - last_recruitment_time < recruitment_interval:
+        return False
+    
+    # Aynı kullanıcıya tekrar teşvik yapma
+    if last_recruited_user == user_id:
+        return False
+    
+    # Kullanıcı kayıtlı mı kontrol et
+    pool = await get_db_pool()
+    if not pool:
+        return False
+        
+    async with pool.acquire() as conn:
+        result = await conn.fetchrow(
+            "SELECT id FROM users WHERE telegram_id = $1",
+            user_id
+        )
+        
+        # Kayıtlı kullanıcıları teşvik etme
+        if result:
+            return False
+    
+    # Tüm koşullar sağlanıyorsa True döndür
+    return True
+
+async def send_recruitment_message(user_id: int, username: str, first_name: str, group_name: str):
+    """Teşvik mesajı gönder"""
+    global last_recruitment_time, last_recruited_user
+    
+    try:
+        # Rastgele mesaj seç
+        message = random.choice(GROUP_REPLY_MESSAGES)
+        
+        # Mesajı gönder
+        config = get_config()
+        bot = Bot(token=config.BOT_TOKEN)
+        
+        await bot.send_message(
+            chat_id=user_id,
+            text=message,
+            parse_mode="HTML"
+        )
+        
+        # Zaman damgalarını güncelle
+        last_recruitment_time = time.time()
+        last_recruited_user = user_id
+        
+        await bot.session.close()
+        logger.info(f"🎯 Teşvik mesajı gönderildi - User: {user_id}, Name: {first_name}")
+        
+    except Exception as e:
+        logger.error(f"❌ Teşvik mesajı gönderilemedi - User: {user_id}, Error: {e}") 
