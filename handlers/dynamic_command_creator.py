@@ -1,16 +1,20 @@
 """
-🔧 Dinamik Komut Oluşturucu Sistemi - KirveHub Bot
+⚙️ Dinamik Komut Oluşturucu - KirveHub Bot
+Admin'lerin özel komutlar oluşturabilmesi için sistem
 """
 
+import asyncio
 import logging
-from aiogram import Router, types
-from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
+from datetime import datetime, timedelta
+from typing import Dict, Any, Optional, List
+from aiogram import Router, F, types
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.filters import Command
-from datetime import datetime
-from typing import List, Dict, Any
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import State, StatesGroup
 
 from config import get_config
-from database import add_custom_command, list_custom_commands, get_custom_command, get_db_pool
+from database import get_db_pool
 from utils.logger import logger
 
 router = Router()
@@ -34,7 +38,8 @@ async def start_command_creation(callback: types.CallbackQuery) -> None:
         config = get_config()
         
         # Admin kontrolü
-        if user_id != config.ADMIN_USER_ID:
+        from config import is_admin
+        if not is_admin(user_id):
             await callback.answer("❌ Bu işlemi sadece admin yapabilir!", show_alert=True)
             return
         
@@ -86,7 +91,8 @@ async def handle_command_creation_input(message: types.Message) -> None:
         logger.info(f"🔧 DEBUG - handle_command_creation_input çağrıldı - User: {user_id}, Text: {message.text}")
         
         # Admin kontrolü
-        if user_id != config.ADMIN_USER_ID:
+        from config import is_admin
+        if not is_admin(user_id):
             logger.info(f"❌ Admin değil - User: {user_id}")
             return
         
@@ -727,6 +733,9 @@ async def handle_custom_command(message: types.Message) -> None:
         # Scope belirle ve komut ara
         current_scope = 1 if message.chat.type != "private" else 2
         
+        # Debug log
+        logger.info(f"🔍 Dinamik komut aranıyor - Command: {command_name}, Scope: {current_scope}, Chat Type: {message.chat.type}")
+        
         # Komutu veritabanından al
         from database import get_custom_command
         
@@ -735,13 +744,19 @@ async def handle_custom_command(message: types.Message) -> None:
         
         # Eğer bulunamadıysa, scope 3 (her ikisi) için de ara
         if not command:
+            logger.info(f"🔍 Komut bulunamadı, scope 3 deneniyor - Command: {command_name}")
             command = await get_custom_command(command_name, 3)
+        
+        if command:
+            logger.info(f"✅ Komut bulundu - Command: {command_name}, Response: {command.get('response_message', 'Yok')[:50]}...")
+        else:
+            logger.info(f"❌ Komut bulunamadı - Command: {command_name}")
         
         if not command:
             return  # Komut bulunamadı, normal handler'lara geç
         
         # Yanıt oluştur
-        reply_text = command.get("reply_text", "Yanıt bulunamadı")
+        reply_text = command.get("response_message", "Yanıt bulunamadı")
         
         # Buton varsa ekle
         keyboard = None
@@ -783,16 +798,16 @@ async def create_link_command(command_name: str, link: str, description: str = "
             
             # Database'e kaydet
             await conn.execute(
-                """
-                INSERT INTO custom_commands (command, type, content, description, active, created_at, usage_count)
-                VALUES ($1, $2, $3, $4, $5, $6, $7)
-                ON CONFLICT (command) DO UPDATE SET
-                content = $3, description = $4, active = $5, updated_at = CURRENT_TIMESTAMP
-                """,
-                command_data["command"], command_data["type"], command_data["content"],
-                command_data["description"], command_data["active"], command_data["created_at"],
-                command_data["usage_count"]
-            )
+                    """
+                    INSERT INTO custom_commands (command_name, scope, response_message, button_text, button_url, created_by, is_active)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7)
+                    ON CONFLICT (command_name, scope) DO UPDATE SET
+                    response_message = $3, button_text = $4, button_url = $5, is_active = $7, updated_at = CURRENT_TIMESTAMP
+                    """,
+                    command_data["command"], command_data["scope"], command_data["content"],
+                    command_data.get("button_text"), command_data.get("button_url"), command_data["created_by"],
+                    command_data["active"]
+                )
             
             logger.info(f"✅ Link komutu oluşturuldu: !{command_name}")
             return True
@@ -830,14 +845,14 @@ async def create_scheduled_message_command(command_name: str, message: str, inte
                 # Database'e kaydet
                 await conn.execute(
                     """
-                    INSERT INTO custom_commands (command, type, content, description, active, created_at, usage_count)
+                    INSERT INTO custom_commands (command_name, scope, response_message, button_text, button_url, created_by, is_active)
                     VALUES ($1, $2, $3, $4, $5, $6, $7)
-                    ON CONFLICT (command) DO UPDATE SET
-                    content = $3, description = $4, active = $5, updated_at = CURRENT_TIMESTAMP
+                    ON CONFLICT (command_name, scope) DO UPDATE SET
+                    response_message = $3, button_text = $4, button_url = $5, is_active = $7, updated_at = CURRENT_TIMESTAMP
                     """,
-                    command_data["command"], command_data["type"], command_data["content"],
-                    command_data["description"], command_data["active"], command_data["created_at"],
-                    command_data["usage_count"]
+                    command_data["command"], command_data["scope"], command_data["content"],
+                    command_data.get("button_text"), command_data.get("button_url"), command_data["created_by"],
+                    command_data["active"]
                 )
                 
                 logger.info(f"✅ Zamanlanmış mesaj komutu oluşturuldu: !{command_name}")
@@ -868,7 +883,7 @@ async def toggle_custom_command(command_name: str, active: bool) -> bool:
         pool = await get_db_pool()
         async with pool.acquire() as conn:
             await conn.execute(
-                "UPDATE custom_commands SET active = $1 WHERE command = $2",
+                "UPDATE custom_commands SET is_active = $1 WHERE command_name = $2",
                 active, command_name
             )
             logger.info(f"✅ Komut durumu güncellendi: !{command_name} -> {active}")

@@ -111,7 +111,7 @@ async def send_maintenance_notification() -> None:
 
 async def send_startup_notification() -> None:
     """
-    Bot açılırken tüm aktif üyelere tekrar aktif bildirimi gönder
+    Bot açılırken sadece adminlere bildirim gönder
     """
     try:
         # Database pool'u dinamik olarak al
@@ -123,27 +123,28 @@ async def send_startup_notification() -> None:
         config = get_config()
         bot = Bot(token=config.BOT_TOKEN)
         
-        logger.info("🔔 Startup bildirimi başlatılıyor...")
+        logger.info("🔔 Admin startup bildirimi başlatılıyor...")
         
-        # Tüm kayıtlı kullanıcıları al (son 90 gün aktif)
+        # Sadece admin kullanıcıları al
         async with current_db_pool.acquire() as conn:
-            users = await conn.fetch("""
+            admins = await conn.fetch("""
                 SELECT user_id, first_name, username, last_activity 
                 FROM users 
                 WHERE is_registered = TRUE 
+                  AND (user_id = $1 OR is_admin = TRUE)
                   AND last_activity >= NOW() - INTERVAL '90 days'
                 ORDER BY last_activity DESC
-            """)
+            """, config.ADMIN_USER_ID)
         
-        if not users:
-            logger.info("📭 Bildirim gönderilecek aktif kullanıcı bulunamadı")
+        if not admins:
+            logger.info("📭 Bildirim gönderilecek admin bulunamadı")
             await bot.session.close()
             return
         
         startup_message = f"""
 🎊 **BOT YENİDEN AKTİF!** 🎊
 
-🌟 **Hoş geldiniz değerli KirveHub üyesi!**
+🌟 **Hoş geldiniz değerli Admin!**
 
 🚀 **Bot başarıyla yeniden başlatıldı!**
 
@@ -153,6 +154,7 @@ async def send_startup_notification() -> None:
 🤖 Bot: Çevrimiçi ve hazır
 💎 Point: Aktif ve kayıt ediyor
 🎯 Etkinlikler: Katılıma açık
+📊 Log Sistemi: Aktif ve çalışıyor
 
 ⏰ **Aktif Olma:** `{datetime.now().strftime('%d.%m.%Y %H:%M')}`
 
@@ -163,12 +165,12 @@ async def send_startup_notification() -> None:
         success_count = 0
         failed_count = 0
         
-        logger.info(f"📬 {len(users)} kullanıcıya startup bildirimi gönderiliyor...")
+        logger.info(f"📬 {len(admins)} admin'e startup bildirimi gönderiliyor...")
         
-        for user in users:
+        for admin in admins:
             try:
                 await bot.send_message(
-                    chat_id=user['user_id'],
+                    chat_id=admin['user_id'],
                     text=startup_message,
                     parse_mode="Markdown"
                 )
@@ -179,22 +181,22 @@ async def send_startup_notification() -> None:
                 
             except Exception as e:
                 failed_count += 1
-                logger.debug(f"❌ Bildirim gönderilemedi - User: {user['user_id']} - Hata: {e}")
+                logger.debug(f"❌ Admin bildirimi gönderilemedi - User: {admin['user_id']} - Hata: {e}")
         
         await bot.session.close()
         
-        logger.info(f"✅ Startup bildirimi tamamlandı - Başarılı: {success_count}, Başarısız: {failed_count}")
+        logger.info(f"✅ Admin startup bildirimi tamamlandı - Başarılı: {success_count}, Başarısız: {failed_count}")
         
         # Startup durumunu database'e kaydet
         if current_db_pool:
             async with current_db_pool.acquire() as conn:
                 await conn.execute("""
                     INSERT INTO bot_status (status) 
-                    VALUES ('🚀 AKTİF - Bot başlatıldı, kullanıcılara bildirim gönderildi')
+                    VALUES ('🚀 AKTİF - Bot başlatıldı, adminlere bildirim gönderildi')
                 """)
         
     except Exception as e:
-        logger.error(f"❌ Startup bildirimi hatası: {e}")
+        logger.error(f"❌ Admin startup bildirimi hatası: {e}")
 
 
 async def send_emergency_broadcast(message: str, admin_id: int) -> None:

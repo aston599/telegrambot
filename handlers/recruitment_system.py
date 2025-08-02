@@ -9,20 +9,28 @@ import time
 import random
 from datetime import datetime, timedelta
 from typing import Dict, List, Set
-from aiogram import Bot, types
+from aiogram import Bot, types, Router, F
 from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
+from aiogram.filters import Command
 
 from database import is_user_registered, save_user_info, get_db_pool
 from config import get_config
 
 logger = logging.getLogger(__name__)
 
+# Router tanımla
+router = Router()
+
 # Teşvik sistemi ayarları
-recruitment_system_active = False  # Production'da kapalı
+recruitment_system_active = True  # Production'da açık
 recruitment_interval = 120  # 2 dakika (saniye)
 recruitment_message_cooldown = 120  # 2 dakika (saniye)
 last_recruitment_time = 0
 last_recruited_user = None
+
+# Eksik değişkenleri tanımla
+user_recruitment_times: Dict[int, datetime] = {}
+last_recruitment_users: Set[int] = set()
 
 # Grup reply mesajları (daha nazik ve az agresif)
 GROUP_REPLY_MESSAGES = [
@@ -243,10 +251,10 @@ _💡 İpucu: Kayıt olduktan sonra grup sohbetlerinde mesaj atarak günlük 5 K
         
         # Butonlu mesaj
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="💎 Hemen Kayıt Ol!", callback_data="register_user")],
+            [InlineKeyboardButton(text="💎 Hemen Kayıt Ol!", callback_data="recruitment_register")],
             [InlineKeyboardButton(text="📊 Detaylı Bilgi", callback_data="recruitment_info")],
-            [InlineKeyboardButton(text="🎮 Komutları Gör", callback_data="show_commands")],
-            [InlineKeyboardButton(text="❌ Kapat", callback_data="close_recruitment")]
+            [InlineKeyboardButton(text="🎮 Komutları Gör", callback_data="recruitment_show_commands")],
+            [InlineKeyboardButton(text="❌ Kapat", callback_data="recruitment_close")]
         ])
         
         await bot.send_message(
@@ -290,9 +298,10 @@ async def start_recruitment_background():
     logger.info("🎯 Recruitment background task başlatıldı")
 
 # ==============================================
-# CALLBACK HANDLER'LARI
+# ROUTER HANDLER'LARI
 # ==============================================
 
+@router.callback_query(F.data.startswith("recruitment_"))
 async def handle_recruitment_callback(callback: CallbackQuery):
     """Recruitment callback handler"""
     try:
@@ -301,7 +310,7 @@ async def handle_recruitment_callback(callback: CallbackQuery):
         
         logger.info(f"🎯 Recruitment callback - User: {user_id}, Data: {data}")
         
-        if data == "register_user":
+        if data == "recruitment_register":
             # Kayıt ol butonu
             await callback.answer("🎯 Kayıt sayfasına yönlendiriliyorsunuz...")
             
@@ -317,7 +326,7 @@ async def handle_recruitment_callback(callback: CallbackQuery):
 📊 **KIRVEHUB DETAYLI BİLGİ**
 
 💎 **Point Sistemi:**
-• Her mesaj: 0.04 KP
+• Her 10 mesaj: 0.02 KP
 • Günlük limit: 5.00 KP
 • Flood koruması: 10 saniye
 
@@ -349,7 +358,7 @@ async def handle_recruitment_callback(callback: CallbackQuery):
                 ])
             )
             
-        elif data == "show_commands":
+        elif data == "recruitment_show_commands":
             # Komutları göster butonu
             await callback.answer("🎮 Komutlar gösteriliyor...")
             
@@ -391,7 +400,7 @@ async def handle_recruitment_callback(callback: CallbackQuery):
                 ])
             )
             
-        elif data == "close_recruitment":
+        elif data == "recruitment_close":
             # Kapat butonu
             await callback.answer("❌ Mesaj kapatılıyor...")
             await callback.message.delete()
@@ -403,7 +412,137 @@ async def handle_recruitment_callback(callback: CallbackQuery):
             
     except Exception as e:
         logger.error(f"❌ Recruitment callback hatası: {e}")
-        await callback.answer("❌ Bir hata oluştu!", show_alert=True) 
+        await callback.answer("❌ Bir hata oluştu!", show_alert=True)
+
+@router.message(Command("recruitment"))
+async def recruitment_command(message: Message):
+    """Recruitment sistemi admin komutu"""
+    try:
+        # Admin kontrolü
+        from config import get_config
+        config = get_config()
+        if message.from_user.id != config.ADMIN_USER_ID:
+            return
+
+        # Grup chatindeyse komut mesajını sil
+        if message.chat.type != "private":
+            try:
+                await message.delete()
+                logger.info(f"🔇 Recruitment komutu mesajı silindi - Group: {message.chat.id}")
+            except Exception as e:
+                logger.error(f"❌ Recruitment mesajı silinemedi: {e}")
+            return
+
+        # Recruitment durumunu göster
+        status = "✅ Açık" if recruitment_system_active else "❌ Kapalı"
+        
+        status_message = f"""
+🎯 **RECRUITMENT SİSTEMİ DURUMU**
+
+📊 **Mevcut Durum:** {status}
+⏱️ **Mesaj Aralığı:** {recruitment_interval} saniye
+🔄 **Cooldown:** {recruitment_message_cooldown} saniye
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎮 **KOMUTLAR:**
+• `/recruitment` - Bu menü
+• `/recruitment_toggle` - Sistemi aç/kapat
+• `/recruitment_interval <saniye>` - Aralığı ayarla
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+💡 **Bilgi:** Sistem otomatik olarak kayıtsız kullanıcılara teşvik mesajları gönderir.
+        """
+        
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🔄 Durumu Güncelle", callback_data="recruitment_status_refresh")],
+            [InlineKeyboardButton(text="❌ Kapat", callback_data="recruitment_close")]
+        ])
+        
+        await message.reply(
+            status_message,
+            parse_mode="Markdown",
+            reply_markup=keyboard
+        )
+        
+    except Exception as e:
+        logger.error(f"❌ Recruitment komut hatası: {e}")
+        await message.reply("❌ Recruitment durumu yüklenemedi!")
+
+@router.message(Command("recruitment_toggle"))
+async def recruitment_toggle_command(message: Message):
+    """Recruitment sistemi aç/kapat komutu"""
+    try:
+        # Admin kontrolü
+        from config import get_config
+        config = get_config()
+        if message.from_user.id != config.ADMIN_USER_ID:
+            return
+
+        # Grup chatindeyse komut mesajını sil
+        if message.chat.type != "private":
+            try:
+                await message.delete()
+                logger.info(f"🔇 Recruitment toggle komutu mesajı silindi - Group: {message.chat.id}")
+            except Exception as e:
+                logger.error(f"❌ Recruitment toggle mesajı silinemedi: {e}")
+            return
+
+        # Sistemi aç/kapat
+        global recruitment_system_active
+        recruitment_system_active = not recruitment_system_active
+        
+        status = "✅ Açıldı" if recruitment_system_active else "❌ Kapatıldı"
+        
+        await message.reply(f"🎯 Recruitment sistemi {status}!")
+        
+    except Exception as e:
+        logger.error(f"❌ Recruitment toggle komut hatası: {e}")
+        await message.reply("❌ Recruitment sistemi değiştirilemedi!")
+
+@router.message(Command("recruitment_interval"))
+async def recruitment_interval_command(message: Message):
+    """Recruitment mesaj aralığını ayarla"""
+    try:
+        # Admin kontrolü
+        from config import get_config
+        config = get_config()
+        if message.from_user.id != config.ADMIN_USER_ID:
+            return
+
+        # Grup chatindeyse komut mesajını sil
+        if message.chat.type != "private":
+            try:
+                await message.delete()
+                logger.info(f"🔇 Recruitment interval komutu mesajı silindi - Group: {message.chat.id}")
+            except Exception as e:
+                logger.error(f"❌ Recruitment interval mesajı silinemedi: {e}")
+            return
+
+        # Parametre kontrolü
+        args = message.text.split()
+        if len(args) != 2:
+            await message.reply("❌ Kullanım: `/recruitment_interval <saniye>`")
+            return
+            
+        try:
+            new_interval = int(args[1])
+            if new_interval < 30:  # Minimum 30 saniye
+                await message.reply("❌ Minimum aralık 30 saniye olmalı!")
+                return
+                
+            global recruitment_interval
+            recruitment_interval = new_interval
+            
+            await message.reply(f"✅ Recruitment mesaj aralığı {new_interval} saniye olarak ayarlandı!")
+            
+        except ValueError:
+            await message.reply("❌ Geçersiz sayı! Örnek: `/recruitment_interval 120`")
+        
+    except Exception as e:
+        logger.error(f"❌ Recruitment interval komut hatası: {e}")
+        await message.reply("❌ Recruitment aralığı ayarlanamadı!")
 
 async def check_recruitment_eligibility(user_id: int, username: str, first_name: str, group_name: str) -> bool:
     """Kullanıcının teşvik için uygun olup olmadığını kontrol et"""

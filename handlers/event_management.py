@@ -6,7 +6,7 @@
 import logging
 from datetime import datetime
 from typing import Optional, Dict
-from aiogram import Router, F
+from aiogram import Router, F, types
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.filters import Command
 
@@ -43,12 +43,23 @@ async def end_lottery_command(message: Message):
         # ID kontrolü - Direkt komuttan
         args = message.text.split()
         event_id = None
-        if len(args) == 2:
+        target_group_id = None
+        
+        if len(args) >= 2:
             try:
                 event_id = int(args[1])
                 logger.info(f"🎯 ID ile çekiliş bitirme: {event_id}")
+                
+                # Eğer 3. parametre varsa grup ID'si
+                if len(args) >= 3:
+                    try:
+                        target_group_id = int(args[2])
+                        logger.info(f"🎯 Grup ID ile çekiliş bitirme: Event {event_id}, Group {target_group_id}")
+                    except ValueError:
+                        logger.warning(f"⚠️ Geçersiz grup ID: {args[2]}")
+                        
             except ValueError:
-                error_message = "❌ Geçersiz çekiliş ID! Örnek: `/cekilisbitir 123`"
+                error_message = "❌ Geçersiz çekiliş ID! Örnek: `/cekilisbitir 123` veya `/cekilisbitir 123 456789`"
                 if message.chat.type == "private":
                     await message.reply(error_message)
                 else:
@@ -59,33 +70,15 @@ async def end_lottery_command(message: Message):
         # ID yoksa reply kontrolü
         if not event_id:
             if message.reply_to_message:
-                # Reply edilen mesajdan etkinlik ID'si bulmaya çalış
                 try:
-                    # Callback data'dan ID bulma (inline keyboard'dan)
-                    if message.reply_to_message.reply_markup:
-                        for row in message.reply_to_message.reply_markup.inline_keyboard:
-                            for button in row:
-                                if button.callback_data and "join_event_" in button.callback_data:
-                                    event_id = int(button.callback_data.split("_")[-1])
-                                    logger.info(f"🎯 Reply callback'den çekiliş ID bulundu: {event_id}")
-                                    break
-                            if event_id:
-                                break
-                    
-                    # Hala bulunamadıysa mesaj içeriğinden bul
-                    if not event_id and message.reply_to_message.text:
-                        import re
-                        id_match = re.search(r'ID:\s*(\d+)', message.reply_to_message.text)
-                        if id_match:
-                            event_id = int(id_match.group(1))
-                            logger.info(f"🎯 Reply text'ten çekiliş ID bulundu: {event_id}")
-                    
-                    # Son çare: grup içindeki en son aktif etkinliği bul
-                    if not event_id:
-                        event_id = await get_latest_active_event_in_group(message.chat.id)
-                        if event_id:
-                            logger.info(f"🎯 Grup'taki son aktif çekiliş ID bulundu: {event_id}")
-                        
+                    # Reply'den event ID'sini çıkar
+                    reply_text = message.reply_to_message.text
+                    # Event ID'sini bul (örnek: "🎯 ID: 123" formatında)
+                    import re
+                    id_match = re.search(r'🎯\s*ID:\s*(\d+)', reply_text)
+                    if id_match:
+                        event_id = int(id_match.group(1))
+                        logger.info(f"🎯 Reply'den çekiliş ID'si alındı: {event_id}")
                 except Exception as e:
                     logger.error(f"❌ Reply'den ID çıkarma hatası: {e}")
             
@@ -93,6 +86,7 @@ async def end_lottery_command(message: Message):
                 error_message = "❌ Çekiliş ID'si bulunamadı!\n\n" \
                                "**Kullanım:**\n" \
                                "• `/cekilisbitir 123` (ID ile)\n" \
+                               "• `/cekilisbitir 123 456789` (ID ve Grup ID ile)\n" \
                                "• Çekiliş mesajına reply yapıp `/cekilisbitir`"
                 if message.chat.type == "private":
                     await message.reply(error_message, parse_mode="Markdown")
@@ -101,7 +95,7 @@ async def end_lottery_command(message: Message):
                         await _bot_instance.send_message(message.from_user.id, error_message, parse_mode="Markdown")
                 return
         
-        logger.info(f"🎯 Bitirilecek çekiliş ID: {event_id} - Group: {message.chat.id}")
+        logger.info(f"🎯 Bitirilecek çekiliş ID: {event_id}, Hedef Grup: {target_group_id}")
         
         # Çekiliş detaylarını al
         event_details = await get_event_info_for_end(event_id)
@@ -114,70 +108,63 @@ async def end_lottery_command(message: Message):
                     await _bot_instance.send_message(message.from_user.id, error_message)
             return
         
+        # Grup kontrolü - Eğer hedef grup belirtilmişse kontrol et
+        if target_group_id:
+            event_group_id = event_details.get('group_id')
+            if event_group_id and event_group_id != target_group_id:
+                error_message = f"❌ Bu çekiliş farklı bir grupta! (Event: {event_id}, Event Group: {event_group_id}, Target Group: {target_group_id})"
+                if message.chat.type == "private":
+                    await message.reply(error_message)
+                else:
+                    if _bot_instance:
+                        await _bot_instance.send_message(message.from_user.id, error_message)
+                return
+        
         # Çekiliş bitirme işlemi - Sadece bitirme, kazanan işleme yok
         success = await end_event(event_id)
         
         if success:
             # Kazananları tekrar al (end_event'ten sonra)
             participant_count = await get_event_participant_count(event_id)
-            max_winners = event_details.get('max_winners', 1)
-            winners = await get_event_winners(event_id, max_winners)
+            winners = await get_event_winners(event_id, event_details.get('max_winners', 1))
             
-            logger.info(f"🔍 Event {event_id} - end_lottery_command winners: {winners}")
-            
-            # Point hesaplamaları
-            entry_cost = event_details.get('entry_cost', 0)
-            total_pool = participant_count * entry_cost
+            # Point havuzu hesapla
+            total_pool = participant_count * event_details.get('entry_cost', 0)
             winner_share = total_pool / len(winners) if winners else 0
             
-            # Kazananları kaydet ve point dağıt
-            from database import get_db_pool, add_points_to_user
-            pool = await get_db_pool()
-            if pool:
-                async with pool.acquire() as conn:
-                    for winner in winners:
-                        # Kazananı event_participations tablosunda kaydet
-                        await conn.execute("""
-                            UPDATE event_participations 
-                            SET status = 'completed'
-                            WHERE user_id = $1 AND event_id = $2
-                        """, winner['user_id'], event_id)
+            # Kazananlara point ver
+            if winners:
+                from database import add_points_to_user
+                for winner in winners:
+                    try:
+                        # Kazananlara point ver
+                        await add_points_to_user(
+                            winner['user_id'], 
+                            winner_share,
+                            group_id=event_details.get('group_id')
+                        )
                         
-                        # Kazananı event_participants tablosunda da kaydet
-                        await conn.execute("""
-                            UPDATE event_participants 
-                            SET status = 'completed', is_winner = TRUE
-                            WHERE user_id = $1 AND event_id = $2
-                        """, winner['user_id'], event_id)
-                        
-                        # Point dağıt
-                        if winner_share > 0:
-                            await add_points_to_user(winner['user_id'], winner_share, event_details.get('group_id'))
-                            logger.info(f"🎉 Kazanan point dağıtıldı: User {winner['user_id']}, Amount: {winner_share:.2f}")
-                        
-                        # Kazananlara özel mesaj gönder
-                        if _bot_instance:
-                            try:
-                                winner_message = f"""
-🎉 **TEBRİKLER! ÇEKİLİŞİ KAZANDINIZ!** 🎉
+                        # Kazananlara özel bildirim gönder
+                        winner_message = f"""
+🎉 **TEBRİKLER! ÇEKİLİŞ KAZANDINIZ!** 🎉
 
-🏆 **Çekiliş:** {event_details.get('title', 'Bilinmeyen Çekiliş')}
+🏆 **Çekiliş:** {event_details.get('title', 'Çekiliş')}
 💰 **Kazandığınız:** {winner_share:.2f} KP
+👥 **Toplam Katılımcı:** {participant_count} kişi
 🎯 **Çekiliş ID:** {event_id}
 
-✨ **Point'leriniz hesabınıza eklendi!**
-📊 **Yeni bakiyenizi görmek için:** /menu
-
 🎊 **İyi şanslar!**
-                                """
-                                await _bot_instance.send_message(
-                                    winner['user_id'],
-                                    winner_message,
-                                    parse_mode="Markdown"
-                                )
-                                logger.info(f"🎉 Kazanan bildirimi gönderildi: User {winner['user_id']}")
-                            except Exception as e:
-                                logger.error(f"❌ Kazanan bildirimi gönderilemedi: User {winner['user_id']}, Error: {e}")
+                        """
+                        
+                        if _bot_instance:
+                            await _bot_instance.send_message(
+                                winner['user_id'],
+                                winner_message,
+                                parse_mode="Markdown"
+                            )
+                            logger.info(f"🎉 Kazanan bildirimi gönderildi: User {winner['user_id']}")
+                    except Exception as e:
+                        logger.error(f"❌ Kazanan bildirimi gönderilemedi: User {winner['user_id']}, Error: {e}")
             
             # Kazanan listesi oluştur - DETAYLI
             winner_list = []
@@ -205,7 +192,7 @@ async def end_lottery_command(message: Message):
                 # Sadece ID
                 elif user_id:
                     winner_info = f"<b>ID: {user_id}</b>"
-                    winner_mentions.append(f"ID: {user_id}")
+                    winner_mentions.append("ID: {user_id}")
                 else:
                     winner_info = f"<b>Bilinmeyen Kullanıcı</b>"
                     winner_mentions.append("Bilinmeyen Kullanıcı")
@@ -252,85 +239,37 @@ async def end_lottery_command(message: Message):
             
             # 2. ÇEKİLİŞİN OLDUĞU GRUPTA DA SONUÇ GÖSTER
             try:
-                from database import get_db_pool
-                pool = await get_db_pool()
-                if pool:
-                    async with pool.acquire() as conn:
-                        event_data = await conn.fetchrow("SELECT message_id, group_id FROM events WHERE id = $1", event_id)
-                    
-                    if event_data and event_data['group_id']:
-                        # Çekilişin olduğu grupta sonuç mesajı gönder
-                        group_completion_msg = await _bot_instance.send_message(
-                            event_data['group_id'],
-                            event_completion_message,
-                            parse_mode="HTML"
-                        )
-                        logger.info(f"✅ Çekiliş sonucu grupta gönderildi: {event_data['group_id']}")
-                        
-                        # Kazananları etiketle
-                        if winner_mentions:
-                            mention_text = " ".join(winner_mentions)
-                            mention_message = f"🎉 **TEBRİKLER KAZANANLAR!** 🎉\n\n{mention_text}"
-                            await _bot_instance.send_message(
-                                event_data['group_id'],
-                                mention_message,
-                                parse_mode="Markdown"
-                            )
-                            logger.info(f"✅ Kazananlar etiketlendi: {event_data['group_id']}")
-                        
-                        # Orijinal çekiliş mesajını güncelle - "Çekiliş Sonuçlandı" butonu
-                        if event_data['message_id']:
-                            keyboard = InlineKeyboardMarkup(inline_keyboard=[
-                                [InlineKeyboardButton(
-                                    text="🏁 Çekiliş Sonuçlandı - Katılım Kapalı",
-                                    callback_data="event_completed"
-                                )]
-                            ])
-                            await _bot_instance.edit_message_reply_markup(
-                                chat_id=event_data['group_id'],
-                                message_id=event_data['message_id'],
-                                reply_markup=keyboard
-                            )
-                            logger.info(f"✅ Orijinal çekiliş mesajı güncellendi: {event_data['message_id']}")
+                # created_by kullanıcısının en son aktif olduğu grubu bul
+                from database import get_registered_groups
+                groups = await get_registered_groups()
+                
+                # Basit bir grup seçimi - ilk grubu kullan
+                if groups and _bot_instance:
+                    group_id = groups[0]['group_id']  # İlk grubu kullan
+                    await _bot_instance.send_message(
+                        group_id,
+                        event_completion_message,
+                        parse_mode="HTML"
+                    )
+                    logger.info(f"✅ Çekiliş sonucu gruba gönderildi: Group {group_id}")
                 else:
-                    logger.warning("⚠️ Database pool yok - grup sonuç mesajı gönderilemedi")
-                        
+                    logger.info("ℹ️ Grup bulunamadı, sadece özel mesajda gösterildi")
             except Exception as e:
-                logger.error(f"❌ Grup sonuç mesajı gönderme hatası: {e}")
+                logger.error(f"❌ Grup mesajı gönderilemedi: {e}")
             
-            # Admin'e özel mesajla sonuç bildir
-            if _bot_instance and message.chat.type != "private":
-                admin_message = f"""
-╔═══════════════╗
-║   ✅ <b>İŞLEM BAŞARILI</b> ✅   ║
-╚═══════════════╝
-
-📊 <b>Çekiliş Özeti:</b>
-• 🎯 ID: <code>{event_id}</code>
-• 👥 Katılımcı: <code>{participant_count}</code>
-• 🏆 Kazanan: <code>{len(winners)}</code>
-
-✨ <b>Çekiliş başarıyla sonuçlandırıldı!</b>
-• ✅ KirveBot sohbetinde sonuç gösterildi
-• ✅ Çekiliş grubunda sonuç gösterildi
-• ✅ Orijinal mesaj güncellendi
-                """
-                await _bot_instance.send_message(
-                    message.from_user.id,
-                    admin_message,
-                    parse_mode="HTML"
-                )
+            logger.info(f"✅ Çekiliş başarıyla bitirildi: Event {event_id}, Winners: {len(winners)}")
+            
         else:
-            error_message = "❌ Çekiliş bitirilemedi! Çekiliş bulunamadı veya zaten bitmiş."
+            error_message = "❌ Çekiliş bitirilemedi! Sistem hatası."
             if message.chat.type == "private":
                 await message.reply(error_message)
             else:
                 if _bot_instance:
                     await _bot_instance.send_message(message.from_user.id, error_message)
-                    
+            
     except Exception as e:
-        logger.error(f"❌ End lottery command hatası: {e}")
-        error_message = "❌ Çekiliş bitirme işlemi başarısız!"
+        logger.error(f"❌ Çekiliş bitirme hatası: {e}")
+        error_message = "❌ Çekiliş bitirme sırasında hata oluştu!"
         if message.chat.type == "private":
             await message.reply(error_message)
         else:

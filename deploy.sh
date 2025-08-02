@@ -1,45 +1,57 @@
 #!/bin/bash
 
-# 🚀 KirveHub Bot - Otomatik Deploy Script
-# DigitalOcean'da çalıştırılacak
+echo "🚀 KirveHub Bot - Hızlı Deployment"
+echo "=================================="
 
-echo "🔧 KirveHub Bot Deploy Başlatılıyor..."
+# Renkli çıktı için
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
 
-# 1. Mevcut botu durdur
-echo "⏹️ Mevcut bot durduruluyor..."
-pkill -f "python3 main.py" || true
-sleep 2
-
-# 2. Git'ten güncellemeleri çek
-echo "📥 Git güncellemeleri çekiliyor..."
-cd ~/telegrambot
-git fetch origin
-git reset --hard origin/main
-
-# 3. Virtual environment'ı aktifleştir
-echo "🐍 Virtual environment aktifleştiriliyor..."
-source venv/bin/activate
-
-# 4. Gereksinimleri güncelle
-echo "📦 Gereksinimler güncelleniyor..."
-pip install -r requirements.txt
-
-# 5. Database migration'ları çalıştır
-echo "🗄️ Database kontrol ediliyor..."
-python3 -c "import asyncio; from database import init_database; asyncio.run(init_database())"
-
-# 6. Botu başlat
-echo "🤖 Bot başlatılıyor..."
-nohup python3 main.py > bot.log 2>&1 &
-
-# 7. Durumu kontrol et
-sleep 5
-if pgrep -f "python3 main.py" > /dev/null; then
-    echo "✅ Bot başarıyla başlatıldı!"
-    echo "📊 Log dosyası: ~/telegrambot/bot.log"
-else
-    echo "❌ Bot başlatılamadı!"
-    echo "🔍 Log kontrolü: tail -f ~/telegrambot/bot.log"
+# Git durumunu kontrol et
+echo -e "${YELLOW}📋 Git durumu kontrol ediliyor...${NC}"
+if [[ -n $(git status --porcelain) ]]; then
+    echo -e "${YELLOW}⚠️  Değişiklikler tespit edildi${NC}"
+    read -p "Değişiklikleri commit etmek istiyor musun? (y/n): " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        git add .
+        read -p "Commit mesajı: " commit_msg
+        git commit -m "$commit_msg"
+    fi
 fi
 
-echo "🚀 Deploy tamamlandı!" 
+# Git'e push yap
+echo -e "${YELLOW}📤 GitHub'a push yapılıyor...${NC}"
+git push origin main
+
+if [ $? -eq 0 ]; then
+    echo -e "${GREEN}✅ Push başarılı!${NC}"
+else
+    echo -e "${RED}❌ Push başarısız!${NC}"
+    exit 1
+fi
+
+# DigitalOcean IP adresini al
+echo -e "${YELLOW}🌐 DigitalOcean sunucusuna bağlanılıyor...${NC}"
+
+# SSH ile sunucuya bağlan ve güncelle
+ssh kirvehub@YOUR_DROPLET_IP << 'EOF'
+echo "🔄 Bot güncelleniyor..."
+cd /home/kirvehub/telegrambot
+git pull origin main
+source venv/bin/activate
+pip install -r requirements.txt
+sudo systemctl restart kirvehub-bot
+echo "✅ Bot başarıyla güncellendi!"
+sudo systemctl status kirvehub-bot
+EOF
+
+if [ $? -eq 0 ]; then
+    echo -e "${GREEN}🎉 Deployment tamamlandı!${NC}"
+    echo -e "${GREEN}🤖 Bot yeniden başlatıldı ve çalışıyor.${NC}"
+else
+    echo -e "${RED}❌ Deployment başarısız!${NC}"
+    exit 1
+fi 

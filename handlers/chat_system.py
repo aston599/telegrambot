@@ -3,397 +3,268 @@
 Bot'un grup sohbetlerinde doğal konuşabilmesi için
 """
 
-import logging
 import random
+import asyncio
+import time
 import re
-from typing import List, Dict, Optional
+from typing import Optional, Dict
 from aiogram import Bot
 from aiogram.types import Message
-
-from database import is_user_registered, save_user_info
-from config import get_config
+from utils.logger import logger
 from utils.cooldown_manager import cooldown_manager
+from database import is_user_registered
+from config import get_config
+from aiogram import types
 
-logger = logging.getLogger(__name__)
+# Bot başlangıç koruması
+bot_startup_time = time.time() - 300  # 5 dakika önce başlat (koruma geçmiş olsun)
+STARTUP_PROTECTION_DURATION = 60  # 1 dakika koruma
 
-# Sohbet sistemi durumu
+# Chat sistemi ayarları
 chat_system_active = True
-chat_probability = 0.5  # %50 ihtimalle cevap ver (cooldown manager ile kontrol edilecek)
-min_message_length = 5  # Production için 5 harf minimum
+chat_probability = 0.15  # %15 ihtimalle cevap ver (daha seçici)
+min_message_length = 3  # Minimum mesaj uzunluğu (3 harf)
 
-# Selamlaşma kalıpları ve cevapları - Genişletilmiş ve samimi
+# Kayıt olmayan kullanıcılar için teşvik sistemi
+unregistered_users_last_message = {}  # {user_id: timestamp}
+REGISTRATION_REMINDER_INTERVAL = 600  # 10 dakika (600 saniye)
+
+# Selamlaşma kalıpları - Sadece gerçek selamlamalar
 GREETINGS = {
     "selam": [
-        "Selam kirvem! Nasılsın? 😊",
-        "Selam! Bugün nasıl gidiyor? 💎",
-        "Selam! Sohbete katılığın için teşekkürler! 🎯",
-        "Selam kirvem! Hoş geldin! 🚀",
-        "Selam dostum! Nasıl gidiyor hayat? 😄",
-        "Selam! Bugün keyfin nasıl? 💫",
-        "Selam kirvem! Sohbete hoş geldin! 🌟",
-        "Selam! Nasıl gidiyor hayat? 😊",
-        "Selam dostum! Bugün nasıl? 💎",
-        "Selam! Hoş geldin sohbete! 🎯"
+        "Selam! 😊",
+        "Selam! 💎"
     ],
     "merhaba": [
-        "Merhaba! Nasılsın kirvem? 😊",
-        "Merhaba! Bugün nasıl? 💎",
-        "Merhaba! Sohbete hoş geldin! 🎯",
-        "Merhaba kirvem! 🚀",
-        "Merhaba dostum! Nasıl gidiyor? 😄",
-        "Merhaba! Bugün keyfin nasıl? 💫",
-        "Merhaba! Hoş geldin! 🌟",
-        "Merhaba! Nasıl gidiyor hayat? 😊",
-        "Merhaba dostum! Bugün nasıl? 💎",
-        "Merhaba! Sohbete hoş geldin! 🎯"
+        "Merhaba! 😊",
+        "Merhaba! 💎"
     ],
     "sa": [
-        "As kirvem! Nasılsın? 😊",
-        "As! Bugün nasıl gidiyor? 💎",
-        "As! Hoş geldin! 🎯",
-        "As kirvem! 🚀",
-        "As dostum! Nasıl gidiyor? 😄",
-        "As! Bugün keyfin nasıl? 💫",
-        "As! Hoş geldin sohbete! 🌟",
-        "As! Nasıl gidiyor hayat? 😊",
-        "As dostum! Bugün nasıl? 💎",
-        "As! Sohbete hoş geldin! 🎯"
-    ],
-    "hey": [
-        "Hey! Nasılsın? 😊",
-        "Hey kirvem! Bugün nasıl? 💎",
-        "Hey! Sohbete katılığın için teşekkürler! 🎯",
-        "Hey! Hoş geldin! 🚀",
-        "Hey dostum! Nasıl gidiyor? 😄",
-        "Hey! Bugün keyfin nasıl? 💫",
-        "Hey! Hoş geldin sohbete! 🌟",
-        "Hey! Nasıl gidiyor hayat? 😊",
-        "Hey dostum! Bugün nasıl? 💎",
-        "Hey! Sohbete hoş geldin! 🎯"
-    ],
-    "hi": [
-        "Hi! Nasılsın? 😊",
-        "Hi kirvem! Bugün nasıl? 💎",
-        "Hi! Sohbete hoş geldin! 🎯",
-        "Hi! 🚀",
-        "Hi dostum! Nasıl gidiyor? 😄",
-        "Hi! Bugün keyfin nasıl? 💫",
-        "Hi! Hoş geldin sohbete! 🌟",
-        "Hi! Nasıl gidiyor hayat? 😊",
-        "Hi dostum! Bugün nasıl? 💎",
-        "Hi! Sohbete hoş geldin! 🎯"
+        "Aleyküm selam! 😊",
+        "Selam! 💎"
     ],
     "günaydın": [
-        "Günaydın kirvem! Nasılsın? 😊",
-        "Günaydın! Bugün nasıl gidiyor? 💎",
-        "Günaydın! Hoş geldin! 🎯",
-        "Günaydın dostum! 🌟",
-        "Günaydın! Bugün keyfin nasıl? 💫",
-        "Günaydın kirvem! Hoş geldin! 😄",
-        "Günaydın! Sohbete hoş geldin! 🚀",
-        "Günaydın dostum! Nasıl gidiyor? 💎",
-        "Günaydın! Bugün nasıl? 🎯",
-        "Günaydın! Hoş geldin sohbete! 🌟"
+        "Günaydın! 😊",
+        "Günaydın! 💎"
     ],
     "iyi akşamlar": [
-        "İyi akşamlar kirvem! Nasılsın? 😊",
-        "İyi akşamlar! Bugün nasıl gidiyor? 💎",
-        "İyi akşamlar! Hoş geldin! 🎯",
-        "İyi akşamlar dostum! 🌟",
-        "İyi akşamlar! Bugün keyfin nasıl? 💫",
-        "İyi akşamlar kirvem! Hoş geldin! 😄",
-        "İyi akşamlar! Sohbete hoş geldin! 🚀",
-        "İyi akşamlar dostum! Nasıl gidiyor? 💎",
-        "İyi akşamlar! Bugün nasıl? 🎯",
-        "İyi akşamlar! Hoş geldin sohbete! 🌟"
+        "İyi akşamlar! 😊",
+        "İyi akşamlar! 💎"
     ],
     "iyi geceler": [
-        "İyi geceler kirvem! Uyku tatlı olsun! 😊",
-        "İyi geceler! Tatlı rüyalar! 💎",
-        "İyi geceler! Hoşça kal! 🎯",
-        "İyi geceler dostum! 🌟",
-        "İyi geceler! Tatlı uykular! 💫",
-        "İyi geceler kirvem! Hoşça kal! 😄",
-        "İyi geceler! Sohbete hoş geldin! 🚀",
-        "İyi geceler dostum! Tatlı rüyalar! 💎",
-        "İyi geceler! Hoşça kal! 🎯",
-        "İyi geceler! Tatlı uykular! 🌟"
+        "İyi geceler! 😊",
+        "İyi geceler! 💎"
     ]
 }
 
-# Soru kalıpları ve cevapları - Genişletilmiş ve samimi
+# Soru kalıpları - Sadece gerçek sorular
 QUESTIONS = {
     "nasılsın": [
-        "İyiyim kirvem, teşekkürler! Sen nasılsın? 😊",
-        "Çok iyiyim! Sen nasılsın? 💎",
-        "Harika! Sen nasılsın? 🎯",
-        "İyiyim! Sen nasılsın? 🚀",
-        "Çok iyiyim dostum! Sen nasılsın? 😄",
-        "Harika gidiyor! Sen nasıl? 💫",
-        "İyiyim! Sen nasılsın? 🌟",
-        "Çok iyiyim! Sen nasıl? 😊",
-        "Harika! Sen nasılsın? 💎",
-        "İyiyim dostum! Sen nasıl? 🎯"
-    ],
-    "nasıl gidiyor": [
-        "Harika gidiyor! Sen nasıl? 😊",
-        "Çok iyi! Sen nasıl? 💎",
-        "Mükemmel! Sen nasıl? 🎯",
-        "İyi gidiyor! Sen nasıl? 🚀",
-        "Harika dostum! Sen nasıl? 😄",
-        "Çok iyi gidiyor! Sen nasıl? 💫",
-        "Mükemmel! Sen nasıl? 🌟",
-        "İyi gidiyor! Sen nasıl? 😊",
-        "Harika! Sen nasıl? 💎",
-        "Çok iyi dostum! Sen nasıl? 🎯"
+        "İyiyim, teşekkürler! Sen nasılsın? 😊",
+        "İyiyim! Sen nasılsın? 💎"
     ],
     "ne yapıyorsun": [
         "Sohbete katılıyorum! Sen ne yapıyorsun? 😊",
-        "Burada sohbet ediyorum! Sen ne yapıyorsun? 💎",
-        "Sohbete katılıyorum! Sen ne yapıyorsun? 🎯",
-        "Burada! Sen ne yapıyorsun? 🚀",
-        "Sohbete katılıyorum dostum! Sen ne yapıyorsun? 😄",
-        "Burada sohbet ediyorum! Sen ne yapıyorsun? 💫",
-        "Sohbete katılıyorum! Sen ne yapıyorsun? 🌟",
-        "Burada! Sen ne yapıyorsun? 😊",
-        "Sohbete katılıyorum! Sen ne yapıyorsun? 💎",
-        "Burada dostum! Sen ne yapıyorsun? 🎯"
+        "Burada sohbet ediyorum! Sen ne yapıyorsun? 💎"
     ],
     "ne haber": [
         "İyi haber! Sen ne haber? 😊",
-        "Çok iyi! Sen ne haber? 💎",
-        "Harika! Sen ne haber? 🎯",
-        "İyi! Sen ne haber? 🚀",
-        "İyi haber dostum! Sen ne haber? 😄",
-        "Çok iyi! Sen ne haber? 💫",
-        "Harika! Sen ne haber? 🌟",
-        "İyi! Sen ne haber? 😊",
-        "İyi haber! Sen ne haber? 💎",
-        "Çok iyi dostum! Sen ne haber? 🎯"
+        "İyi! Sen ne haber? 💎"
     ],
-    "ne yapıyorsun": [
-        "Sohbete katılıyorum! Sen ne yapıyorsun? 😊",
-        "Burada sohbet ediyorum! Sen ne yapıyorsun? 💎",
-        "Sohbete katılıyorum! Sen ne yapıyorsun? 🎯",
-        "Burada! Sen ne yapıyorsun? 🚀",
-        "Sohbete katılıyorum dostum! Sen ne yapıyorsun? 😄",
-        "Burada sohbet ediyorum! Sen ne yapıyorsun? 💫",
-        "Sohbete katılıyorum! Sen ne yapıyorsun? 🌟",
-        "Burada! Sen ne yapıyorsun? 😊",
-        "Sohbete katılıyorum! Sen ne yapıyorsun? 💎",
-        "Burada dostum! Sen ne yapıyorsun? 🎯"
+    "naber": [
+        "İyidir! Sen naber? 😊",
+        "İyi haber! Sen naber? 💎"
     ],
-    "nasıl gidiyor hayat": [
-        "Harika gidiyor! Sen nasıl? 😊",
-        "Çok iyi! Sen nasıl? 💎",
-        "Mükemmel! Sen nasıl? 🎯",
-        "İyi gidiyor! Sen nasıl? 🚀",
-        "Harika dostum! Sen nasıl? 😄",
-        "Çok iyi gidiyor! Sen nasıl? 💫",
-        "Mükemmel! Sen nasıl? 🌟",
+    "nabıyon": [
+        "İyidir! Sen nabıyon? 😊",
+        "İyi haber! Sen nabıyon? 💎"
+    ],
+    "ne var ne yok": [
+        "İyi haber! Sen ne var ne yok? 😊",
+        "İyi! Sen ne var ne yok? 💎"
+    ],
+    "ne oluo": [
+        "İyidir! Sen ne oluo? 😊",
+        "İyi haber! Sen ne oluo? 💎"
+    ],
+    "ne oluyor": [
+        "İyidir! Sen ne oluyor? 😊",
+        "İyi haber! Sen ne oluyor? 💎"
+    ],
+    "nasıl gidiyor": [
         "İyi gidiyor! Sen nasıl? 😊",
-        "Harika! Sen nasıl? 💎",
-        "Çok iyi dostum! Sen nasıl? 🎯"
+        "Harika! Sen nasıl? 💎"
     ],
     "keyfin nasıl": [
         "Çok iyi! Sen nasıl? 😊",
-        "Harika! Sen nasıl? 💎",
-        "Mükemmel! Sen nasıl? 🎯",
-        "İyi! Sen nasıl? 🚀",
-        "Çok iyi dostum! Sen nasıl? 😄",
-        "Harika! Sen nasıl? 💫",
-        "Mükemmel! Sen nasıl? 🌟",
-        "İyi! Sen nasıl? 😊",
-        "Çok iyi! Sen nasıl? 💎",
-        "Harika dostum! Sen nasıl? 🎯"
+        "Harika! Sen nasıl? 💎"
+    ],
+    "halin nasıl": [
+        "İyidir! Sen nasılsın? 😊",
+        "İyi! Sen nasılsın? 💎"
+    ],
+    "halin ne": [
+        "İyidir! Sen nasılsın? 😊",
+        "İyi! Sen nasılsın? 💎"
+    ],
+    "ne yapıyon": [
+        "Sohbete katılıyorum! Sen ne yapıyon? 😊",
+        "Burada sohbet ediyorum! Sen ne yapıyon? 💎"
+    ],
+    "ne yapıyorsun": [
+        "Sohbete katılıyorum! Sen ne yapıyorsun? 😊",
+        "Burada sohbet ediyorum! Sen ne yapıyorsun? 💎"
     ]
 }
 
-# Emoji ve duygu kalıpları
-EMOTIONS = {
-    "😊": ["😊", "😄", "😁", "😆"],
-    "😢": ["😢", "😭", "😔", "😞"],
-    "😡": ["😡", "😠", "😤", "😾"],
-    "😍": ["😍", "🥰", "😘", "😋"],
-    "🤔": ["🤔", "🤨", "🧐", "🤓"],
-    "😂": ["😂", "🤣", "😅", "😆"],
-    "😎": ["😎", "😏", "😌", "😉"]
+# Günlük konuşma kalıpları - Sadece gerçek tepkiler
+DAILY_CHAT = {
+    "evet": [
+        "Evet! 😊",
+        "Evet! 💎"
+    ],
+    "hayır": [
+        "Hayır! 😊",
+        "Hayır! 💎"
+    ],
+    "tamam": [
+        "Tamam! 😊",
+        "Tamam! 💎"
+    ],
+    "olur": [
+        "Olur! 😊",
+        "Olur! 💎"
+    ],
+    "yok": [
+        "Yok! 😊",
+        "Yok! 💎"
+    ],
+    "var": [
+        "Var! 😊",
+        "Var! 💎"
+    ],
+    "biliyorum": [
+        "Biliyorum! 😊",
+        "Evet, biliyorum! 💎"
+    ],
+    "bilmiyorum": [
+        "Bilmiyorum! 😊",
+        "Bilmiyorum, söyle! 💎"
+    ],
+    "anladım": [
+        "Anladım! 😊",
+        "Evet, anladım! 💎"
+    ],
+    "anlamadım": [
+        "Anlamadım! 😊",
+        "Anlamadım, açıkla! 💎"
+    ],
+    "güzel": [
+        "Güzel! 😊",
+        "Evet, güzel! 💎"
+    ],
+    "kötü": [
+        "Kötü! 😊",
+        "Evet, kötü! 💎"
+    ],
+    "iyi": [
+        "İyi! 😊",
+        "Evet, iyi! 💎"
+    ],
+    "harika": [
+        "Harika! 😊",
+        "Evet, harika! 💎"
+    ],
+    "mükemmel": [
+        "Mükemmel! 😊",
+        "Evet, mükemmel! 💎"
+    ],
+    "süper": [
+        "Süper! 😊",
+        "Evet, süper! 💎"
+    ],
+    "muhteşem": [
+        "Muhteşem! 😊",
+        "Evet, muhteşem! 💎"
+    ],
+    "berbat": [
+        "Berbat! 😊",
+        "Evet, berbat! 💎"
+    ],
+    "korkunç": [
+        "Korkunç! 😊",
+        "Evet, korkunç! 💎"
+    ],
+    "ah": [
+        "Ah! 😊",
+        "Ah, evet! 💎"
+    ],
+    "oh": [
+        "Oh! 😊",
+        "Oh, evet! 💎"
+    ],
+    "wow": [
+        "Wow! 😊",
+        "Wow, evet! 💎"
+    ],
+    "vay": [
+        "Vay! 😊",
+        "Vay, evet! 💎"
+    ],
+    "aferin": [
+        "Aferin! 😊",
+        "Evet, aferin! 💎"
+    ],
+    "bravo": [
+        "Bravo! 😊",
+        "Evet, bravo! 💎"
+    ],
+    "tebrikler": [
+        "Tebrikler! 😊",
+        "Evet, tebrikler! 💎"
+    ]
 }
 
-# Genel sohbet cevapları - Genişletilmiş ve samimi
-GENERAL_RESPONSES = [
-    "Evet kirvem! 😊",
-    "Haklısın! 💎",
-    "Aynen öyle! 🎯",
-    "Kesinlikle! 🚀",
-    "Doğru söylüyorsun! 😊",
-    "Evet! 💎",
-    "Haklısın kirvem! 🎯",
-    "Aynen! 🚀",
-    "Evet! 😊",
-    "Doğru! 💎",
-    "Evet dostum! 😄",
-    "Haklısın! 💫",
-    "Aynen öyle! 🌟",
-    "Kesinlikle! 😊",
-    "Doğru söylüyorsun! 💎",
-    "Evet! 🎯",
-    "Haklısın dostum! 🚀",
-    "Aynen! 😄",
-    "Evet! 💫",
-    "Doğru! 🌟",
-    "Evet kirvem! 😊",
-    "Haklısın! 💎",
-    "Aynen öyle! 🎯",
-    "Kesinlikle! 🚀",
-    "Doğru söylüyorsun! 😄",
-    "Evet! 💫",
-    "Haklısın kirvem! 🌟",
-    "Aynen! 😊",
-    "Evet! 💎",
-    "Doğru! 🎯"
-]
-
-# KirveHub ile ilgili cevaplar - Genişletilmiş
+# KirveHub ile ilgili cevaplar - Sadece gerçekten KirveHub hakkında konuşulduğunda
 KIRVEHUB_RESPONSES = [
     "KirveHub harika bir yer! 💎",
     "Burada çok güzel sohbetler oluyor! 🎯",
     "KirveHub'da herkes çok iyi! 😊",
-    "KirveHub gerçekten güzel bir topluluk! 🚀",
-    "Burada çok samimi bir ortam var! 😄",
-    "KirveHub'da herkes dostane! 💫",
-    "Burada gerçekten harika insanlar var! 🌟",
-    "KirveHub çok güzel bir yer! 😊",
-    "Burada çok iyi sohbetler oluyor! 💎",
-    "KirveHub'da herkes çok samimi! 🎯",
-    "Burada gerçekten güzel bir topluluk var! 🚀",
-    "KirveHub harika bir ortam! 😄",
-    "Burada çok dostane bir atmosfer var! 💫",
-    "KirveHub'da herkes çok iyi! 🌟",
-    "Burada gerçekten harika insanlar var! 😊"
+    "Burada gerçekten harika insanlar var! 🚀"
 ]
 
-# Günlük hayat ile ilgili cevaplar
-DAILY_LIFE_RESPONSES = [
-    "Hayat gerçekten güzel! 😊",
-    "Her gün yeni bir macera! 💎",
-    "Hayat çok güzel dostum! 🎯",
-    "Her gün yeni bir deneyim! 🚀",
-    "Hayat gerçekten harika! 😄",
-    "Her gün yeni bir fırsat! 💫",
-    "Hayat çok güzel! 🌟",
-    "Her gün yeni bir başlangıç! 😊",
-    "Hayat gerçekten muhteşem! 💎",
-    "Her gün yeni bir heyecan! 🎯",
-    "Hayat çok güzel dostum! 🚀",
-    "Her gün yeni bir deneyim! 😄",
-    "Hayat gerçekten harika! 💫",
-    "Her gün yeni bir fırsat! 🌟",
-    "Hayat çok güzel! 😊"
-]
-
-# Motivasyon cevapları
-MOTIVATION_RESPONSES = [
-    "Sen de harikasın! 😊",
-    "Sen de çok iyisin! 💎",
-    "Sen de mükemmelsin! 🎯",
-    "Sen de harika birisin! 🚀",
-    "Sen de çok güzelsin! 😄",
-    "Sen de muhteşemsin! 💫",
-    "Sen de harika bir dostsun! 🌟",
-    "Sen de çok iyisin! 😊",
-    "Sen de mükemmelsin! 💎",
-    "Sen de harika birisin! 🎯",
-    "Sen de çok güzelsin! 🚀",
-    "Sen de muhteşemsin! 😄",
-    "Sen de harika bir dostsun! 💫",
-    "Sen de çok iyisin! 🌟",
-    "Sen de mükemmelsin! 😊"
-]
-
-# Point sistemi ile ilgili cevaplar
+# Point sistemi ile ilgili cevaplar - Sadece point hakkında konuşulduğunda
 POINT_RESPONSES = [
-    "Point kazanmak çok kolay! Her mesajın point kazandırır! 💎",
+            "Point kazanmak çok kolay! Her 10 mesajda 0.02 point kazandırır! 💎",
     "Günlük 5 Kirve Point kazanabilirsin! 🎯",
     "Point sistemi harika! Her mesajın değeri var! 😊",
-    "Point kazanmak için sadece sohbet et! 🚀",
-    "Point sistemi çok adil! 💎",
-    "Her mesajın point kazandırdığını biliyor muydun? 🎯",
-    "Point kazanmak için aktif ol! 😊",
-    "Point sistemi mükemmel! 🚀",
-    "Point kazanmak çok eğlenceli! 💫",
-    "Her mesajın point kazandırdığını unutma! 🌟",
-    "Point sistemi gerçekten harika! 😄",
-    "Point kazanmak için aktif ol dostum! 💎",
-    "Point sistemi çok güzel! 🎯",
-    "Her mesajın point kazandırdığını biliyor muydun? 😊",
-    "Point kazanmak çok kolay! 🚀"
+    "Point kazanmak için sadece sohbet et! 🚀"
 ]
 
-# Point sistemi ile ilgili cevaplar
-POINT_RESPONSES = [
-    "Point kazanmak çok kolay! Her mesajın point kazandırır! 💎",
-    "Günlük 5 Kirve Point kazanabilirsin! 🎯",
-    "Point sistemi harika! Her mesajın değeri var! 😊",
-    "Point kazanmak için sadece sohbet et! 🚀",
-    "Point sistemi çok adil! 💎",
-    "Her mesajın point kazandırdığını biliyor muydun? 🎯",
-    "Point kazanmak için aktif ol! 😊",
-    "Point sistemi mükemmel! 🚀"
-]
-
-# Kısaltma ve argo sözlüğü
+# Kısaltma ve argo sözlüğü - Sadece gerçek kısaltmalar
 SHORTCUTS = {
     "ab": ("abi", "Erkeklere hitap"),
     "abl": ("abla", "Kadınlara hitap"),
     "aeo": ("allah'a emanet ol", "Vedalaşma sözü"),
-    "aq": ("amk", "Küfür kısaltması"),
     "as": ("aleyküm selam", "Selamlaşmaya cevap"),
     "bknz": ("bakınız", "İmla/dalga geçme amaçlı"),
-    "bı": ("biri", '"Biri şunu yapsın" gibi'),
     "brn": ("ben", "Kısaltma"),
-    "bsl": ("başla", "Genellikle oyunlarda"),
-    "byk": ("büyük", "Söyleniş kolaylığı"),
     "cnm": ("canım", "Hitap"),
     "cvp": ("cevap", "Genelde soru-cevapta"),
-    "dşn": ("düşün", "Komut gibi kullanılır"),
-    "dnz": ("deniz", "İsim yerine geçebilir"),
     "fln": ("falan", "Belirsizlik"),
-    "grlz": ("görülez", '“Görülmedi” anlamında, mizahi'),
     "grş": ("görüşürüz", "Veda"),
-    "hfd": ("haftada", "Zaman kısaltması"),
     "hşr": ("hoşçakal", "Vedalaşma"),
-    "kbs": ("k.bakma sıkıntı yok", "Mizahi kullanılır"),
-    "kdn": ("kanka dedin ne", "Mizah"),
     "knk": ("kanka", "Arkadaşça hitap"),
     "krdş": ("kardeş", "Hitap"),
-    "lan": ("ulan", "Argo, hitap"),
-    "lg": ("lol gibi", "İngilizce etkisi"),
-    "lgs": ("lol gibi salaklık", "Şaka"),
     "mrb": ("merhaba", "Selam"),
     "msl": ("mesela", "Örnek vermek için"),
     "nbr": ("ne haber", "Selamlaşma"),
-    "np": ("ne problem", '"Sıkıntı yok" anlamında'),
-    "oç": ("orospu çocuğu", "Ağır küfür"),
-    "pls": ("lütfen", "İngilizce etkisiyle"),
-    "qlsn": ("konuşsun", "Mizahi"),
     "sa": ("selamünaleyküm", "Selam"),
     "slm": ("selam", "Kısaca selam"),
-    "snn": ("senin", "Kısaltma"),
-    "spo": ("spoiler", "Dizi/film ön bilgi uyarısı"),
-    "sry": ("sorry", "Özür dilerim (İngilizce)"),
-    "sş": ("sessiz", "Mizahi ya da komut"),
     "tmm": ("tamam", "Onay"),
-    "tk": ("takıl", "Mizahi/davet"),
-    "tnq": ("thank you", "İngilizce etkisi"),
-    "trkr": ("tekrar", "Sıkça yazışmada geçer"),
     "tşk": ("teşekkür", "Teşekkür etme"),
     "tşkrlr": ("teşekkürler", "Daha resmi"),
-    "üzdü": ("üzülme sebebi", "Kısa tepki"),
-    "yb": ("yap bakalım", "Mizah"),
-    "yk": ("yok", "Red cevabı"),
-    "ykrm": ("yakarım", "Tehdit/şaka"),
-    "ytd": ("yatırım tavsiyesi değildir", "Kripto sohbetlerinde")
+    "yk": ("yok", "Red cevabı")
 }
 
 # Küfür/argo kelimeler
@@ -405,41 +276,21 @@ FAREWELLS = ["aeo", "grş", "hşr"]
 # Selamlaşma kısaltmaları
 GREET_SHORTS = ["mrb", "slm", "sa", "nbr", "as"]
 
-# Jargonlara özel hazır cevaplar
+# Jargonlara özel hazır cevaplar - Günlük konuşma jargonları
 JARGON_REPLIES = {
-    "mrb": "Selam knk! Nasılsın?",
+    "mrb": "Selam! Nasılsın?",
     "slm": "Selam! Nasılsın?",
     "sa": "Aleyküm selam! Hoş geldin!",
-    "nbr": "İyiyim knk, sen nasılsın?",
+    "nbr": "İyiyim, sen nasılsın?",
     "as": "Aleyküm selam!",
     "aeo": "Allah'a emanet ol, kendine dikkat et! 👋",
     "grş": "Görüşürüz, kendine iyi bak!",
     "hşr": "Hoşçakal! Görüşmek üzere!",
-    "tşk": "Rica ederim knk!",
+    "tşk": "Rica ederim!",
     "tşkrlr": "Rica ederim, her zaman!",
-    "pls": "Tabii, hemen hallediyorum!",
-    "cvp": "Cevap veriyorum knk!",
+    "cvp": "Cevap veriyorum!",
     "kdn": "Kanka dedin ne? 😂",
     "kbs": "K.bakma sıkıntı yok, devam!",
-    "yb": "Yap bakalım, görelim 😎",
-    "qlsn": "Biri konuşsun mu dedin? Ben buradayım!",
-    "tk": "Takıl kafana göre knk!",
-    "byk": "Büyük düşün, büyük yaşa!",
-    "brn": "Ben de buradayım!",
-    "bsl": "Başla bakalım, izliyorum!",
-    "trkr": "Tekrar tekrar denemekten vazgeçme!",
-    "spo": "Spoiler verme knk, izlemeyen var!",
-    "sry": "Sorun yok, canın sağ olsun!",
-    "tnq": "Thank you too!",
-    "msl": "Mesela? Devam et!",
-    "fln": "Falan filan işte...",
-    "hfd": "Haftada bir görüşelim knk!",
-    "dşn": "Düşün bakalım, belki güzel bir fikir çıkar!",
-    "sş": "Sessiz mod açıldı...",
-    "oç": "Knk, ağır oldu bu! Biraz sakin 😅",
-    "aq": "Knk, biraz yavaş olalım 😅",
-    "amk": "Knk, argo fazla oldu!", 
-    "lan": "Lan demesek daha iyi olur knk!",
     "kanka": "Kanka! Buradayım, ne var ne yok?",
     "knk": "Kanka! Nasılsın?",
     "abi": "Abi, buyur dinliyorum!",
@@ -448,10 +299,19 @@ JARGON_REPLIES = {
     "cnm": "Canım, ne oldu?",
     "kirvem": "Kirvem! Her zaman buradayım!",
     "kirve": "Kirve! Ne var ne yok?",
-    "üzdü": "Üzülme knk, her şey yoluna girer!",
     "yk": "Yok mu başka soru?",
-    "ykrm": "Yakarım buraları şaka şaka! 😂",
-    "ytd": "Yatırım tavsiyesi değildir, kriptoya dikkat!",
+    "naber": "İyidir! Sen naber?",
+    "nabıyon": "İyidir! Sen nabıyon?",
+    "ne var ne yok": "İyi haber! Sen ne var ne yok?",
+    "ne oluo": "İyidir! Sen ne oluo?",
+    "ne oluyor": "İyidir! Sen ne oluyor?",
+    "nasıl gidiyor": "İyi gidiyor! Sen nasıl?",
+    "keyfin nasıl": "Çok iyi! Sen nasıl?",
+    "halin nasıl": "İyidir! Sen nasılsın?",
+    "halin ne": "İyidir! Sen nasılsın?",
+    "ne yapıyon": "Sohbete katılıyorum! Sen ne yapıyon?",
+    "ne yapıyorsun": "Sohbete katılıyorum! Sen ne yapıyorsun?",
+    "ne yapıyorsunuz": "Sohbete katılıyorum! Sen ne yapıyorsun?"
 }
 
 import re
@@ -460,7 +320,7 @@ def find_shortcuts(text):
     found = []
     for k in SHORTCUTS:
         # kelime olarak geçiyorsa
-        if re.search(rf"\\b{k}\\b", text):
+        if re.search(rf"\b{k}\b", text):
             found.append(k)
     return found
 
@@ -468,12 +328,140 @@ def find_jargon_reply(text):
     # En son geçen ve baskın jargon için cevap döndür
     found = []
     for k in JARGON_REPLIES:
-        if re.search(rf"\\b{k}\\b", text):
+        if re.search(rf"\b{k}\b", text):
             found.append(k)
     if found:
         # En son geçen jargonun cevabını döndür
         return JARGON_REPLIES[found[-1]]
-        return None
+    return None
+
+def is_bot_startup_protection_active():
+    """Bot başlangıç koruması aktif mi kontrol et"""
+    return (time.time() - bot_startup_time) < STARTUP_PROTECTION_DURATION
+
+async def send_registration_reminder(user_id: int, user_name: str):
+    """Kayıt olmayan kullanıcıya hatırlatma mesajı gönder"""
+    try:
+        from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+        
+        # Farklı teşvik mesajları
+        reminder_messages = [
+            f"""
+🎯 **Hala Kayıt Olmadın!**
+
+Merhaba {user_name}! 👋
+
+❌ **Hala kayıtlı değilsin!**
+
+💎 **Kayıt ol ve şunları kazan:**
+• Her mesajın point kazandırır
+• Günlük 5.00 KP limitin var
+• Market'te freespin ve bakiye alabilirsin
+• Çekilişlere ve etkinliklere katılabilirsin
+• Sıralamada yer alabilirsin
+
+⬇️ **Hemen kayıt ol ve sisteme katıl!**
+            """,
+            f"""
+🚀 **Kayıt Olma Zamanı!**
+
+{user_name}, hala kayıt olmadın! 😅
+
+❌ **Şu anda kayıtlı değilsin!**
+
+💎 **Kayıt olarak neler kazanacaksın:**
+• Point kazanma sistemi
+• Market alışverişi
+• Etkinliklere katılma
+• Profil ve istatistikler
+• Topluluk özellikleri
+
+⬇️ **Hemen kayıt ol ve sisteme katıl!**
+            """,
+            f"""
+💡 **Son Fırsat!**
+
+{user_name}, kayıt olmayı unuttun! 😊
+
+❌ **Hala kayıtlı değilsin!**
+
+💎 **Kayıt ol ve şunları yap:**
+• Her mesajın point kazandırır
+• Market'ten freespin alabilirsin
+• Çekilişlere katılabilirsin
+• Sıralamada yer alabilirsin
+• Etkinliklerde ödüller kazanabilirsin
+
+⬇️ **Hemen kayıt ol ve sisteme katıl!**
+            """,
+            f"""
+🎯 **Kayıt Olma Vakti!**
+
+{user_name}, hala bekliyoruz! 😄
+
+❌ **Şu anda kayıtlı değilsin!**
+
+💎 **Kayıt olarak neler yapabilirsin:**
+• Point kazanma sistemi
+• Market alışverişi
+• Etkinliklere katılma
+• Profil ve istatistikler
+• Topluluk özellikleri
+
+⬇️ **Hemen kayıt ol ve sisteme katıl!**
+            """
+        ]
+        
+        # Rastgele bir mesaj seç
+        registration_message = random.choice(reminder_messages)
+        
+        # Kayıt butonu
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🎯 KAYIT OL", callback_data="register_user")],
+            [InlineKeyboardButton(text="📋 Komutlar", callback_data="show_commands")],
+            [InlineKeyboardButton(text="❌ Kapat", callback_data="close_message")]
+        ])
+        
+        # Özelden gönder
+        config = get_config()
+        bot = Bot(token=config.BOT_TOKEN)
+        
+        await bot.send_message(
+            chat_id=user_id,
+            text=registration_message,
+            parse_mode="Markdown",
+            reply_markup=keyboard
+        )
+        
+        await bot.session.close()
+        logger.info(f"✅ Kayıt olmayan kullanıcıya hatırlatma mesajı gönderildi - User: {user_id}")
+        
+    except Exception as e:
+        logger.error(f"❌ Hatırlatma mesajı gönderme hatası: {e}")
+
+def should_send_registration_reminder(user_id: int) -> bool:
+    """Kayıt olmayan kullanıcıya hatırlatma gönderilmeli mi kontrol et"""
+    current_time = time.time()
+    
+    # Kullanıcının son mesaj zamanını kontrol et
+    if user_id in unregistered_users_last_message:
+        last_message_time = unregistered_users_last_message[user_id]
+        # 10 dakika geçmişse hatırlatma gönder
+        if current_time - last_message_time >= REGISTRATION_REMINDER_INTERVAL:
+            unregistered_users_last_message[user_id] = current_time
+            return True
+    
+    return False
+
+def cleanup_unregistered_user(user_id: int):
+    """Kullanıcı gruptan çıktığında veya kayıt olduğunda temizlik yap"""
+    if user_id in unregistered_users_last_message:
+        del unregistered_users_last_message[user_id]
+        logger.info(f"🧹 Kayıt olmayan kullanıcı temizlendi - User: {user_id}")
+
+def is_user_in_unregistered_list(user_id: int) -> bool:
+    """Kullanıcı kayıt olmayan kullanıcılar listesinde mi kontrol et"""
+    return user_id in unregistered_users_last_message
         
 async def handle_chat_message(message: Message) -> Optional[str]:
     """
@@ -482,6 +470,11 @@ async def handle_chat_message(message: Message) -> Optional[str]:
     try:
         user_id = message.from_user.id
         text = message.text.lower().strip()
+        
+        # Bot başlangıç koruması kontrolü
+        if is_bot_startup_protection_active():
+            logger.info(f"🛡️ Bot başlangıç koruması aktif - User: {user_id}")
+            return None
         
         # Temel kontroller
         if not chat_system_active:
@@ -502,8 +495,39 @@ async def handle_chat_message(message: Message) -> Optional[str]:
             logger.info(f"❌ Cooldown aktif - User: {user_id}")
             return None
             
-        # Kayıt kontrolü - Kayıtlı olmayan kullanıcılar için de cevap ver
+        # Rastgele cevap verme olasılığı kontrolü
+        if random.random() > chat_probability:
+            logger.info(f"❌ Rastgele cevap verme olasılığı düşük - User: {user_id}")
+            return None
+            
+        # Kayıt kontrolü
         is_registered = await is_user_registered(user_id)
+        
+        # Kayıt olmayan kullanıcılar için teşvik sistemi
+        if not is_registered:
+            # Sadece grupta çalış
+            if message.chat.type in ["group", "supergroup"]:
+                current_time = time.time()
+                
+                # Kullanıcının son mesaj zamanını kaydet
+                if user_id not in unregistered_users_last_message:
+                    unregistered_users_last_message[user_id] = current_time
+                    # İlk mesaj - hemen teşvik gönder
+                    await send_registration_reminder(user_id, message.from_user.first_name)
+                    logger.info(f"✅ Kayıt olmayan kullanıcıya ilk teşvik mesajı gönderildi - User: {user_id}")
+                    return None  # Grupta hiçbir şey yazma
+                else:
+                    # Son mesaj zamanını güncelle
+                    unregistered_users_last_message[user_id] = current_time
+                    
+                    # 10 dakika geçmişse hatırlatma gönder
+                    if should_send_registration_reminder(user_id):
+                        await send_registration_reminder(user_id, message.from_user.first_name)
+                        logger.info(f"✅ Kayıt olmayan kullanıcıya hatırlatma mesajı gönderildi - User: {user_id}")
+                        return None  # Grupta hiçbir şey yazma
+            
+            # Kayıtsız kullanıcı özelde yazıyorsa da hiçbir şey yapma
+            return None
         
         # Mesajı kaydet
         await cooldown_manager.record_user_message(user_id)
@@ -511,9 +535,8 @@ async def handle_chat_message(message: Message) -> Optional[str]:
         # Jargonlara özel cevap
         jargon_reply = find_jargon_reply(text)
         if jargon_reply:
-            yanit = jargon_reply
-            logger.info(f"✅ Jargon cevabı: {yanit}")
-            return yanit
+            logger.info(f"✅ Jargon cevabı: {jargon_reply}")
+            return jargon_reply
 
         # Kısaltma tespiti (diğerleri)
         found_shortcuts = find_shortcuts(text)
@@ -533,57 +556,52 @@ async def handle_chat_message(message: Message) -> Optional[str]:
             logger.info(f"✅ Kısaltma cevabı: {yanit}")
             return yanit
 
-        # Selamlaşma kontrolü
+        # Selamlaşma kontrolü - Sadece gerçek selamlamalar
         for greeting, responses in GREETINGS.items():
             if greeting in text:
                 response = random.choice(responses)
                 logger.info(f"✅ Selamlaşma cevabı: {response}")
                 return response
                 
-        # Soru kontrolü
+        # Soru kontrolü - Sadece gerçek sorular
         for question, responses in QUESTIONS.items():
             if question in text:
                 response = random.choice(responses)
                 logger.info(f"✅ Soru cevabı: {response}")
                 return response
                 
-        # Emoji kontrolü
-        for emoji in EMOTIONS:
-            if emoji in text:
-                response_emoji = random.choice(EMOTIONS[emoji])
-                response = f"{response_emoji}"
-                logger.info(f"✅ Emoji cevabı: {response}")
+        # Günlük konuşma kalıpları kontrolü - Sadece gerçek tepkiler
+        for phrase, responses in DAILY_CHAT.items():
+            if phrase in text:
+                response = random.choice(responses)
+                logger.info(f"✅ Günlük konuşma cevabı: {response}")
                 return response
                 
-        # KirveHub kelimesi kontrolü
-        if "kirve" in text or "kirvehub" in text:
+        # KirveHub kelimesi kontrolü - Sadece gerçekten KirveHub hakkında konuşulduğunda
+        if "kirvehub" in text or "kirve hub" in text:
             response = random.choice(KIRVEHUB_RESPONSES)
             logger.info(f"✅ KirveHub cevabı: {response}")
             return response
             
-        # Point kelimesi kontrolü
+        # Point kelimesi kontrolü - Sadece gerçekten point hakkında konuşulduğunda
         if "point" in text or "puan" in text or "kp" in text:
             response = random.choice(POINT_RESPONSES)
             logger.info(f"✅ Point cevabı: {response}")
             return response
             
-        # Günlük hayat kelimeleri kontrolü
-        if any(word in text for word in ["hayat", "gün", "yaşam", "dünya"]):
-            response = random.choice(DAILY_LIFE_RESPONSES)
-            logger.info(f"✅ Günlük hayat cevabı: {response}")
-            return response
-            
-        # Motivasyon kelimeleri kontrolü
-        if any(word in text for word in ["güzel", "harika", "mükemmel", "süper", "muhteşem"]):
-            response = random.choice(MOTIVATION_RESPONSES)
-            logger.info(f"✅ Motivasyon cevabı: {response}")
-            return response
-            
-        # Genel cevaplar (düşük ihtimalle)
-        if random.random() < 0.1:
-            response = random.choice(GENERAL_RESPONSES)
-            logger.info(f"✅ Genel cevap: {response}")
-            return response
+        # Çok nadir genel cevaplar - Sadece çok pozitif mesajlarda
+        if random.random() < 0.005:  # %0.5 ihtimalle (daha nadir)
+            # Sadece çok pozitif mesajlarda cevap ver
+            positive_words = ["güzel", "harika", "mükemmel", "süper", "muhteşem", "çok iyi"]
+            if any(word in text for word in positive_words):
+                response = random.choice([
+                    "Evet, gerçekten güzel! 😊",
+                    "Haklısın! 💎",
+                    "Aynen öyle! 🎯",
+                    "Kesinlikle! 🚀"
+                ])
+                logger.info(f"✅ Pozitif mesaj cevabı: {response}")
+                return response
             
         logger.info("❌ Uygun cevap bulunamadı")
         return None
@@ -602,15 +620,27 @@ async def send_chat_response(message: Message, response: str):
         user_id = message.from_user.id
         is_registered = await is_user_registered(user_id)
         
-        if not is_registered:
-            # Kayıtlı olmayan kullanıcıya kayıt yönlendirmesi
-            response += "\n\n💡 İpucu: Kayıt olarak point kazanabilirsin!"
-        
-        await bot.send_message(
-            chat_id=message.chat.id,
-            text=response,
-            reply_to_message_id=message.message_id
-        )
+        # Kayıt olmayan kullanıcılar için özel mesaj kontrolü
+        if not is_registered and any(keyword in response.lower() for keyword in ["kayıt ol", "point kazan", "etkinliklere katıl"]):
+            # Inline keyboard ile kayıt butonu
+            from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+            
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="🎯 KAYIT OL", callback_data="register_user")]
+            ])
+            
+            await bot.send_message(
+                chat_id=message.chat.id,
+                text=response,
+                reply_to_message_id=message.message_id,
+                reply_markup=keyboard
+            )
+        else:
+            await bot.send_message(
+                chat_id=message.chat.id,
+                text=response,
+                reply_to_message_id=message.message_id
+            )
         
         await bot.session.close()
         logger.info(f"💬 Chat response gönderildi - User: {message.from_user.id}, Registered: {is_registered}")
@@ -652,9 +682,11 @@ def get_chat_stats() -> Dict:
         "active": chat_system_active,
         "probability": chat_probability,
         "min_length": min_message_length,
+        "startup_protection_active": is_bot_startup_protection_active(),
+        "startup_protection_remaining": max(0, STARTUP_PROTECTION_DURATION - (time.time() - bot_startup_time)),
         "greetings_count": len(GREETINGS),
         "questions_count": len(QUESTIONS),
-        "general_responses_count": len(GENERAL_RESPONSES),
+        "daily_chat_count": len(DAILY_CHAT),
         "kirvehub_responses_count": len(KIRVEHUB_RESPONSES),
         "point_responses_count": len(POINT_RESPONSES)
     }
@@ -667,7 +699,9 @@ async def bot_write_command(message: Message):
         config = get_config()
         
         # Admin kontrolü
-        if user_id != config.ADMIN_USER_ID:
+        from config import is_admin
+        if not is_admin(user_id):
+            await message.reply("❌ Bu komutu sadece admin kullanabilir!")
             return
         
         # 🔥 GRUP SESSİZLİK: Grup chatindeyse sil ve özel mesajla yanıt ver
@@ -723,6 +757,44 @@ async def bot_write_command(message: Message):
         logger.error(f"❌ Bot write command hatası: {e}")
         await message.reply("❌ Bir hata oluştu!")
 
+# Callback handler'ları
+async def chat_callback_handler(callback: types.CallbackQuery):
+    """Chat sistemi callback handler'ı"""
+    try:
+        user_id = callback.from_user.id
+        data = callback.data
+        
+        logger.info(f"🔍 Chat callback alındı - User: {user_id} - Data: {data}")
+        
+        if data == "register_user":
+            # Kayıt işlemi başlat
+            from handlers.register_handler import register_user_command
+            await register_user_command(callback.message)
+            
+            # Kayıt olmayan kullanıcılar listesinden temizle
+            cleanup_unregistered_user(user_id)
+            
+            await callback.answer("🎯 Kayıt işlemi başlatıldı!")
+            
+        elif data == "show_commands":
+            # Komut listesi göster
+            from handlers.register_handler import komutlar_command
+            await komutlar_command(callback.message)
+            await callback.answer("📋 Komutlar gösterildi!")
+            
+        elif data == "close_message":
+            # Mesajı sil
+            try:
+                await callback.message.delete()
+                await callback.answer("❌ Mesaj kapatıldı!")
+            except Exception as e:
+                logger.error(f"❌ Mesaj silme hatası: {e}")
+                await callback.answer("❌ Mesaj silinemedi!")
+                
+    except Exception as e:
+        logger.error(f"❌ Chat callback handler hatası: {e}")
+        await callback.answer("❌ Bir hata oluştu!")
+
 async def _send_bot_write_privately(user_id: int, command_text: str):
     """Botyaz mesajını özel mesajla gönder"""
     try:
@@ -731,9 +803,9 @@ async def _send_bot_write_privately(user_id: int, command_text: str):
             return
         
         # Admin kontrolü
-        from config import get_config
+        from config import get_config, is_admin
         config = get_config()
-        if user_id != config.ADMIN_USER_ID:
+        if not is_admin(user_id):
             await _bot_instance.send_message(user_id, "❌ Bu komutu sadece admin kullanabilir!")
             return
         

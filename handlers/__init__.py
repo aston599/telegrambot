@@ -4,7 +4,7 @@
 
 from .start_handler import start_command
 from .register_handler import kirvekayit_command, private_message_handler, register_callback_handler, kayitsil_command, yardim_command, komutlar_command
-from .group_handler import kirvegrup_command, group_info_command
+from .group_handler import kirvegrup_command, group_info_command, botlog_command
 from .message_monitor import monitor_group_message, start_cleanup_task
 from .profile_handler import menu_command, profile_callback_handler, siparislerim_command, siralama_command, profil_command
 # Admin commands artık router olarak import ediliyor
@@ -20,6 +20,7 @@ __all__ = [
     'kayitsil_command',
     'kirvegrup_command',
     'group_info_command',
+    'botlog_command',
     'menu_command',
     'profile_callback_handler',
     'send_maintenance_notification',

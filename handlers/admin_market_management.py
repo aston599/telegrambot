@@ -59,7 +59,8 @@ async def orders_list_command(message: Message) -> None:
         config = get_config()
         
         # Admin kontrolü
-        if user_id != config.ADMIN_USER_ID:
+        from config import is_admin
+        if not is_admin(user_id):
             return
         
         # 🔥 GRUP SESSİZLİK: Grup chatindeyse sil ve özel mesajla yanıt ver
@@ -97,7 +98,8 @@ async def approve_order_command(message: Message) -> None:
         config = get_config()
         
         # Admin kontrolü
-        if user_id != config.ADMIN_USER_ID:
+        from config import is_admin
+        if not is_admin(user_id):
             return
         
         # 🔥 GRUP SESSİZLİK: Grup chatindeyse sil ve özel mesajla yanıt ver
@@ -1200,11 +1202,11 @@ async def handle_product_stock_input(message: Message, product_info: Dict):
         
         # Kategori seçim menüsü
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="🎮 Oyun Kartları", callback_data="market_category_gaming")],
-            [InlineKeyboardButton(text="📺 Streaming", callback_data="market_category_streaming")],
-            [InlineKeyboardButton(text="🎵 Müzik", callback_data="market_category_music")],
-            [InlineKeyboardButton(text="📱 Mobil", callback_data="market_category_mobile")],
-            [InlineKeyboardButton(text="💳 Diğer", callback_data="market_category_other")],
+            [InlineKeyboardButton(text="🎰 Freespinler", callback_data="market_category_freespin")],
+            [InlineKeyboardButton(text="💰 Site Bakiyeleri", callback_data="market_category_balance")],
+            [InlineKeyboardButton(text="🎁 Bonus Paketleri", callback_data="market_category_bonus")],
+            [InlineKeyboardButton(text="👑 VIP Ürünler", callback_data="market_category_vip")],
+            [InlineKeyboardButton(text="📦 Diğer Ürünler", callback_data="market_category_other")],
             [InlineKeyboardButton(text="❌ İptal", callback_data="market_cancel_creation")]
         ])
         
@@ -1212,11 +1214,11 @@ async def handle_product_stock_input(message: Message, product_info: Dict):
             "📂 **Adım 5: Ürün Kategorisi**\n\n"
             "Lütfen ürün kategorisini seçin:\n\n"
             "**💡 Kategoriler:**\n"
-            "• 🎮 Oyun Kartları (Steam, Xbox, vb.)\n"
-            "• 📺 Streaming (Netflix, Disney+, vb.)\n"
-            "• 🎵 Müzik (Spotify, Apple Music, vb.)\n"
-            "• 📱 Mobil (Google Play, App Store, vb.)\n"
-            "• 💳 Diğer (Genel ürünler)",
+            "• 🎰 Freespinler (Slot siteleri için)\n"
+            "• 💰 Site Bakiyeleri (Casino siteleri için)\n"
+            "• 🎁 Bonus Paketleri (Çeşitli siteler için)\n"
+            "• 👑 VIP Ürünler (Özel ayrıcalıklar)\n"
+            "• 📦 Diğer Ürünler (Genel ürünler)",
             parse_mode="Markdown",
             reply_markup=keyboard
         )
@@ -1385,12 +1387,12 @@ async def create_product_in_db(product_info: Dict, admin_id: int) -> bool:
             # Kategori ID'sini al veya oluştur
             category_name = product_info.get('category', 'Diğer')
             category_emoji = {
-                'Oyun Kartları': '🎮',
-                'Streaming': '📺', 
-                'Müzik': '🎵',
-                'Mobil': '📱',
-                'Diğer': '💳'
-            }.get(category_name, '💳')
+                'freespin': '🎰',
+                'balance': '💰',
+                'bonus': '🎁',
+                'vip': '👑',
+                'other': '📦'
+            }.get(category_name, '📦')
             
             # Kategoriyi kontrol et, yoksa oluştur
             category_id = await conn.fetchval("""
@@ -1399,8 +1401,8 @@ async def create_product_in_db(product_info: Dict, admin_id: int) -> bool:
             
             if not category_id:
                 category_id = await conn.fetchval("""
-                    INSERT INTO market_categories (name, emoji) VALUES ($1, $2) RETURNING id
-                """, category_name, category_emoji)
+                    INSERT INTO market_categories (name, description, emoji) VALUES ($1, $2, $3) RETURNING id
+                """, category_name, f"{category_name} kategorisi", category_emoji)
             
             # Ürünü ekle
             site_name = product_info.get('site_name')
@@ -1408,12 +1410,11 @@ async def create_product_in_db(product_info: Dict, admin_id: int) -> bool:
                 site_name = 'Bilinmiyor'
                 
             await conn.execute("""
-                INSERT INTO market_products (name, description, price, stock, category_id, created_by, is_active, site_link, site_name)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-            """, product_info.get('name'), product_info.get('description'), 
+                INSERT INTO market_products (name, product_name, description, price, stock, category_id, is_active, company_name, site_link, created_by)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            """, product_info.get('name'), product_info.get('name'), product_info.get('description'), 
                  product_info.get('price'), product_info.get('stock'), 
-                 category_id, admin_id, True, product_info.get('site_link'), 
-                 site_name)
+                 category_id, True, site_name, product_info.get('site_link'), admin_id)
             
             logger.info(f"✅ Ürün başarıyla oluşturuldu: {product_info.get('name')}")
             return True
@@ -1539,10 +1540,10 @@ async def handle_category_selection(callback: CallbackQuery, action: str):
         # Kategori adını çıkar
         category_name = action.replace("market_category_", "")
         category_map = {
-            'gaming': 'gaming',
-            'streaming': 'streaming', 
-            'music': 'music',
-            'mobile': 'mobile',
+            'freespin': 'freespin',
+            'balance': 'balance', 
+            'bonus': 'bonus',
+            'vip': 'vip',
             'other': 'other'
         }
         
@@ -1690,10 +1691,9 @@ async def show_products_list(callback: CallbackQuery):
         
         async with pool.acquire() as conn:
             products = await conn.fetch("""
-                SELECT p.id, p.name, p.description, p.price, p.stock, p.site_link, p.site_name, 
-                       p.is_active, p.created_at, c.name as category_name, c.emoji as category_emoji
+                SELECT p.id, p.name, p.description, p.price, p.stock, p.company_link as site_link, p.company_name as site_name, 
+                       p.is_active, p.created_at, p.category as category_name
                 FROM market_products p
-                LEFT JOIN market_categories c ON p.category_id = c.id
                 ORDER BY p.created_at DESC
             """)
         

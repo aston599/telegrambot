@@ -22,10 +22,10 @@ class CooldownManager:
         self.global_cooldown = 60  # 1 dakika minimum
         
         # Ayarlar
-        self.min_cooldown = 30  # 30 saniye minimum (1 dakikadan düşürüldü)
-        self.max_cooldown = 60  # 1 dakika maksimum (2 dakikadan düşürüldü)
-        self.response_probability = 0.7  # %70 ihtimalle cevap ver (50'den artırıldı)
-        self.max_consecutive_messages = 2  # Aynı kişiye maksimum 2 mesaj (1'den artırıldı)
+        self.min_cooldown = 60  # 1 dakika minimum (daha seçici)
+        self.max_cooldown = 120  # 2 dakika maksimum (daha seçici)
+        self.response_probability = 0.3  # %30 ihtimalle cevap ver (daha seçici)
+        self.max_consecutive_messages = 1  # Aynı kişiye maksimum 1 mesaj (daha seçici)
         
     async def can_respond_to_user(self, user_id: int) -> bool:
         """Kullanıcıya cevap verilebilir mi kontrol et"""
@@ -50,7 +50,7 @@ class CooldownManager:
             # Global cooldown kontrolü
             if self.last_bot_message:
                 global_time_diff = (now - self.last_bot_message).total_seconds()
-                if global_time_diff < 15:  # Global 15 saniye minimum (30'dan düşürüldü)
+                if global_time_diff < 30:  # Global 30 saniye minimum (daha seçici)
                     return False
             
             # Response probability kontrolü

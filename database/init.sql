@@ -66,12 +66,184 @@ CREATE TABLE IF NOT EXISTS point_settings (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- User ranks tablosu
+CREATE TABLE IF NOT EXISTS user_ranks (
+    rank_id SERIAL PRIMARY KEY,
+    rank_name VARCHAR(100) NOT NULL UNIQUE,
+    min_points DECIMAL(10,2) DEFAULT 0.00,
+    max_points DECIMAL(10,2),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Bot status tablosu
 CREATE TABLE IF NOT EXISTS bot_status (
     id SERIAL PRIMARY KEY,
-    status VARCHAR(50) NOT NULL,
+    status VARCHAR(255) NOT NULL,
     message TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- System settings tablosu
+CREATE TABLE IF NOT EXISTS system_settings (
+    id SERIAL PRIMARY KEY,
+    setting_key VARCHAR(100) UNIQUE NOT NULL,
+    setting_value TEXT NOT NULL,
+    description TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Registered groups tablosu
+CREATE TABLE IF NOT EXISTS registered_groups (
+    group_id BIGINT PRIMARY KEY,
+    group_name VARCHAR(255) NOT NULL,
+    group_type VARCHAR(50),
+    member_count INTEGER DEFAULT 0,
+    is_active BOOLEAN DEFAULT TRUE,
+    admin_user_id BIGINT,
+    registration_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Scheduled messages settings tablosu
+CREATE TABLE IF NOT EXISTS scheduled_messages_settings (
+    id SERIAL PRIMARY KEY,
+    settings JSONB NOT NULL DEFAULT '{}',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Recruitment settings tablosu
+CREATE TABLE IF NOT EXISTS recruitment_settings (
+    id SERIAL PRIMARY KEY,
+    setting_key VARCHAR(100) UNIQUE NOT NULL,
+    setting_value TEXT NOT NULL,
+    description TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Recruitment daily limits tablosu
+CREATE TABLE IF NOT EXISTS recruitment_daily_limits (
+    id SERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    daily_count INTEGER DEFAULT 0,
+    last_reset_date DATE DEFAULT CURRENT_DATE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, last_reset_date)
+);
+
+-- Market categories tablosu
+CREATE TABLE IF NOT EXISTS market_categories (
+    id SERIAL PRIMARY KEY,
+    category_name VARCHAR(100) NOT NULL,
+    description TEXT,
+    emoji VARCHAR(10),
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Market products tablosu
+CREATE TABLE IF NOT EXISTS market_products (
+    id SERIAL PRIMARY KEY,
+    product_name VARCHAR(255) NOT NULL,
+    description TEXT,
+    price DECIMAL(10,2) NOT NULL,
+    category_id INTEGER,
+    stock_quantity INTEGER DEFAULT -1,
+    company_name VARCHAR(255),
+    site_link VARCHAR(500),
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (category_id) REFERENCES market_categories(id) ON DELETE SET NULL
+);
+
+-- Market orders tablosu
+CREATE TABLE IF NOT EXISTS market_orders (
+    id SERIAL PRIMARY KEY,
+    order_number VARCHAR(50) UNIQUE NOT NULL,
+    user_id BIGINT NOT NULL,
+    product_id INTEGER NOT NULL,
+    quantity INTEGER DEFAULT 1,
+    total_price DECIMAL(10,2) NOT NULL,
+    status VARCHAR(50) DEFAULT 'pending',
+    admin_notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    FOREIGN KEY (product_id) REFERENCES market_products(id) ON DELETE CASCADE
+);
+
+-- Market order logs tablosu
+CREATE TABLE IF NOT EXISTS market_order_logs (
+    id SERIAL PRIMARY KEY,
+    order_id INTEGER NOT NULL,
+    action VARCHAR(50) NOT NULL,
+    old_status VARCHAR(50),
+    new_status VARCHAR(50),
+    admin_id BIGINT,
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (order_id) REFERENCES market_orders(id) ON DELETE CASCADE,
+    FOREIGN KEY (admin_id) REFERENCES users(user_id) ON DELETE SET NULL
+);
+
+-- Market stats tablosu
+CREATE TABLE IF NOT EXISTS market_stats (
+    id SERIAL PRIMARY KEY,
+    stat_date DATE NOT NULL,
+    total_orders INTEGER DEFAULT 0,
+    total_revenue DECIMAL(10,2) DEFAULT 0.00,
+    unique_customers INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(stat_date)
+);
+
+-- Event participations tablosu
+CREATE TABLE IF NOT EXISTS event_participations (
+    id SERIAL PRIMARY KEY,
+    event_id INTEGER NOT NULL,
+    user_id BIGINT NOT NULL,
+    payment_amount DECIMAL(10,2) DEFAULT 0.00,
+    status VARCHAR(50) DEFAULT 'active',
+    joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    UNIQUE(event_id, user_id)
+);
+
+-- Balance logs tablosu
+CREATE TABLE IF NOT EXISTS balance_logs (
+    id SERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    action VARCHAR(50) NOT NULL,
+    amount DECIMAL(10,2) NOT NULL,
+    balance_before DECIMAL(10,2) NOT NULL,
+    balance_after DECIMAL(10,2) NOT NULL,
+    description TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+);
+
+-- Custom commands tablosu
+CREATE TABLE IF NOT EXISTS custom_commands (
+    id SERIAL PRIMARY KEY,
+    command_name VARCHAR(100) NOT NULL,
+    scope INTEGER NOT NULL,  -- 0: global, group_id: specific group
+    response_message TEXT NOT NULL,
+    button_text VARCHAR(100),
+    button_url VARCHAR(500),
+    created_by BIGINT NOT NULL,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (created_by) REFERENCES users(user_id) ON DELETE CASCADE,
+    UNIQUE(command_name, scope)
 );
 
 -- Events tablosu
@@ -197,18 +369,23 @@ END;
 $$ language 'plpgsql';
 
 -- Triggers for updated_at
+DROP TRIGGER IF EXISTS update_users_updated_at ON users;
 CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_groups_updated_at ON groups;
 CREATE TRIGGER update_groups_updated_at BEFORE UPDATE ON groups
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_events_updated_at ON events;
 CREATE TRIGGER update_events_updated_at BEFORE UPDATE ON events
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_market_items_updated_at ON market_items;
 CREATE TRIGGER update_market_items_updated_at BEFORE UPDATE ON market_items
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_orders_updated_at ON orders;
 CREATE TRIGGER update_orders_updated_at BEFORE UPDATE ON orders
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
@@ -245,9 +422,9 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Grant permissions
-GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO kirvehub;
-GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO kirvehub;
-GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO kirvehub;
+-- GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO kirvehub;
+-- GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO kirvehub;
+-- GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO kirvehub;
 
--- Vacuum and analyze
-VACUUM ANALYZE; 
+-- Vacuum and analyze (transaction dışında çalıştırılmalı)
+-- VACUUM ANALYZE; 

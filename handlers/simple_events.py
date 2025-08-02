@@ -10,6 +10,7 @@ from typing import Optional, Dict
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.filters import Command
+from aiogram import types
 
 from config import get_config
 from database import db_pool, get_registered_groups, get_db_pool
@@ -158,6 +159,18 @@ async def create_lottery_callback(callback: CallbackQuery):
 async def create_lottery_command_wrapper(message: Message):
     """Çekiliş oluşturma komutu wrapper"""
     await create_lottery_command(message)
+
+@router.message(Command("cekilisler"))
+async def list_lottery_command(message: Message):
+    """Aktif çekilişleri listele komutu"""
+    try:
+        logger.info(f"🎯 /cekilisler komutu alındı - User: {message.from_user.id}")
+        from handlers.event_participation import list_active_events
+        await list_active_events(message)
+        logger.info(f"✅ /cekilisler komutu tamamlandı - User: {message.from_user.id}")
+    except Exception as e:
+        logger.error(f"❌ List lottery command hatası: {e}")
+        await message.reply("❌ Bir hata oluştu!")
 
 @router.callback_query(F.data == "lottery_type_lottery")
 async def select_lottery_type(callback: CallbackQuery):
@@ -342,7 +355,8 @@ async def handle_lottery_input(message: Message):
         
         # Admin kontrolü
         config = get_config()
-        if user_id != config.ADMIN_USER_ID:
+        from config import is_admin
+        if not is_admin(user_id):
             logger.info(f"❌ Admin değil - User: {user_id}")
             return
         
@@ -722,7 +736,7 @@ async def confirm_lottery_creation(callback: CallbackQuery):
                     group_message = f"""
 🚀 **YENİ ÇEKİLİŞ BAŞLADI!** 🚀
 
-{event_type} **{event_info.get('title', event_info.get('description', 'Çekiliş'))}**
+{event_type} **{event_info.get('event_name', event_info.get('description', 'Çekiliş'))}**
 
 💰 **Katılım:** {event_info.get('entry_cost', 0):.2f} KP
 🏆 **Kazanan:** {event_info.get('max_winners', 1)} kişi  
@@ -744,17 +758,7 @@ Hala kayıtlı değilseniz, botun özel mesajına gidip **/kirvekayit** komutunu
                         reply_markup=keyboard
                     )
                     
-                    # Message ID'yi database'e kaydet
-                    pool = await get_db_pool()
-                    if pool:
-                        async with pool.acquire() as conn:
-                            await conn.execute("""
-                                UPDATE events 
-                                SET message_id = $1 
-                                WHERE id = $2
-                            """, sent_message.message_id, event_id)
-                    
-                    logger.info(f"✅ Grup bildirimi gönderildi: {event_info['selected_group_id']} - Message ID: {sent_message.message_id}")
+                    logger.info(f"✅ Grup bildirimi gönderildi: {event_info['selected_group_id']}")
                     
                 except Exception as e:
                     logger.error(f"❌ Grup bildirimi hatası: {e}")
@@ -794,22 +798,17 @@ async def create_event_in_db(event_info: Dict, admin_id: int) -> tuple[bool, int
                 logger.info(f"🎲 Lottery event oluşturuluyor: {title}")
                 
                 await conn.execute("""
-                    INSERT INTO events (event_type, title, entry_cost, max_winners, description, created_by, status, group_id)
-                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-                """, "lottery", title, event_info["entry_cost"], 
-                     event_info["max_winners"], event_info["description"], admin_id, "active", 
-                     event_info.get("selected_group_id", 0))
+                    INSERT INTO events (event_type, event_name, max_participants, created_by, is_active)
+                    VALUES ($1, $2, $3, $4, $5)
+                """, "lottery", title, event_info["max_winners"], admin_id, True)
             else:
                 title = f"Bonus: {event_info.get('description', 'Chat Bonus')}"
                 logger.info(f"🎁 Bonus event oluşturuluyor: {title}")
                 
                 await conn.execute("""
-                    INSERT INTO events (event_type, title, duration_minutes, bonus_multiplier, description, created_by, status, group_id)
-                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-                """, "bonus", title, 
-                     event_info["duration_minutes"], event_info["bonus_multiplier"], 
-                     event_info.get("description", "Chat Bonus"), admin_id, "active",
-                     event_info.get("selected_group_id", 0))
+                    INSERT INTO events (event_type, event_name, created_by, is_active)
+                    VALUES ($1, $2, $3, $4)
+                """, "bonus", title, admin_id, True)
             
             # Oluşturulan etkinliğin ID'sini al
             event_id = await conn.fetchval("SELECT id FROM events WHERE created_by = $1 ORDER BY created_at DESC LIMIT 1", admin_id)
@@ -839,16 +838,19 @@ async def create_event_in_db(event_info: Dict, admin_id: int) -> tuple[bool, int
 async def get_active_events() -> list:
     """Aktif etkinlikleri getir"""
     try:
-        if not db_pool:
+        pool = await get_db_pool()
+        if not pool:
+            logger.error("❌ Database pool yok!")
             return []
         
-        async with db_pool.acquire() as conn:
+        async with pool.acquire() as conn:
             events = await conn.fetch("""
-                SELECT id, event_type, title, entry_cost, max_winners, description, created_at
-                FROM events WHERE status = 'active'
+                SELECT id, event_type, event_name, max_participants, created_at
+                FROM events WHERE is_active = TRUE
                 ORDER BY created_at DESC
             """)
             
+            logger.info(f"✅ Aktif etkinlikler getirildi: {len(events)} adet")
             return [dict(event) for event in events]
             
     except Exception as e:
@@ -863,3 +865,7 @@ __all__ = [
     'set_bot_instance',
     'get_active_events'
 ] 
+
+@router.message(Command("grupid"))
+async def grup_id_command(message: Message):
+    await message.reply(f"Bu grubun/sohbetin ID'si: `{message.chat.id}`", parse_mode="Markdown") 

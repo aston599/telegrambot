@@ -42,7 +42,7 @@ async def show_product_details_modern(callback: types.CallbackQuery, data: str) 
 ║        📦 ÜRÜN DETAYI 📦          ║
 ╚═══════════════════════════════════╝
 
-🛍️ **Ürün:** {product['name']}
+🛍️ **Ürün:** {product['product_name']}
 🏢 **Site:** {product['company_name']}
 💰 **Fiyat:** {product_price:.2f} KP
 📊 **Stok:** {product['stock']} adet
@@ -135,7 +135,7 @@ async def handle_buy_product_modern(callback: types.CallbackQuery, data: str) ->
 ╚═══════════════════════════════════╝
 
 📋 **Sipariş Özeti:**
-🛍️ **Ürün:** {product['name']}
+🛍️ **Ürün:** {product['product_name']}
 🏢 **Site:** {product['company_name']}
 💰 **Fiyat:** {product_price:.2f} KP
 📊 **Stok:** {product['stock']} adet
@@ -228,7 +228,7 @@ async def confirm_buy_product_modern(callback: types.CallbackQuery, data: str) -
 
 📋 **Sipariş Bilgileri:**
 🆔 **Sipariş No:** `{order_number}`
-🛍️ **Ürün:** {product['name']}
+🛍️ **Ürün:** {product['product_name']}
 🏢 **Site:** {product['company_name']}
 💰 **Tutar:** {product_price:.2f} KP
 
@@ -257,7 +257,7 @@ async def confirm_buy_product_modern(callback: types.CallbackQuery, data: str) -
         
         # Log kaydı
         from utils.logger import log_market_purchase
-        log_market_purchase(order_number, user_id, product['name'], product_price)
+        log_market_purchase(order_number, user_id, product['product_name'], product_price)
         
     except Exception as e:
         logger.error(f"❌ Satın alma işlemi hatası: {e}")
@@ -290,7 +290,7 @@ async def notify_admin_new_order_modern(user_id: int, product: dict, order_numbe
 📋 **Sipariş Detayları:**
 🆔 **Sipariş No:** `{order_number}`
 👤 **Müşteri:** {user_info['first_name']} (@{user_info['username']})
-🛍️ **Ürün:** {product['name']}
+🛍️ **Ürün:** {product['product_name']}
 🏢 **Site:** {product['company_name']}
 💰 **Tutar:** {product['price']} KP
 
@@ -519,34 +519,10 @@ async def show_market_empty_message(callback: types.CallbackQuery) -> None:
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-💎 **Point Kazanmaya Devam Et:**
-✅ **Mesaj atarak point kazanabilirsin**
-✅ **Etkinliklere katılarak bonus alabilirsin**
-✅ **Günlük limitlerin dolmamış**
-✅ **Sistem tamamen aktif**
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-📢 **Yakında Eklenecek:**
-• 🎰 **Freespinler** - Slot siteleri için
-• 💰 **Site Bakiyeleri** - Casino siteleri için
-• 🎁 **Bonus Paketleri** - Çeşitli siteler için
-• 🏆 **VIP Ürünler** - Özel ayrıcalıklar
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-🎯 **Şimdi Yapabileceklerin:**
-• 💬 **Sohbette mesaj at** - Point kazan
-• 🎮 **Etkinliklere katıl** - Bonus al
-• 📊 **Profilini kontrol et** - İstatistiklerini gör
-• 🏆 **Sıralamada yüksel** - Daha fazla point kazan
-
 💎 **Point kazanmaya devam et, ürünler yakında eklenecek!**
         """
         
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="📊 Profilim", callback_data="profile_refresh")],
-            [InlineKeyboardButton(text="🎮 Etkinlikler", callback_data="profile_events")],
             [InlineKeyboardButton(text="⬅️ Geri", callback_data="profile_back")]
         ])
         
@@ -596,10 +572,6 @@ async def show_market_products_modern(callback: types.CallbackQuery, products: l
 
 💰 **Bakiyeniz:** {user_balance:.2f} KP
 📦 **Mevcut Ürünler:** {len(products)} adet
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-**Ürünler:**
         """
         
         # Ürün butonları
@@ -609,7 +581,7 @@ async def show_market_products_modern(callback: types.CallbackQuery, products: l
             product_price = float(product['price'])
             stock_status = "✅ Stokta" if product['stock'] > 0 else "❌ Tükendi"
             
-            button_text = f"{product['name']} - {product_price:.2f} KP - {stock_status}"
+            button_text = f"{product['product_name']} - {product_price:.2f} KP - {stock_status}"
             
             if product['stock'] > 0:
                 keyboard_buttons.append([
@@ -628,8 +600,7 @@ async def show_market_products_modern(callback: types.CallbackQuery, products: l
         
         # Alt butonlar
         keyboard_buttons.append([
-            InlineKeyboardButton(text="📋 Siparişlerim", callback_data="profile_orders"),
-            InlineKeyboardButton(text="⬅️ Geri", callback_data="profile_refresh")
+            InlineKeyboardButton(text="⬅️ Geri", callback_data="profile_back")
         ])
         
         keyboard = InlineKeyboardMarkup(inline_keyboard=keyboard_buttons)

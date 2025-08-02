@@ -7,7 +7,7 @@ import asyncio
 import logging
 from datetime import datetime
 from typing import List, Dict, Optional
-from aiogram import Router, F
+from aiogram import Router, F, types
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.filters import Command
 
@@ -39,18 +39,14 @@ async def get_active_events() -> List[Dict]:
                 SELECT 
                     e.id,
                     e.event_type,
-                    e.title,
-                    e.entry_cost,
-                    e.max_winners,
-                    e.description,
+                    e.event_name,
+                    e.max_participants,
                     e.created_at,
-                    e.message_id,
-                    e.group_id,
                     COUNT(ep.user_id) as participant_count
                 FROM events e
                 LEFT JOIN event_participants ep ON e.id = ep.event_id
-                WHERE e.status = 'active'
-                GROUP BY e.id, e.event_type, e.title, e.entry_cost, e.max_winners, e.description, e.created_at, e.message_id, e.group_id
+                WHERE e.is_active = TRUE
+                GROUP BY e.id, e.event_type, e.event_name, e.max_participants, e.created_at
                 ORDER BY e.created_at DESC
             """)
         
@@ -59,16 +55,16 @@ async def get_active_events() -> List[Dict]:
             result.append({
                 'id': event['id'],
                 'event_type': event['event_type'],
-                'title': event['title'],
-                'entry_cost': float(event['entry_cost']) if event['entry_cost'] else 0,
-                'max_winners': event['max_winners'],
-                'description': event['description'],
+                'title': event['event_name'],
+                'entry_cost': 0,  # Şimdilik 0
+                'max_winners': event['max_participants'],
+                'description': event['event_name'],
                 'created_at': event['created_at'],
-                'message_id': event['message_id'],
-                'group_id': event['group_id'],
+                'message_id': None,
+                'group_id': None,
                 'participant_count': event['participant_count']
             })
-            logger.info(f"📋 Çekiliş bulundu: ID={event['id']}, Title={event['title']}, Participants={event['participant_count']}, Message_ID={event['message_id']}, Group_ID={event['group_id']}")
+            logger.info(f"📋 Çekiliş bulundu: ID={event['id']}, Title={event['event_name']}, Participants={event['participant_count']}")
         
         logger.info(f"📊 Aktif etkinlik sorgusu tamamlandı: {len(result)} sonuç")
         return result

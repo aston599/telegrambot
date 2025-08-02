@@ -1,0 +1,483 @@
+🤖 KIRVEHUB BOT - DIGITALOCEAN DEPLOYMENT REHBERİ
+================================================================
+
+📋 İÇİNDEKİLER:
+1. Sunucu Hazırlığı
+2. Sistem Kurulumu
+3. Proje İndirme
+4. Database Kurulumu
+5. Bot Konfigürasyonu
+6. Service Kurulumu
+7. Test ve Kontrol
+8. Sorun Giderme
+
+================================================================
+🚀 1. SUNUCU HAZIRLIĞI
+================================================================
+
+A) DigitalOcean Droplet Oluşturma:
+- DigitalOcean Dashboard'a git
+- "Create" > "Droplets" seç
+- Ubuntu 24.04 LTS seç
+- Plan: Basic > $12/month (2GB RAM, 1 vCPU)
+- Datacenter: Frankfurt (EU) veya Amsterdam
+- Authentication: SSH Key ekle
+- Hostname: kirvehub-bot
+- "Create Droplet" tıkla
+
+B) SSH Key Oluşturma (Windows):
+- PowerShell aç
+- ssh-keygen -t rsa -b 4096 -C "your_email@example.com"
+- Enter tuşuna bas (varsayılan konum)
+- Passphrase boş bırak
+- Public key'i kopyala: cat ~/.ssh/id_rsa.pub
+
+C) DigitalOcean'a SSH Key Ekleme:
+- DigitalOcean > Settings > Security > SSH Keys
+- "Add SSH Key" tıkla
+- Public key'i yapıştır
+- "Add SSH Key" tıkla
+
+================================================================
+🔧 2. SİSTEM KURULUMU
+================================================================
+
+A) Sunucuya Bağlanma:
+ssh root@your_server_ip
+
+B) Sistem Güncelleme:
+apt update && apt upgrade -y
+
+C) Gerekli Paketleri Kurma:
+apt install -y git python3.12 python3.12-venv python3.12-dev python3-pip postgresql postgresql-contrib nginx curl wget unzip
+
+D) Bot Kullanıcısı Oluşturma:
+useradd -m -s /bin/bash kirvehub
+usermod -aG sudo kirvehub
+passwd kirvehub  # Şifre belirle
+
+E) Sudo Yetkisi Verme:
+visudo
+# Dosyanın sonuna ekle:
+kirvehub ALL=(ALL) NOPASSWD: ALL
+
+================================================================
+📥 3. PROJE İNDİRME
+================================================================
+
+A) Bot Kullanıcısına Geçme:
+su - kirvehub
+
+B) Projeyi İndirme:
+git clone https://github.com/aston599/telegrambot.git
+cd telegrambot
+
+C) Python Environment Kurma:
+python3.12 -m venv venv
+source venv/bin/activate
+pip install --upgrade pip
+pip install -r requirements.txt
+
+D) Gerekli Dizinleri Oluşturma:
+mkdir -p logs
+mkdir -p data
+chmod 755 logs data
+
+================================================================
+🗄️ 4. DATABASE KURULUMU
+================================================================
+
+A) PostgreSQL Servisini Başlatma:
+sudo systemctl start postgresql
+sudo systemctl enable postgresql
+
+B) PostgreSQL Durumunu Kontrol Etme:
+sudo systemctl status postgresql
+
+C) Database Kullanıcısı Oluşturma:
+sudo -u postgres psql
+
+PostgreSQL komutları:
+CREATE USER kirvehub WITH PASSWORD 'kirvehub123';
+CREATE DATABASE kirvehub_db OWNER kirvehub;
+GRANT ALL PRIVILEGES ON DATABASE kirvehub_db TO kirvehub;
+\q
+
+D) Database Bağlantısını Test Etme:
+psql -h localhost -U kirvehub -d kirvehub_db
+# Şifre: kirvehub123
+# Çıkış: \q
+
+================================================================
+⚙️ 5. BOT KONFİGÜRASYONU
+================================================================
+
+A) Environment Dosyası Oluşturma:
+cp env.example .env
+nano .env
+
+B) .env Dosyası İçeriği:
+# Bot Token (Telegram BotFather'dan al)
+BOT_TOKEN=your_actual_bot_token_here
+
+# Admin User ID (Telegram user ID)
+ADMIN_USER_ID=your_actual_admin_id_here
+
+# Database URL
+DATABASE_URL=postgresql://kirvehub:kirvehub123@localhost:5432/kirvehub_db
+
+# Environment Settings
+PRODUCTION_MODE=true
+DEBUG_MODE=false
+MAINTENANCE_MODE=false
+
+# Server Settings
+SERVER_HOST=0.0.0.0
+SERVER_PORT=8000
+WORKER_PROCESSES=2
+
+# Database Settings
+DB_POOL_SIZE=10
+DB_MAX_OVERFLOW=20
+DB_POOL_TIMEOUT=30
+
+# Logging Settings
+LOG_LEVEL=INFO
+LOG_FILE=logs/bot.log
+LOG_MAX_SIZE=10485760
+LOG_BACKUP_COUNT=5
+
+# Performance Settings
+MAX_CONCURRENT_UPDATES=50
+UPDATE_TIMEOUT=30
+RATE_LIMIT_DELAY=0.1
+
+# Security Settings
+ENABLE_RATE_LIMITING=true
+MAX_MESSAGES_PER_MINUTE=60
+ENABLE_IP_WHITELIST=false
+
+# Point System Settings
+POINT_PER_MESSAGE=0.04
+DAILY_POINT_LIMIT=5.00
+FLOOD_PROTECTION_SECONDS=10
+MIN_MESSAGE_LENGTH=5
+
+# Notification Settings
+ENABLE_STARTUP_NOTIFICATIONS=true
+ENABLE_SHUTDOWN_NOTIFICATIONS=true
+NOTIFICATION_DELAY=0.1
+
+C) Bot Token Alma:
+1. Telegram'da @BotFather'a git
+2. /newbot komutunu kullan
+3. Bot adı: KirveHub Bot
+4. Bot username: kirvehub_bot (veya benzeri)
+5. Bot token'ını kopyala ve .env dosyasına ekle
+
+D) Admin ID Alma:
+1. Telegram'da @userinfobot'a git
+2. ID'ni al ve .env dosyasına ekle
+
+================================================================
+🔧 6. SERVICE KURULUMU
+================================================================
+
+A) Systemd Service Dosyası Oluşturma:
+sudo nano /etc/systemd/system/kirvehub-bot.service
+
+B) Service Dosyası İçeriği:
+[Unit]
+Description=KirveHub Telegram Bot
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=kirvehub
+Group=kirvehub
+WorkingDirectory=/home/kirvehub/telegrambot
+Environment=PATH=/home/kirvehub/telegrambot/venv/bin
+Environment=PYTHONPATH=/home/kirvehub/telegrambot
+ExecStart=/home/kirvehub/telegrambot/venv/bin/python main.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/home/kirvehub/telegrambot
+
+[Install]
+WantedBy=multi-user.target
+
+C) Service'i Etkinleştirme:
+sudo systemctl daemon-reload
+sudo systemctl enable kirvehub-bot
+sudo systemctl start kirvehub-bot
+
+D) Service Durumunu Kontrol Etme:
+sudo systemctl status kirvehub-bot
+
+================================================================
+🧪 7. TEST VE KONTROL
+================================================================
+
+A) Manuel Test:
+cd /home/kirvehub/telegrambot
+source venv/bin/activate
+python main.py
+
+B) Logları Kontrol Etme:
+sudo journalctl -u kirvehub-bot -f
+
+C) Bot Durumunu Kontrol Etme:
+sudo systemctl status kirvehub-bot
+
+D) Database Bağlantısını Test Etme:
+cd /home/kirvehub/telegrambot
+source venv/bin/activate
+python -c "
+import asyncio
+from database import init_database
+async def test():
+    result = await init_database()
+    print(f'Database connection: {result}')
+asyncio.run(test())
+"
+
+================================================================
+🔍 8. SORUN GİDERME
+================================================================
+
+A) Bot Çalışmıyorsa:
+1. Logları kontrol et:
+   sudo journalctl -u kirvehub-bot -f
+
+2. Manuel test et:
+   cd /home/kirvehub/telegrambot
+   source venv/bin/activate
+   python main.py
+
+3. Environment dosyasını kontrol et:
+   cat .env
+
+B) Database Bağlantı Sorunu:
+1. PostgreSQL durumunu kontrol et:
+   sudo systemctl status postgresql
+
+2. Database bağlantısını test et:
+   psql -h localhost -U kirvehub -d kirvehub_db
+
+3. Database kullanıcısını yeniden oluştur:
+   sudo -u postgres psql
+   DROP USER IF EXISTS kirvehub;
+   CREATE USER kirvehub WITH PASSWORD 'kirvehub123';
+   CREATE DATABASE kirvehub_db OWNER kirvehub;
+   GRANT ALL PRIVILEGES ON DATABASE kirvehub_db TO kirvehub;
+   \q
+
+C) Permission Sorunları:
+1. Dizin izinlerini düzelt:
+   sudo chown -R kirvehub:kirvehub /home/kirvehub/telegrambot
+   sudo chmod -R 755 /home/kirvehub/telegrambot
+
+2. Log dizini izinlerini düzelt:
+   sudo mkdir -p /home/kirvehub/telegrambot/logs
+   sudo chown -R kirvehub:kirvehub /home/kirvehub/telegrambot/logs
+   sudo chmod -R 755 /home/kirvehub/telegrambot/logs
+
+D) Python Paket Sorunları:
+1. Virtual environment'ı yeniden oluştur:
+   cd /home/kirvehub/telegrambot
+   rm -rf venv
+   python3.12 -m venv venv
+   source venv/bin/activate
+   pip install --upgrade pip
+   pip install -r requirements.txt
+
+E) Bot Token Sorunu:
+1. Bot token'ını kontrol et:
+   curl https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getMe
+
+2. Bot token'ını yenile:
+   - @BotFather'a git
+   - /mybots
+   - Bot'u seç
+   - API Token > Revoke current token
+   - Generate new token
+
+================================================================
+📊 9. MONİTÖRİNG VE BAKIM
+================================================================
+
+A) Log Rotasyonu:
+sudo nano /etc/logrotate.d/kirvehub-bot
+
+İçerik:
+/home/kirvehub/telegrambot/logs/*.log {
+    daily
+    missingok
+    rotate 7
+    compress
+    delaycompress
+    notifempty
+    create 644 kirvehub kirvehub
+    postrotate
+        systemctl reload kirvehub-bot
+    endscript
+}
+
+B) Otomatik Backup:
+sudo nano /home/kirvehub/backup.sh
+
+İçerik:
+#!/bin/bash
+BACKUP_DIR="/home/kirvehub/backups"
+DATE=$(date +%Y%m%d_%H%M%S)
+mkdir -p $BACKUP_DIR
+
+# Database backup
+pg_dump -h localhost -U kirvehub kirvehub_db > $BACKUP_DIR/db_backup_$DATE.sql
+
+# Config backup
+cp /home/kirvehub/telegrambot/.env $BACKUP_DIR/env_backup_$DATE
+
+# Log backup
+tar -czf $BACKUP_DIR/logs_backup_$DATE.tar.gz /home/kirvehub/telegrambot/logs/
+
+# Clean old backups (keep last 7 days)
+find $BACKUP_DIR -name "*.sql" -mtime +7 -delete
+find $BACKUP_DIR -name "*.tar.gz" -mtime +7 -delete
+find $BACKUP_DIR -name "env_backup_*" -mtime +7 -delete
+
+chmod +x /home/kirvehub/backup.sh
+
+C) Cron Job Ekleme:
+crontab -e
+
+Eklenecek satırlar:
+# Daily backup at 2 AM
+0 2 * * * /home/kirvehub/backup.sh
+
+# Log rotation
+0 3 * * * /usr/sbin/logrotate /etc/logrotate.d/kirvehub-bot
+
+================================================================
+🚀 10. HIZLI DEPLOYMENT SCRIPT
+================================================================
+
+A) Otomatik Deployment Script:
+nano /home/kirvehub/deploy.sh
+
+İçerik:
+#!/bin/bash
+echo "🚀 KirveHub Bot Deployment Başlıyor..."
+
+# Update system
+sudo apt update && sudo apt upgrade -y
+
+# Install packages
+sudo apt install -y git python3.12 python3.12-venv python3.12-dev python3-pip postgresql postgresql-contrib nginx curl
+
+# Create bot user
+sudo useradd -m -s /bin/bash kirvehub
+sudo usermod -aG sudo kirvehub
+echo "kirvehub:kirvehub123" | sudo chpasswd
+
+# Switch to bot user
+su - kirvehub << 'EOF'
+cd /home/kirvehub
+git clone https://github.com/aston599/telegrambot.git
+cd telegrambot
+python3.12 -m venv venv
+source venv/bin/activate
+pip install --upgrade pip
+pip install -r requirements.txt
+mkdir -p logs data
+EOF
+
+# Setup database
+sudo -u postgres psql << 'EOF'
+CREATE USER kirvehub WITH PASSWORD 'kirvehub123';
+CREATE DATABASE kirvehub_db OWNER kirvehub;
+GRANT ALL PRIVILEGES ON DATABASE kirvehub_db TO kirvehub;
+\q
+EOF
+
+# Create service
+sudo tee /etc/systemd/system/kirvehub-bot.service > /dev/null << 'EOF'
+[Unit]
+Description=KirveHub Telegram Bot
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=kirvehub
+Group=kirvehub
+WorkingDirectory=/home/kirvehub/telegrambot
+Environment=PATH=/home/kirvehub/telegrambot/venv/bin
+Environment=PYTHONPATH=/home/kirvehub/telegrambot
+ExecStart=/home/kirvehub/telegrambot/venv/bin/python main.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/home/kirvehub/telegrambot
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# Enable and start service
+sudo systemctl daemon-reload
+sudo systemctl enable kirvehub-bot
+sudo systemctl start kirvehub-bot
+
+echo "✅ Deployment tamamlandı!"
+echo "📝 .env dosyasını düzenlemeyi unutmayın!"
+echo "🔍 Durum kontrolü: sudo systemctl status kirvehub-bot"
+
+chmod +x /home/kirvehub/deploy.sh
+
+B) Script'i Çalıştırma:
+./deploy.sh
+
+================================================================
+📞 11. İLETİŞİM VE DESTEK
+================================================================
+
+Sorun yaşarsan:
+1. Logları kontrol et: sudo journalctl -u kirvehub-bot -f
+2. Bot durumunu kontrol et: sudo systemctl status kirvehub-bot
+3. Database bağlantısını test et: psql -h localhost -U kirvehub -d kirvehub_db
+4. Manuel test et: cd /home/kirvehub/telegrambot && source venv/bin/activate && python main.py
+
+================================================================
+🎯 ÖNEMLİ NOTLAR
+================================================================
+
+✅ Yapılması Gerekenler:
+- .env dosyasında BOT_TOKEN ve ADMIN_USER_ID'yi doğru ayarla
+- Database şifresini güvenli yap
+- Firewall ayarlarını kontrol et
+- SSL sertifikası ekle (opsiyonel)
+- Düzenli backup al
+
+❌ Yapılmaması Gerekenler:
+- Root kullanıcısıyla bot çalıştırma
+- Güvenlik güncellemelerini atlama
+- Log dosyalarını sınırsız büyütme
+- Database şifresini açık bırakma
+
+================================================================
+🚀 BAŞARI! Bot artık DigitalOcean'da çalışıyor!
+================================================================ 

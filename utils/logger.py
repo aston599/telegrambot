@@ -1,106 +1,181 @@
 """
-🔧 Gelişmiş Log Sistemi - KirveHub Bot
-Sadece önemli sistem logları için optimize edilmiş
+🔧 Logger - Tüm logları Telegram grubuna da gönderir
 """
 
 import logging
-import sys
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Dict, Any
 
-# Log seviyeleri
-SYSTEM_LOG = 25  # Sistem logları için özel seviye
-BOT_LOG = 26     # Bot logları için özel seviye
-ERROR_LOG = 27   # Hata logları için özel seviye
+# Logger'ı al
+logger = logging.getLogger(__name__)
 
-# Özel log seviyelerini kaydet
-logging.addLevelName(SYSTEM_LOG, "SYSTEM")
-logging.addLevelName(BOT_LOG, "BOT")
-logging.addLevelName(ERROR_LOG, "ERROR")
-
-class KirveLogger:
-    """KirveHub Bot için özel logger"""
+def log_system(message: str, user_id: Optional[int] = None, username: Optional[str] = None, chat_id: Optional[int] = None, additional_data: Optional[Dict[str, Any]] = None):
+    """Sistem logu - Telegram grubuna da gönderir"""
+    # CMD'ye yazdır
+    print(f"🔧 SYSTEM: {message}")
     
-    def __init__(self, name: str = "kirvebot"):
-        self.logger = logging.getLogger(name)
-        self.logger.setLevel(logging.INFO)
+    # Log record oluştur
+    record = logging.LogRecord(
+        name="system",
+        level=logging.INFO,
+        pathname="",
+        lineno=0,
+        msg=message,
+        args=(),
+        exc_info=None
+    )
+    
+    # Ek bilgiler ekle
+    if user_id:
+        record.user_id = user_id
+    if username:
+        record.username = username
+    if chat_id:
+        record.chat_id = chat_id
+    if additional_data:
+        record.additional_data = additional_data
         
-        # Handler yoksa ekle
-        if not self.logger.handlers:
-            self._setup_handlers()
+    # Logger'a gönder
+    logger.handle(record)
+
+def log_bot(message: str, user_id: Optional[int] = None, username: Optional[str] = None, chat_id: Optional[int] = None, additional_data: Optional[Dict[str, Any]] = None):
+    """Bot logu - Telegram grubuna da gönderir"""
+    # Log record oluştur
+    record = logging.LogRecord(
+        name="bot",
+        level=logging.INFO,
+        pathname="",
+        lineno=0,
+        msg=message,
+        args=(),
+        exc_info=None
+    )
     
-    def _setup_handlers(self):
-        """Handler'ları kur"""
-        # Console handler
-        console_handler = logging.StreamHandler(sys.stdout)
-        console_handler.setLevel(logging.INFO)
+    # Ek bilgiler ekle
+    if user_id:
+        record.user_id = user_id
+    if username:
+        record.username = username
+    if chat_id:
+        record.chat_id = chat_id
+    if additional_data:
+        record.additional_data = additional_data
         
-        # File handler
-        file_handler = logging.FileHandler('bot.log', encoding='utf-8')
-        file_handler.setLevel(logging.INFO)
+    # Logger'a gönder
+    logger.handle(record)
+
+def log_error(message: str, user_id: Optional[int] = None, username: Optional[str] = None, chat_id: Optional[int] = None, additional_data: Optional[Dict[str, Any]] = None):
+    """Hata logu - Telegram grubuna da gönderir"""
+    # CMD'ye yazdır
+    print(f"❌ ERROR: {message}")
+    
+    # Log record oluştur
+    record = logging.LogRecord(
+        name="error",
+        level=logging.ERROR,
+        pathname="",
+        lineno=0,
+        msg=message,
+        args=(),
+        exc_info=None
+    )
+    
+    # Ek bilgiler ekle
+    if user_id:
+        record.user_id = user_id
+    if username:
+        record.username = username
+    if chat_id:
+        record.chat_id = chat_id
+    if additional_data:
+        record.additional_data = additional_data
         
-        # Formatter
-        formatter = logging.Formatter(
-            '%(asctime)s - %(levelname)s - %(message)s',
-            datefmt='%Y-%m-%d %H:%M:%S'
-        )
+    # Logger'a gönder
+    logger.handle(record)
+
+def log_info(message: str, user_id: Optional[int] = None, username: Optional[str] = None, chat_id: Optional[int] = None, additional_data: Optional[Dict[str, Any]] = None):
+    """Bilgi logu - Telegram grubuna da gönderir"""
+    # CMD'ye yazdır
+    print(f"ℹ️ INFO: {message}")
+    
+    # Log record oluştur
+    record = logging.LogRecord(
+        name="info",
+        level=logging.INFO,
+        pathname="",
+        lineno=0,
+        msg=message,
+        args=(),
+        exc_info=None
+    )
+    
+    # Ek bilgiler ekle
+    if user_id:
+        record.user_id = user_id
+    if username:
+        record.username = username
+    if chat_id:
+        record.chat_id = chat_id
+    if additional_data:
+        record.additional_data = additional_data
         
-        console_handler.setFormatter(formatter)
-        file_handler.setFormatter(formatter)
+    # Logger'a gönder
+    logger.handle(record)
+
+def log_warning(message: str, user_id: Optional[int] = None, username: Optional[str] = None, chat_id: Optional[int] = None, additional_data: Optional[Dict[str, Any]] = None):
+    """Uyarı logu - Telegram grubuna da gönderir"""
+    # CMD'ye yazdır
+    print(f"⚠️ WARNING: {message}")
+    
+    # Log record oluştur
+    record = logging.LogRecord(
+        name="warning",
+        level=logging.WARNING,
+        pathname="",
+        lineno=0,
+        msg=message,
+        args=(),
+        exc_info=None
+    )
+    
+    # Ek bilgiler ekle
+    if user_id:
+        record.user_id = user_id
+    if username:
+        record.username = username
+    if chat_id:
+        record.chat_id = chat_id
+    if additional_data:
+        record.additional_data = additional_data
         
-        self.logger.addHandler(console_handler)
-        self.logger.addHandler(file_handler)
+    # Logger'a gönder
+    logger.handle(record)
+
+def log_debug(message: str, user_id: Optional[int] = None, username: Optional[str] = None, chat_id: Optional[int] = None, additional_data: Optional[Dict[str, Any]] = None):
+    """Debug logu - Telegram grubuna da gönderir"""
+    # Log record oluştur
+    record = logging.LogRecord(
+        name="debug",
+        level=logging.DEBUG,
+        pathname="",
+        lineno=0,
+        msg=message,
+        args=(),
+        exc_info=None
+    )
     
-    def system(self, message: str):
-        """Sistem logları - Sadece önemli sistem olayları"""
-        self.logger.log(SYSTEM_LOG, f"🔧 {message}")
-    
-    def bot(self, message: str):
-        """Bot logları - Bot durumu ve komutları"""
-        self.logger.log(BOT_LOG, f"🤖 {message}")
-    
-    def error(self, message: str):
-        """Hata logları - Kritik hatalar"""
-        self.logger.log(ERROR_LOG, f"❌ {message}")
-    
-    def info(self, message: str):
-        """Bilgi logları - Genel bilgiler"""
-        self.logger.info(f"ℹ️ {message}")
-    
-    def warning(self, message: str):
-        """Uyarı logları"""
-        self.logger.warning(f"⚠️ {message}")
-    
-    def debug(self, message: str):
-        """Debug logları - Sadece geliştirme sırasında"""
-        self.logger.debug(f"🔍 {message}")
-
-# Global logger instance
-kirve_logger = KirveLogger()
-
-def log_system(message: str):
-    """Sistem logu"""
-    kirve_logger.system(message)
-
-def log_bot(message: str):
-    """Bot logu"""
-    kirve_logger.bot(message)
-
-def log_error(message: str):
-    """Hata logu"""
-    kirve_logger.error(message)
-
-def log_info(message: str):
-    """Bilgi logu"""
-    kirve_logger.info(message)
-
-def log_warning(message: str):
-    """Uyarı logu"""
-    kirve_logger.warning(message)
-
-def log_debug(message: str):
-    """Debug logu"""
-    kirve_logger.debug(message)
+    # Ek bilgiler ekle
+    if user_id:
+        record.user_id = user_id
+    if username:
+        record.username = username
+    if chat_id:
+        record.chat_id = chat_id
+    if additional_data:
+        record.additional_data = additional_data
+        
+    # Logger'a gönder
+    logger.handle(record)
 
 def log_market_purchase(order_number: str, user_id: int, product_name: str, amount: float):
     """Market satın alma logu"""
@@ -133,7 +208,7 @@ def log_performance(operation: str, duration: float):
 # Eski logger fonksiyonları (geriye uyumluluk için)
 def setup_logger(name="bot", log_level=logging.INFO):
     """Eski logger fonksiyonu - Geriye uyumluluk"""
-    return kirve_logger
+    return logger
 
 # Global logger instance'ı döndür
-logger = kirve_logger 
+logger = logger 

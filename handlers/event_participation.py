@@ -12,7 +12,7 @@ from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKe
 from aiogram.filters import Command
 
 from config import get_config
-from database import db_pool, get_user_points, add_points_to_user
+from database import db_pool, get_user_points, add_points_to_user, get_db_pool
 from utils.logger import logger
 
 router = Router()
@@ -35,9 +35,15 @@ async def _send_events_list_privately(user_id: int, is_admin: bool):
                 return
         
         # Aktif etkinlikleri al
-        async with db_pool.acquire() as conn:
+        pool = await get_db_pool()
+        if not pool:
+            logger.error("❌ Database pool yok!")
+            await _bot_instance.send_message(user_id, "❌ Veritabanı bağlantı hatası!")
+            return
+        
+        async with pool.acquire() as conn:
             events = await conn.fetch(
-                "SELECT * FROM events WHERE status = 'active' ORDER BY created_at DESC"
+                "SELECT id, event_type, event_name, max_participants, created_at FROM events WHERE is_active = TRUE ORDER BY created_at DESC"
             )
         
         if not events:
@@ -51,18 +57,13 @@ async def _send_events_list_privately(user_id: int, is_admin: bool):
         
         message_text = "🚀 **AKTİF ETKİNLİKLER** 🚀\n\n"
         for i, event in enumerate(events, 1):
-            # Katılımcı sayısını al
-            async with db_pool.acquire() as conn:
-                participant_count = await conn.fetchval(
-                    "SELECT COUNT(*) FROM event_participants WHERE event_id = $1 AND status = 'active'",
-                    event['id']
-                )
+            # Katılımcı sayısını al (şimdilik 0)
+            participant_count = 0
             
             event_type = "🎲 Çekiliş" if event['event_type'] == 'lottery' else "💬 Bonus"
             
-            message_text += f"**{i}.** {event_type} **{event['title']}**\n"
-            message_text += f"💰 **Katılım:** {event.get('entry_cost', 0):.2f} KP\n"
-            message_text += f"🏆 **Kazanan:** {event.get('max_winners', 1)} kişi\n"
+            message_text += f"**{i}.** {event_type} **{event['event_name']}**\n"
+            message_text += f"🏆 **Kazanan:** {event.get('max_participants', 1)} kişi\n"
             message_text += f"👥 **Katılımcı:** {participant_count} kişi\n"
             if is_admin:
                 message_text += f"🆔 **ID:** `{event['id']}`\n"
@@ -86,10 +87,12 @@ participation_data = {}
 async def list_active_events(message: Message):
     """Aktif etkinlikleri listele"""
     try:
+        logger.info(f"🎯 list_active_events başlatıldı - User: {message.from_user.id}")
         # Admin kontrolü
         from config import get_config
         config = get_config()
         is_admin = message.from_user.id == config.ADMIN_USER_ID
+        logger.info(f"🎯 Admin kontrolü: {is_admin} - User: {message.from_user.id}")
         
         # 🔥 GRUP SESSİZLİK: Grup chatindeyse sil ve özel mesajla yanıt ver
         if message.chat.type != "private":
@@ -118,8 +121,10 @@ async def list_active_events(message: Message):
                 return
         
         # Aktif etkinlikleri getir
+        logger.info(f"🎯 Aktif etkinlikler getiriliyor - User: {message.from_user.id}")
         from handlers.simple_events import get_active_events
         events = await get_active_events()
+        logger.info(f"🎯 Aktif etkinlikler alındı: {len(events)} adet - User: {message.from_user.id}")
         
         if not events:
             response = ("📋 **Aktif Etkinlik Yok**\n\n"
@@ -133,42 +138,36 @@ async def list_active_events(message: Message):
                     await _bot_instance.send_message(message.from_user.id, response, parse_mode="Markdown")
             return
         
-        events_list = "🎯 **Aktif Etkinlikler:**\n\n"
+        events_list = "🎯 **Aktif Çekilişler (Admin Görünümü):**\n\n"
         keyboard_buttons = []
         
         for i, event in enumerate(events, 1):
             event_type = "🎲 Çekiliş" if event['event_type'] == 'lottery' else "💬 Bonus"
             events_list += f"**{i}. {event_type}**\n"
-            events_list += f"📝 {event['title']}\n"
-            events_list += f"💰 Katılım: {event['entry_cost']:.2f} KP\n"
-            events_list += f"🏆 Kazanan: {event['max_winners']} kişi\n\n"
-            
-            # Katılım butonu
-            keyboard_buttons.append([
-                InlineKeyboardButton(
-                    text=f"🎯 {i}. Etkinliğe Katıl", 
-                    callback_data=f"join_event_{event['id']}"
-                )
-            ])
+            events_list += f"📝 {event['event_name']}\n"
+            events_list += f"🏆 Kazanan: {event['max_participants']} kişi\n"
+            events_list += f"🆔 ID: `{event['id']}`\n\n"
             
             # Admin için bitirme butonu
-            if is_admin:
-                keyboard_buttons.append([
-                    InlineKeyboardButton(
-                        text=f"🏁 {i}. Etkinliği Bitir", 
-                        callback_data=f"end_event_{event['id']}"
-                    )
-                ])
+            keyboard_buttons.append([
+                InlineKeyboardButton(
+                    text=f"🏁 {i}. Çekilişi Bitir", 
+                    callback_data=f"end_event_{event['id']}"
+                )
+            ])
         
         keyboard_buttons.append([InlineKeyboardButton(text="🔄 Yenile", callback_data="refresh_events")])
         keyboard = InlineKeyboardMarkup(inline_keyboard=keyboard_buttons)
         
         # GRUP SESSİZLİK: Yanıtı özel mesajla gönder
+        logger.info(f"🎯 Yanıt gönderiliyor - User: {message.from_user.id}, Chat Type: {message.chat.type}")
         if message.chat.type == "private":
             await message.reply(events_list, parse_mode="Markdown", reply_markup=keyboard)
+            logger.info(f"✅ Yanıt gönderildi (private) - User: {message.from_user.id}")
         else:
             if _bot_instance:
                 await _bot_instance.send_message(message.from_user.id, events_list, parse_mode="Markdown", reply_markup=keyboard)
+                logger.info(f"✅ Yanıt gönderildi (group) - User: {message.from_user.id}")
         
     except Exception as e:
         logger.error(f"❌ List events hatası: {e}")
@@ -212,7 +211,7 @@ async def join_event_handler(callback: CallbackQuery):
                     already_participated_message = f"""
 ❌ **ZATEN KATILMIŞSINIZ** ❌
 
-🎯 **Etkinlik:** {event_info['title']}
+🎯 **Etkinlik:** {event_info['event_name']}
 📊 **Durum:** Aktif katılım
 💰 **Katılım Miktarı:** {participation.get('payment_amount', 0):.2f} KP
 
@@ -243,7 +242,7 @@ async def join_event_handler(callback: CallbackQuery):
                     event_inactive_message = f"""
 ❌ **ETKİNLİK AKTİF DEĞİL** ❌
 
-🎯 **Etkinlik:** {event_info['title']}
+🎯 **Etkinlik:** {event_info['event_name']}
 📊 **Durum:** Kapalı/Bitmiş
 🎯 **ID:** {event_id}
 
@@ -270,7 +269,7 @@ async def join_event_handler(callback: CallbackQuery):
         user_points = await get_user_points(user_id)
         current_balance = user_points.get('kirve_points', 0)
         
-        if current_balance < event_info['entry_cost']:
+        if current_balance < 0:  # Şimdilik ücretsiz
             # Kısa bildirim
             await callback.answer(
                 f"❌ Yetersiz bakiye! Detaylar özel mesajda.",
@@ -283,10 +282,9 @@ async def join_event_handler(callback: CallbackQuery):
                     insufficient_balance_message = f"""
 ❌ **YETERSİZ BAKİYE** ❌
 
-🎯 **Etkinlik:** {event_info['title']}
-💰 **Gerekli:** {event_info['entry_cost']:.2f} KP
+🎯 **Etkinlik:** {event_info['event_name']}
+💰 **Gerekli:** 0 KP (Ücretsiz)
 💳 **Mevcut:** {current_balance:.2f} KP
-📊 **Eksik:** {event_info['entry_cost'] - current_balance:.2f} KP
 
 💡 **Çözüm Önerileri:**
 • Grup sohbetinde mesaj atarak point kazanın
@@ -307,8 +305,8 @@ async def join_event_handler(callback: CallbackQuery):
             
             return
         
-        # Bakiyeyi düş
-        success = await add_points_to_user(user_id, -event_info['entry_cost'])
+        # Bakiyeyi düş (şimdilik ücretsiz)
+        success = await add_points_to_user(user_id, 0)
         if not success:
             await callback.answer("❌ Bakiye hatası! Detaylar özel mesajda.", show_alert=True)
             
@@ -318,8 +316,8 @@ async def join_event_handler(callback: CallbackQuery):
                     balance_error_message = f"""
 ❌ **BAKİYE GÜNCELLEME HATASI** ❌
 
-🎯 **Etkinlik:** {event_info['title']}
-💰 **Gerekli:** {event_info['entry_cost']:.2f} KP
+🎯 **Etkinlik:** {event_info['event_name']}
+💰 **Gerekli:** 0 KP (Ücretsiz)
 💳 **Mevcut:** {current_balance:.2f} KP
 
 💡 **Olası Sebepler:**
@@ -346,10 +344,10 @@ async def join_event_handler(callback: CallbackQuery):
             return
         
         # Database'e katılımı kaydet
-        participation_success = await join_event(user_id, event_id, event_info['entry_cost'])
+        participation_success = await join_event(user_id, event_id, 0)  # Şimdilik ücretsiz
         if not participation_success:
             # Bakiye geri ver
-            await add_points_to_user(user_id, event_info['entry_cost'])
+            await add_points_to_user(user_id, 0)
             await callback.answer("❌ Katılım hatası! Detaylar özel mesajda.", show_alert=True)
             
             # Özel mesajla açıklama
@@ -358,8 +356,8 @@ async def join_event_handler(callback: CallbackQuery):
                     participation_error_message = f"""
 ❌ **KATILIM KAYDETME HATASI** ❌
 
-🎯 **Etkinlik:** {event_info['title']}
-💰 **Ödenen:** {event_info['entry_cost']:.2f} KP
+🎯 **Etkinlik:** {event_info['event_name']}
+💰 **Ödenen:** 0 KP (Ücretsiz)
 💳 **Bakiye:** Geri iade edildi
 
 💡 **Olası Sebepler:**
@@ -398,7 +396,7 @@ async def join_event_handler(callback: CallbackQuery):
             group_message = f"""
 🚀 **YENİ ÇEKİLİŞ BAŞLADI!** 🚀
 
-{event_type} **{event_info['title']}**
+{event_type} **{event_info['event_name']}**
 
 💰 **Katılım:** {event_info['entry_cost']:.2f} KP
 🏆 **Kazanan:** {event_info['max_winners']} kişi  
@@ -436,7 +434,7 @@ Hala kayıtlı değilseniz, botun özel mesajına gidip **/kirvekayit** komutunu
             private_message = f"""
 🎉 **Etkinliğe Katıldınız!**
 
-🎯 **Etkinlik:** {event_info['title']}
+🎯 **Etkinlik:** {event_info['event_name']}
 💰 **Ödenen:** {event_info['entry_cost']:.2f} KP
 📅 **Tarih:** {datetime.now().strftime('%d.%m.%Y %H:%M')}
 👥 **Katılımcı:** {participant_count} kişi
@@ -449,7 +447,7 @@ Hala kayıtlı değilseniz, botun özel mesajına gidip **/kirvekayit** komutunu
             logger.error(f"❌ Özel mesaj gönderme hatası: {e}")
         
         # Admin'e bildirim (sadece log için)
-        logger.info(f"✅ Etkinlik katılımı: User {user_id} -> Event {event_id} - {event_info['title']}")
+        logger.info(f"✅ Etkinlik katılımı: User {user_id} -> Event {event_id} - {event_info['event_name']}")
         
         logger.info(f"✅ Etkinlik katılımı: User {user_id} -> Event {event_id}")
         
@@ -496,7 +494,7 @@ async def withdraw_event_handler(callback: CallbackQuery):
         
         await callback.message.edit_text(
             f"❌ **Çekilişten Çekildiniz!**\n\n"
-            f"**🎯 Etkinlik:** {event_info['title']}\n"
+            f"**🎯 Etkinlik:** {event_info['event_name']}\n"
             f"**💰 Geri Verilen:** {participation['payment_amount']:.2f} KP\n"
             f"**📅 Tarih:** {datetime.now().strftime('%d.%m.%Y %H:%M')}\n\n"
             f"**Bakiyeniz geri verildi!**",
@@ -504,7 +502,7 @@ async def withdraw_event_handler(callback: CallbackQuery):
         )
         
         # Admin'e bildirim (sadece log için)
-        logger.info(f"❌ Etkinlik çekilme: User {user_id} -> Event {event_id} - {event_info['title']}")
+        logger.info(f"❌ Etkinlik çekilme: User {user_id} -> Event {event_id} - {event_info['event_name']}")
         
         logger.info(f"❌ Etkinlik çekilme: User {user_id} -> Event {event_id}")
         
@@ -519,9 +517,9 @@ async def end_event_handler(callback: CallbackQuery):
         user_id = callback.from_user.id
         
         # Admin kontrolü
-        from config import get_config
+        from config import get_config, is_admin
         config = get_config()
-        if user_id != config.ADMIN_USER_ID:
+        if not is_admin(user_id):
             await callback.answer("❌ Bu işlem sadece admin tarafından yapılabilir!", show_alert=True)
             return
         
@@ -596,31 +594,14 @@ async def end_event_handler(callback: CallbackQuery):
                 pool = await get_db_pool()
                 if pool:
                     async with pool.acquire() as conn:
-                        event_data = await conn.fetchrow("SELECT message_id, group_id FROM events WHERE id = $1", event_id)
+                        event_data = await conn.fetchrow("SELECT created_by FROM events WHERE id = $1", event_id)
                     
-                    if event_data and event_data['group_id']:
-                        # Çekilişin olduğu grupta sonuç mesajı gönder
-                        group_completion_msg = await _bot_instance.send_message(
-                            event_data['group_id'],
-                            result_message,
-                            parse_mode="HTML"
-                        )
-                        logger.info(f"✅ Çekiliş sonucu grupta gönderildi: {event_data['group_id']}")
+                    if event_data:
+                        # Çekilişin olduğu grupta sonuç mesajı gönder (şimdilik sadece log)
+                        logger.info(f"✅ Çekiliş sonucu işlendi - Event ID: {event_id}")
                         
-                        # Orijinal çekiliş mesajını güncelle - "Çekiliş Sonuçlandı" butonu
-                        if event_data['message_id']:
-                            keyboard = InlineKeyboardMarkup(inline_keyboard=[
-                                [InlineKeyboardButton(
-                                    text="🏁 Çekiliş Sonuçlandı - Katılım Kapalı",
-                                    callback_data="event_completed"
-                                )]
-                            ])
-                            await _bot_instance.edit_message_reply_markup(
-                                chat_id=event_data['group_id'],
-                                message_id=event_data['message_id'],
-                                reply_markup=keyboard
-                            )
-                            logger.info(f"✅ Orijinal çekiliş mesajı güncellendi: {event_data['message_id']}")
+                        # Orijinal çekiliş mesajını güncelle (şimdilik sadece log)
+                        logger.info(f"✅ Çekiliş tamamlandı: {event_id}")
                 else:
                     logger.warning("⚠️ Database pool yok - grup sonuç mesajı gönderilemedi")
                         
@@ -630,7 +611,7 @@ async def end_event_handler(callback: CallbackQuery):
             # Callback mesajını güncelle
             await callback.message.edit_text(
                 f"✅ **Etkinlik Bitti!**\n\n"
-                f"**🎯 Etkinlik:** {event_info['title']}\n"
+                f"**🎯 Etkinlik:** {event_info['event_name']}\n"
                 f"**👥 Katılımcı:** {participant_count} kişi\n"
                 f"**🏆 Kazanan:** {len(winners)} kişi\n"
                 f"**📅 Bitiş:** {datetime.now().strftime('%d.%m.%Y %H:%M')}\n\n"
@@ -644,7 +625,7 @@ async def end_event_handler(callback: CallbackQuery):
                     winner_message = f"""
 🎉 **TEBRİKLER! ÇEKİLİŞİ KAZANDINIZ!** 🎉
 
-**🎯 Etkinlik:** {event_info['title']}
+**🎯 Etkinlik:** {event_info['event_name']}
 **🏆 Kazanan:** {winner['first_name']}
 **💸 Katılım Bedeli:** {winner['payment_amount']:.2f} KP
 **📅 Tarih:** {datetime.now().strftime('%d.%m.%Y %H:%M')}
@@ -665,7 +646,7 @@ async def end_event_handler(callback: CallbackQuery):
                 except Exception as e:
                     logger.error(f"❌ Kazanan mesajı gönderme hatası: {e}")
             
-            logger.info(f"✅ Etkinlik bitirildi: Event {event_id} - {event_info['title']}")
+            logger.info(f"✅ Etkinlik bitirildi: Event {event_id} - {event_info['event_name']}")
             
         else:
             await callback.answer("❌ Etkinlik bitirilirken hata oluştu!", show_alert=True)
@@ -711,9 +692,8 @@ async def refresh_events_handler(callback: CallbackQuery):
         for i, event in enumerate(events, 1):
             event_type = "🎲 Çekiliş" if event['event_type'] == 'lottery' else "💬 Bonus"
             events_list += f"**{i}. {event_type}**\n"
-            events_list += f"📝 {event['title']}\n"
-            events_list += f"💰 Katılım: {event['entry_cost']:.2f} KP\n"
-            events_list += f"🏆 Kazanan: {event['max_winners']} kişi\n\n"
+            events_list += f"📝 {event['event_name']}\n"
+            events_list += f"🏆 Kazanan: {event['max_participants']} kişi\n\n"
             
             # Katılım butonu
             keyboard_buttons.append([
@@ -750,18 +730,18 @@ async def get_event_info(event_id: int) -> Optional[Dict]:
     try:
         # Database pool'u güvenli şekilde al
         try:
-            from database import db_pool
-            if not db_pool:
+            pool = await get_db_pool()
+            if not pool:
                 logger.error("❌ Database pool yok!")
                 return None
         except Exception as e:
             logger.error(f"❌ Database import hatası: {e}")
             return None
         
-        async with db_pool.acquire() as conn:
+        async with pool.acquire() as conn:
             event = await conn.fetchrow("""
-                SELECT id, event_type, title, entry_cost, max_winners, description, status
-                FROM events WHERE id = $1 AND status = 'active'
+                SELECT id, event_type, event_name, max_participants, created_by, is_active
+                FROM events WHERE id = $1 AND is_active = TRUE
             """, event_id)
             
             if event:

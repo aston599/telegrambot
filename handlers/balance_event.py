@@ -1,18 +1,20 @@
 """
-🎉 Bakiye Etkinliği Handler - KirveHub Bot
+💰 Bakiye Etkinlikleri Sistemi - KirveHub Bot
+Kullanıcıların bakiye ile katılabileceği etkinlikler
 """
 
-import logging
 import asyncio
+import logging
 from datetime import datetime, timedelta
-from aiogram import Router, types, F
-from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
+from typing import Dict, Any, Optional, List
+from aiogram import Router, F, types
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 
 from config import get_config
-from database import db_pool
+from database import get_db_pool, get_user_points
 from utils.logger import logger
 
 router = Router()
@@ -33,7 +35,8 @@ async def balance_event_callback_handler(callback: types.CallbackQuery, state: F
         config = get_config()
         
         # Admin kontrolü
-        if user_id != config.ADMIN_USER_ID:
+        from config import is_admin
+        if not is_admin(user_id):
             await callback.answer("❌ Bu işlemi sadece admin yapabilir!", show_alert=True)
             return
         
@@ -182,7 +185,7 @@ async def start_custom_balance_event(callback: types.CallbackQuery, state: FSMCo
 
 
 @router.message(BalanceEventStates.waiting_for_amount)
-async def handle_balance_event_amount(message: Message, state: FSMContext) -> None:
+async def handle_balance_event_amount(message: types.Message, state: FSMContext) -> None:
     """Sürpriz etkinlik miktar input handler"""
     try:
         amount_input = message.text.strip()
@@ -229,7 +232,7 @@ async def handle_balance_event_amount(message: Message, state: FSMContext) -> No
 
 
 @router.message(BalanceEventStates.waiting_for_reason)
-async def handle_balance_event_reason(message: Message, state: FSMContext) -> None:
+async def handle_balance_event_reason(message: types.Message, state: FSMContext) -> None:
     """Sürpriz etkinlik sebep input handler"""
     try:
         reason = message.text.strip()
@@ -331,56 +334,187 @@ async def confirm_surprise_event(callback: types.CallbackQuery, state: FSMContex
 
 
 # Komut handler'ları
-@router.message(Command("sürpriz"))
-async def surprise_command(message: Message) -> None:
-    """Sürpriz etkinlik komutu"""
+@router.message(Command("surpriz"))
+async def surprise_command(message: types.Message) -> None:
+    """Sürpriz etkinlik komutu: /surpriz [miktar] [sebep]"""
     try:
-        # Admin kontrolü
+        user_id = message.from_user.id
         config = get_config()
-        if message.from_user.id != config.ADMIN_USER_ID:
+        
+        # Admin kontrolü
+        if user_id != config.ADMIN_USER_ID:
             return
         
-        # 🔥 GRUP SESSİZLİK: Grup chatindeyse sil ve özel mesajla yanıt ver
+        # Grup chatindeyse komut mesajını sil ve sessiz çalış
         if message.chat.type != "private":
             try:
                 await message.delete()
-                logger.info(f"🔇 Sürpriz komutu mesajı silindi - Group: {message.chat.id}")
-                
-                # ÖZELİNDE YANIT VER
-                if _bot_instance:
-                    await _send_surprise_result_privately(message.from_user.id)
-                return
-                
-            except Exception as e:
-                logger.error(f"❌ Komut mesajı silinemedi: {e}")
-                return
+            except:
+                pass
+            return
         
-        # Hızlı sürpriz etkinlik başlat
-        amount = 1.00  # 1 KP
-        reason = "🎉 Sürpriz Etkinlik Bonusu!"
+        # Komut metnini parse et
+        command_text = message.text.strip()
+        parts = command_text.split()
         
-        result = await process_surprise_event(amount, reason, message.from_user.id)
-        
-        if result["success"]:
-            response = f"""
-🎉 **Sürpriz Etkinlik Başarılı!**
+        # 1. Sadece /surpriz - Hızlı etkinlik
+        if len(parts) == 1:
+            amount = 1.00  # Varsayılan 1 KP
+            reason = "🎉 Sürpriz Etkinlik Bonusu!"
+            
+            # Hızlı etkinlik başlat
+            result = await process_surprise_event(amount, reason, user_id)
+            
+            if result["success"]:
+                response = f"""
+🎉 **Hızlı Sürpriz Etkinlik Başarılı!**
 
 **💰 Dağıtılan Miktar:** {amount:.2f} KP
 **👥 Etkilenen Kullanıcı:** {result["affected_users"]} kişi
 **📝 Sebep:** {reason}
 **⏰ Tarih:** {datetime.now().strftime('%d.%m.%Y %H:%M')}
 
+**🎯 Kriterler:**
+• Son 10 dakika aktif olan kullanıcılar
+• Kayıtlı üyeler
+• Bot'u bloklamamış kullanıcılar
+
 **✅ İşlem tamamlandı!**
-            """
-        else:
-            response = f"""
+                """
+            else:
+                response = f"""
 ❌ **Sürpriz Etkinlik Başarısız!**
 
 **Hata:** {result["error"]}
 **Etkilenen Kullanıcı:** {result["affected_users"]} kişi
-            """
+
+**🔧 Çözüm:**
+• Database bağlantısını kontrol edin
+• Aktif kullanıcı sayısını kontrol edin
+                """
+            
+            await message.reply(response, parse_mode="Markdown")
+            return
         
-        await message.reply(response, parse_mode="Markdown")
+        # 2. /surpriz [miktar] - Özel miktar
+        elif len(parts) == 2:
+            try:
+                amount = float(parts[1])
+                if amount <= 0:
+                    await message.reply("❌ Miktar pozitif olmalı! Örnek: `/surpriz 5.00`")
+                    return
+                
+                reason = "🎉 Özel Sürpriz Etkinlik!"
+                
+                # Özel etkinlik başlat
+                result = await process_surprise_event(amount, reason, user_id)
+                
+                if result["success"]:
+                    response = f"""
+🎉 **Özel Sürpriz Etkinlik Başarılı!**
+
+**💰 Dağıtılan Miktar:** {amount:.2f} KP
+**👥 Etkilenen Kullanıcı:** {result["affected_users"]} kişi
+**📝 Sebep:** {reason}
+**⏰ Tarih:** {datetime.now().strftime('%d.%m.%Y %H:%M')}
+
+**🎯 Kriterler:**
+• Son 10 dakika aktif olan kullanıcılar
+• Kayıtlı üyeler
+• Bot'u bloklamamış kullanıcılar
+
+**✅ İşlem tamamlandı!**
+                    """
+                else:
+                    response = f"""
+❌ **Sürpriz Etkinlik Başarısız!**
+
+**Hata:** {result["error"]}
+**Etkilenen Kullanıcı:** {result["affected_users"]} kişi
+
+**🔧 Çözüm:**
+• Database bağlantısını kontrol edin
+• Aktif kullanıcı sayısını kontrol edin
+                    """
+                
+                await message.reply(response, parse_mode="Markdown")
+                return
+                
+            except ValueError:
+                await message.reply("❌ Geçersiz miktar! Örnek: `/surpriz 5.00`")
+                return
+        
+        # 3. /surpriz [miktar] [sebep] - Tam özel etkinlik
+        elif len(parts) >= 3:
+            try:
+                amount = float(parts[1])
+                if amount <= 0:
+                    await message.reply("❌ Miktar pozitif olmalı! Örnek: `/surpriz 5.00 Hafta sonu bonusu`")
+                    return
+                
+                # Sebep kısmını birleştir
+                reason = " ".join(parts[2:])
+                
+                # Özel etkinlik başlat
+                result = await process_surprise_event(amount, reason, user_id)
+                
+                if result["success"]:
+                    response = f"""
+🎉 **Özel Sürpriz Etkinlik Başarılı!**
+
+**💰 Dağıtılan Miktar:** {amount:.2f} KP
+**👥 Etkilenen Kullanıcı:** {result["affected_users"]} kişi
+**📝 Sebep:** {reason}
+**⏰ Tarih:** {datetime.now().strftime('%d.%m.%Y %H:%M')}
+
+**🎯 Kriterler:**
+• Son 10 dakika aktif olan kullanıcılar
+• Kayıtlı üyeler
+• Bot'u bloklamamış kullanıcılar
+
+**✅ İşlem tamamlandı!**
+                    """
+                else:
+                    response = f"""
+❌ **Sürpriz Etkinlik Başarısız!**
+
+**Hata:** {result["error"]}
+**Etkilenen Kullanıcı:** {result["affected_users"]} kişi
+
+**🔧 Çözüm:**
+• Database bağlantısını kontrol edin
+• Aktif kullanıcı sayısını kontrol edin
+                    """
+                
+                await message.reply(response, parse_mode="Markdown")
+                return
+                
+            except ValueError:
+                await message.reply("❌ Geçersiz miktar! Örnek: `/surpriz 5.00 Hafta sonu bonusu`")
+                return
+        
+        # 4. Yanlış kullanım
+        else:
+            await message.reply("""
+❌ **Yanlış Kullanım!**
+
+**📋 Doğru Kullanımlar:**
+
+1️⃣ **Hızlı Etkinlik:**
+• `/surpriz` - 1 KP hızlı etkinlik
+
+2️⃣ **Özel Miktar:**
+• `/surpriz 5.00` - 5 KP etkinlik
+
+3️⃣ **Tam Özel:**
+• `/surpriz 10.00 Hafta sonu bonusu` - 10 KP + özel sebep
+
+**💡 Örnekler:**
+• `/surpriz` → 1 KP hızlı etkinlik
+• `/surpriz 2.50` → 2.50 KP etkinlik  
+• `/surpriz 5.00 🎉 Sürpriz bonus!` → 5 KP + özel sebep
+            """, parse_mode="Markdown")
+            return
         
     except Exception as e:
         logger.error(f"❌ Surprise command hatası: {e}")
@@ -389,9 +523,7 @@ async def surprise_command(message: Message) -> None:
 async def _send_surprise_result_privately(user_id: int):
     """Sürpriz sonucunu özel mesajla gönder"""
     try:
-        if not _bot_instance:
-            logger.error("❌ Bot instance bulunamadı!")
-            return
+        from main import bot  # Bot instance'ını al
         
         # Hızlı sürpriz etkinlik başlat
         amount = 1.00  # 1 KP
@@ -418,7 +550,7 @@ async def _send_surprise_result_privately(user_id: int):
 **Etkilenen Kullanıcı:** {result["affected_users"]} kişi
             """
         
-        await _bot_instance.send_message(user_id, response, parse_mode="Markdown")
+        await bot.send_message(user_id, response, parse_mode="Markdown")
         
     except Exception as e:
         logger.error(f"❌ Private surprise result hatası: {e}")
@@ -693,3 +825,153 @@ async def show_surprise_settings(callback: types.CallbackQuery) -> None:
         parse_mode="Markdown",
         reply_markup=keyboard
     ) 
+
+@router.callback_query(F.data == "admin_balance_event_history")
+async def show_balance_event_history_callback(callback: types.CallbackQuery) -> None:
+    """Bakiye etkinlik geçmişi callback handler"""
+    try:
+        user_id = callback.from_user.id
+        config = get_config()
+        
+        # Super Admin kontrolü
+        if user_id != config.ADMIN_USER_ID:
+            await callback.answer("❌ Bu işlemi sadece Super Admin yapabilir!", show_alert=True)
+            return
+        
+        # Etkinlik geçmişini al
+        result = await get_balance_event_history()
+        
+        if result["success"]:
+            history_message = "📊 **BAKİYE ETKİNLİK GEÇMİŞİ**\n\n"
+            
+            if result["events"]:
+                for event in result["events"][:10]:  # Son 10 etkinlik
+                    date = event['created_at'].strftime('%d.%m.%Y %H:%M') if event['created_at'] else 'Bilinmiyor'
+                    history_message += f"🎉 **{event['reason']}**\n"
+                    history_message += f"💰 **Miktar:** {event['amount']:.2f} KP\n"
+                    history_message += f"👥 **Etkilenen:** {event['affected_users']} kişi\n"
+                    history_message += f"📅 **Tarih:** {date}\n\n"
+                
+                history_message += f"📈 **Toplam Etkinlik:** {len(result['events'])} adet"
+            else:
+                history_message += "❌ Henüz etkinlik geçmişi yok!"
+            
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="🔄 Yenile", callback_data="admin_balance_event_history")],
+                [InlineKeyboardButton(text="⬅️ Geri", callback_data="admin_balance_event")],
+                [InlineKeyboardButton(text="❌ Kapat", callback_data="admin_balance_event_close")]
+            ])
+            
+            await callback.message.edit_text(
+                history_message,
+                parse_mode="Markdown",
+                reply_markup=keyboard
+            )
+        else:
+            await callback.answer(f"❌ Hata: {result['error']}", show_alert=True)
+        
+    except Exception as e:
+        logger.error(f"❌ Balance event history callback hatası: {e}")
+        await callback.answer("❌ Bir hata oluştu!", show_alert=True)
+
+@router.callback_query(F.data == "admin_balance_event_settings")
+async def show_balance_event_settings_callback(callback: types.CallbackQuery) -> None:
+    """Bakiye etkinlik ayarları callback handler"""
+    try:
+        user_id = callback.from_user.id
+        config = get_config()
+        
+        # Super Admin kontrolü
+        if user_id != config.ADMIN_USER_ID:
+            await callback.answer("❌ Bu işlemi sadece Super Admin yapabilir!", show_alert=True)
+            return
+        
+        # Etkinlik ayarlarını göster
+        settings_message = f"""
+⚙️ **BAKİYE ETKİNLİK AYARLARI**
+
+**🎯 Aktif Kullanıcı Kriterleri:**
+• **Süre:** Son 10 dakika aktif
+• **Kayıt:** Sadece kayıtlı üyeler
+• **Blok:** Bot'u bloklamamış kullanıcılar
+
+**💰 Varsayılan Ayarlar:**
+• **Hızlı Etkinlik:** 1.00 KP
+• **Sebep:** 🎉 Sürpriz Etkinlik Bonusu!
+• **Maksimum:** Sınırsız
+
+**�� Sistem Durumu:**
+• **Router:** ✅ Aktif
+• **Database:** ✅ Bağlı
+• **Admin Kontrolü:** ✅ Aktif
+
+**💡 Kullanım:**
+• `/surpriz` - Hızlı etkinlik
+• `/surpriz 5.00` - Özel miktar
+• `/surpriz 10.00 Hafta sonu bonusu` - Tam özel
+        """
+        
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🔄 Yenile", callback_data="admin_balance_event_settings")],
+            [InlineKeyboardButton(text="⬅️ Geri", callback_data="admin_balance_event")],
+            [InlineKeyboardButton(text="❌ Kapat", callback_data="admin_balance_event_close")]
+        ])
+        
+        await callback.message.edit_text(
+            settings_message,
+            parse_mode="Markdown",
+            reply_markup=keyboard
+        )
+        
+    except Exception as e:
+        logger.error(f"❌ Balance event settings callback hatası: {e}")
+        await callback.answer("❌ Bir hata oluştu!", show_alert=True)
+
+@router.callback_query(F.data == "admin_balance_event_close")
+async def close_balance_event_callback(callback: types.CallbackQuery) -> None:
+    """Bakiye etkinlik kapatma callback handler"""
+    try:
+        await callback.message.delete()
+        await callback.answer("❌ Mesaj kapatıldı")
+        
+    except Exception as e:
+        logger.error(f"❌ Balance event close callback hatası: {e}")
+        await callback.answer("❌ Bir hata oluştu!", show_alert=True) 
+
+async def get_balance_event_history() -> dict:
+    """Bakiye etkinlik geçmişini al"""
+    try:
+        pool = await get_db_pool()
+        if not pool:
+            return {"success": False, "error": "Database bağlantısı yok"}
+            
+        async with pool.acquire() as conn:
+            # Etkinlik geçmişini al (balance_events tablosu yoksa boş döndür)
+            try:
+                events = await conn.fetch("""
+                    SELECT 
+                        id,
+                        amount,
+                        reason,
+                        affected_users,
+                        created_at,
+                        admin_id
+                    FROM balance_events 
+                    ORDER BY created_at DESC 
+                    LIMIT 50
+                """)
+                
+                return {
+                    "success": True,
+                    "events": [dict(event) for event in events]
+                }
+            except Exception:
+                # Tablo yoksa boş liste döndür
+                return {
+                    "success": True,
+                    "events": []
+                }
+            
+    except Exception as e:
+        logger.error(f"❌ Get balance event history hatası: {e}")
+        return {"success": False, "error": str(e)} 

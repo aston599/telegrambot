@@ -1,13 +1,14 @@
 """
-🛡️ Admin Yetki Yönetimi Modülü - KirveHub Bot
-Modüler yapıda admin yetki verme/alma ve yönetim işlemleri
+👑 Admin İzin Yöneticisi - KirveHub Bot
+Admin seviyeleri ve yetki yönetimi sistemi
 """
 
 import asyncio
 import logging
-from typing import Optional, Dict, Any
-from aiogram import Router, F
-from aiogram.types import Message
+from datetime import datetime, timedelta
+from typing import Dict, Any, Optional, List
+from aiogram import Router, F, types
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.filters import Command
 
 from config import get_config
@@ -184,7 +185,7 @@ def is_super_admin(user_id: int) -> bool:
 # MESAJ GÖNDERME FONKSİYONLARI
 # =============================
 
-async def send_error_message(message: Message, text: str) -> None:
+async def send_error_message(message: types.Message, text: str) -> None:
     """Hata mesajı gönder"""
     if message.chat.type == "private":
         await message.reply(text)
@@ -197,7 +198,7 @@ async def send_error_message(message: Message, text: str) -> None:
                 logger.error(f"❌ Bot instance mesaj gönderme hatası: {e}")
         asyncio.create_task(delete_message_after_delay(sent_message))
 
-async def send_response_message(message: Message, text: str) -> None:
+async def send_response_message(message: types.Message, text: str) -> None:
     """Yanıt mesajı gönder"""
     if message.chat.type == "private":
         await message.reply(text, parse_mode="Markdown")
@@ -215,20 +216,19 @@ async def send_response_message(message: Message, text: str) -> None:
 # =============================
 
 @router.message(Command("adminyap"))
-async def make_admin_command(message: Message) -> None:
+async def make_admin_command(message: types.Message) -> None:
     """Admin yetkisi verme: /adminyap @username SEVİYE veya reply ile /adminyap SEVİYE"""
     try:
         # Super Admin kontrolü
         if not is_super_admin(message.from_user.id):
             return
         
-        # Grup chatindeyse komut mesajını sil ve sessiz çalış
+        # Grup chatindeyse komut mesajını sil (ama çalışmaya devam et)
         if message.chat.type != "private":
             try:
                 await message.delete()
             except:
                 pass
-            return
         
         # Komut metnini parse et
         command_text = message.text.strip()
@@ -295,20 +295,19 @@ async def make_admin_command(message: Message) -> None:
         await send_error_message(message, "❌ Bir hata oluştu!")
 
 @router.message(Command("adminçıkar"))
-async def remove_admin_command(message: Message) -> None:
+async def remove_admin_command(message: types.Message) -> None:
     """Admin yetkisi alma: /adminçıkar @username veya reply ile /adminçıkar"""
     try:
         # Super Admin kontrolü
         if not is_super_admin(message.from_user.id):
             return
         
-        # Grup chatindeyse komut mesajını sil ve sessiz çalış
+        # Grup chatindeyse komut mesajını sil (ama çalışmaya devam et)
         if message.chat.type != "private":
             try:
                 await message.delete()
             except:
                 pass
-            return
         
         # Komut metnini parse et
         command_text = message.text.strip()
@@ -364,20 +363,19 @@ async def remove_admin_command(message: Message) -> None:
         await send_error_message(message, "❌ Bir hata oluştu!")
 
 @router.message(Command("adminlist"))
-async def list_admins_command(message: Message) -> None:
+async def list_admins_command(message: types.Message) -> None:
     """Admin listesi: /adminlist"""
     try:
         # Super Admin kontrolü
         if not is_super_admin(message.from_user.id):
             return
         
-        # Grup chatindeyse komut mesajını sil ve sessiz çalış
+        # Grup chatindeyse komut mesajını sil (ama çalışmaya devam et)
         if message.chat.type != "private":
             try:
                 await message.delete()
             except:
                 pass
-            return
         
         # Admin listesini al
         result = await get_all_admins_db()
@@ -405,20 +403,19 @@ async def list_admins_command(message: Message) -> None:
         await send_error_message(message, "❌ Bir hata oluştu!")
 
 @router.message(Command("admininfo"))
-async def admin_info_command(message: Message) -> None:
+async def admin_info_command(message: types.Message) -> None:
     """Kullanıcı admin bilgisi: /admininfo @username veya reply ile /admininfo"""
     try:
         # Super Admin kontrolü
         if not is_super_admin(message.from_user.id):
             return
         
-        # Grup chatindeyse komut mesajını sil ve sessiz çalış
+        # Grup chatindeyse komut mesajını sil (ama çalışmaya devam et)
         if message.chat.type != "private":
             try:
                 await message.delete()
             except:
                 pass
-            return
         
         # Komut metnini parse et
         command_text = message.text.strip()
@@ -477,16 +474,253 @@ async def admin_info_command(message: Message) -> None:
         await send_error_message(message, "❌ Bir hata oluştu!")
 
 @router.message(Command("yetkiver"))
-async def give_permission_command(message: Message) -> None:
+async def give_permission_command(message: types.Message) -> None:
     """Yetki verme: /yetkiver @username SEVİYE veya reply ile /yetkiver SEVİYE"""
     # /adminyap komutunun aynısı, sadece farklı isim
     await make_admin_command(message)
 
 @router.message(Command("yetkial"))
-async def take_permission_command(message: Message) -> None:
+async def take_permission_command(message: types.Message) -> None:
     """Yetki alma: /yetkial @username veya reply ile /yetkial"""
     # /adminçıkar komutunun aynısı, sadece farklı isim
     await remove_admin_command(message)
+
+# =============================
+# CALLBACK HANDLER'LARI
+# =============================
+
+@router.callback_query(F.data == "admin_permission_manager")
+async def admin_permission_manager_callback(callback: types.CallbackQuery) -> None:
+    """Admin izin yöneticisi callback handler"""
+    try:
+        user_id = callback.from_user.id
+        config = get_config()
+        
+        # Super Admin kontrolü
+        from config import is_admin
+        if not is_admin(user_id):
+            await callback.answer("❌ Bu işlemi sadece Super Admin yapabilir!", show_alert=True)
+            return
+        
+        # Admin izin yöneticisi menüsünü göster
+        menu_message = f"""
+🛡️ **ADMİN İZİN YÖNETİCİSİ**
+
+🎯 **Mevcut Durum:** ✅ Aktif
+📊 **Router Durumu:** ✅ Entegre edildi
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📋 **KOMUTLAR:**
+• `/adminyap` - Admin yetkisi ver
+• `/adminçıkar` - Admin yetkisi al
+• `/adminlist` - Admin listesi
+• `/admininfo` - Kullanıcı bilgisi
+• `/yetkiver` - Yetki verme (alias)
+• `/yetkial` - Yetki alma (alias)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+💡 **Bilgi:** Sistem Super Admin tarafından yönetilir.
+        """
+        
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="📋 Admin Listesi", callback_data="admin_list_callback")],
+            [InlineKeyboardButton(text="🛡️ Yetki Yönetimi", callback_data="admin_permission_management")],
+            [InlineKeyboardButton(text="📊 İstatistikler", callback_data="admin_permission_stats")],
+            [InlineKeyboardButton(text="❌ Kapat", callback_data="admin_permission_close")]
+        ])
+        
+        await callback.message.edit_text(
+            menu_message,
+            parse_mode="Markdown",
+            reply_markup=keyboard
+        )
+        
+    except Exception as e:
+        logger.error(f"❌ Admin permission manager callback hatası: {e}")
+        await callback.answer("❌ Bir hata oluştu!", show_alert=True)
+
+@router.callback_query(F.data == "admin_list_callback")
+async def admin_list_callback_handler(callback: types.CallbackQuery) -> None:
+    """Admin listesi callback handler"""
+    try:
+        user_id = callback.from_user.id
+        config = get_config()
+        
+        # Super Admin kontrolü
+        from config import is_admin
+        if not is_admin(user_id):
+            await callback.answer("❌ Bu işlemi sadece Super Admin yapabilir!", show_alert=True)
+            return
+        
+        # Admin listesini al
+        result = await get_all_admins_db()
+        
+        if result["success"]:
+            admin_list = "🛡️ **ADMİN LİSTESİ**\n\n"
+            
+            for admin in result["admins"]:
+                level_name = get_rank_name(admin["rank_id"])
+                username = admin['username'] or 'Kullanıcı adı yok'
+                last_activity = admin['last_activity'].strftime('%d.%m.%Y %H:%M') if admin['last_activity'] else 'Bilinmiyor'
+                
+                admin_list += f"👤 **{admin['first_name']}** (@{username})\n"
+                admin_list += f"🛡️ **Seviye:** {level_name}\n"
+                admin_list += f"📅 **Son Aktivite:** {last_activity}\n\n"
+            
+            admin_list += f"📊 **Toplam Admin:** {len(result['admins'])} kişi"
+            
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="🔄 Yenile", callback_data="admin_list_callback")],
+                [InlineKeyboardButton(text="⬅️ Geri", callback_data="admin_permission_manager")],
+                [InlineKeyboardButton(text="❌ Kapat", callback_data="admin_permission_close")]
+            ])
+            
+            await callback.message.edit_text(
+                admin_list,
+                parse_mode="Markdown",
+                reply_markup=keyboard
+            )
+        else:
+            await callback.answer(f"❌ Hata: {result['error']}", show_alert=True)
+        
+    except Exception as e:
+        logger.error(f"❌ Admin list callback hatası: {e}")
+        await callback.answer("❌ Bir hata oluştu!", show_alert=True)
+
+@router.callback_query(F.data == "admin_permission_management")
+async def admin_permission_management_callback(callback: types.CallbackQuery) -> None:
+    """Admin yetki yönetimi callback handler"""
+    try:
+        user_id = callback.from_user.id
+        config = get_config()
+        
+        # Super Admin kontrolü
+        if user_id != config.ADMIN_USER_ID:
+            await callback.answer("❌ Bu işlemi sadece Super Admin yapabilir!", show_alert=True)
+            return
+        
+        # Yetki yönetimi menüsünü göster
+        management_message = f"""
+🛡️ **ADMİN YETKİ YÖNETİMİ**
+
+📋 **Kullanım Komutları:**
+
+**👑 Admin Yetkisi Verme:**
+• `/adminyap SEVİYE` (reply ile)
+• `/adminyap @username SEVİYE` (etiket ile)
+
+**❌ Admin Yetkisi Alma:**
+• `/adminçıkar` (reply ile)
+• `/adminçıkar @username` (etiket ile)
+
+**📊 Bilgi Alma:**
+• `/admininfo` (reply ile)
+• `/admininfo @username` (etiket ile)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+**🛡️ Seviye Sistemi:**
+• **1:** Üye (Temel komutlar)
+• **2:** Admin 1 (Chat moderasyon + Bakiye yönetimi)
+• **3:** Admin 2 (Grup kayıt + Etkinlik yönetimi)
+• **4:** Super Admin (Tam yetki + Sistem ayarları)
+
+💡 **Not:** Sadece Super Admin yetki verebilir/alabilir.
+        """
+        
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="📋 Admin Listesi", callback_data="admin_list_callback")],
+            [InlineKeyboardButton(text="📊 İstatistikler", callback_data="admin_permission_stats")],
+            [InlineKeyboardButton(text="⬅️ Geri", callback_data="admin_permission_manager")],
+            [InlineKeyboardButton(text="❌ Kapat", callback_data="admin_permission_close")]
+        ])
+        
+        await callback.message.edit_text(
+            management_message,
+            parse_mode="Markdown",
+            reply_markup=keyboard
+        )
+        
+    except Exception as e:
+        logger.error(f"❌ Admin permission management callback hatası: {e}")
+        await callback.answer("❌ Bir hata oluştu!", show_alert=True)
+
+@router.callback_query(F.data == "admin_permission_stats")
+async def admin_permission_stats_callback(callback: types.CallbackQuery) -> None:
+    """Admin izin istatistikleri callback handler"""
+    try:
+        user_id = callback.from_user.id
+        config = get_config()
+        
+        # Super Admin kontrolü
+        if user_id != config.ADMIN_USER_ID:
+            await callback.answer("❌ Bu işlemi sadece Super Admin yapabilir!", show_alert=True)
+            return
+        
+        # Admin listesini al
+        result = await get_all_admins_db()
+        
+        if result["success"]:
+            # Seviye bazlı istatistikler
+            level_stats = {}
+            for admin in result["admins"]:
+                level = admin["rank_id"]
+                level_stats[level] = level_stats.get(level, 0) + 1
+            
+            stats_message = f"""
+📊 **ADMİN İZİN İSTATİSTİKLERİ**
+
+👥 **Genel İstatistikler:**
+• **Toplam Admin:** {len(result['admins'])} kişi
+• **Aktif Sistem:** ✅ Çalışıyor
+• **Router Durumu:** ✅ Entegre edildi
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🛡️ **Seviye Dağılımı:**
+"""
+            
+            for level in sorted(level_stats.keys()):
+                level_name = get_rank_name(level)
+                count = level_stats[level]
+                stats_message += f"• **{level_name}:** {count} kişi\n"
+            
+            stats_message += f"""
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+💡 **Sistem Durumu:** ✅ Aktif ve çalışıyor
+        """
+            
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="🔄 Yenile", callback_data="admin_permission_stats")],
+                [InlineKeyboardButton(text="⬅️ Geri", callback_data="admin_permission_manager")],
+                [InlineKeyboardButton(text="❌ Kapat", callback_data="admin_permission_close")]
+            ])
+            
+            await callback.message.edit_text(
+                stats_message,
+                parse_mode="Markdown",
+                reply_markup=keyboard
+            )
+        else:
+            await callback.answer(f"❌ Hata: {result['error']}", show_alert=True)
+        
+    except Exception as e:
+        logger.error(f"❌ Admin permission stats callback hatası: {e}")
+        await callback.answer("❌ Bir hata oluştu!", show_alert=True)
+
+@router.callback_query(F.data == "admin_permission_close")
+async def admin_permission_close_callback(callback: types.CallbackQuery) -> None:
+    """Admin izin yöneticisi kapatma callback handler"""
+    try:
+        await callback.message.delete()
+        await callback.answer("❌ Mesaj kapatıldı")
+        
+    except Exception as e:
+        logger.error(f"❌ Admin permission close callback hatası: {e}")
+        await callback.answer("❌ Bir hata oluştu!", show_alert=True)
 
 # =============================
 # DIŞA AÇIK FONKSİYONLAR

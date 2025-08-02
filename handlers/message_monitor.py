@@ -68,12 +68,29 @@ user_message_count: Dict[int, int] = {}
 user_last_messages: Dict[int, List[str]] = {}  # Son mesajları takip et
 user_message_timestamps: Dict[int, List[datetime]] = {}  # Mesaj zamanlarını takip et
 
-# Point sistemi ayarları (dinamik - database'den okunur)
-FLOOD_INTERVAL = 10  # Saniye - mesajlar arası minimum süre
-MIN_MESSAGE_LENGTH = 5  # Minimum mesaj uzunluğu (5 harf)
-DEFAULT_POINT_PER_MESSAGE = 0.04  # Varsayılan mesaj başına point
-DAILY_POINT_LIMIT = 5.0  # Günlük limit
-WEEKLY_POINT_LIMIT = 20.0  # Haftalık limit
+# Point sistemi ayarları (dinamik)
+async def get_dynamic_settings():
+    """Database'den dinamik ayarları al"""
+    try:
+        from handlers.admin_panel import get_system_settings
+        settings = await get_system_settings()
+        
+        return {
+            'flood_interval': 10,  # Saniye - mesajlar arası minimum süre
+            'min_message_length': 5,  # Minimum mesaj uzunluğu
+            'messages_for_point': 5,  # Kaç mesajda bir point kazanılır (5 mesaj)
+            'daily_limit': settings.get('daily_limit', 5.0),
+            'weekly_limit': settings.get('weekly_limit', 20.0)
+        }
+    except Exception as e:
+        logger.error(f"❌ Dinamik ayarlar alınamadı: {e}")
+        return {
+            'flood_interval': 10,
+            'min_message_length': 5,
+            'messages_for_point': 5,
+            'daily_limit': 5.0,
+            'weekly_limit': 20.0
+        }
 
 
 async def update_daily_stats(user_id: int, group_id: int):
@@ -84,22 +101,43 @@ async def update_daily_stats(user_id: int, group_id: int):
             return
         
         async with db_pool.acquire() as conn:
-            # Günlük mesaj sayısını artır
-            await conn.execute("""
-                UPDATE users 
-                SET daily_messages = daily_messages + 1,
-                    last_activity = NOW()
-                WHERE user_id = $1
-            """, user_id)
+            # Transaction başlat
+            async with conn.transaction():
+                # 1. Users tablosundaki total_messages artır
+                await conn.execute("""
+                    UPDATE users 
+                    SET total_messages = total_messages + 1,
+                        last_activity = NOW()
+                    WHERE user_id = $1
+                """, user_id)
+                
+                # 2. Daily_stats tablosuna kayıt ekle/güncelle
+                today = datetime.now().date()
+                try:
+                    # Önce mevcut kaydı kontrol et
+                    existing_record = await conn.fetchrow("""
+                        SELECT message_count FROM daily_stats 
+                        WHERE user_id = $1 AND group_id = $2 AND message_date = $3
+                    """, user_id, group_id, today)
+                    
+                    if existing_record:
+                        # Mevcut kaydı güncelle
+                        await conn.execute("""
+                            UPDATE daily_stats 
+                            SET message_count = message_count + 1
+                            WHERE user_id = $1 AND group_id = $2 AND message_date = $3
+                        """, user_id, group_id, today)
+                    else:
+                        # Yeni kayıt ekle
+                        await conn.execute("""
+                            INSERT INTO daily_stats (user_id, group_id, message_date, message_count, points_earned)
+                            VALUES ($1, $2, $3, 1, 0)
+                        """, user_id, group_id, today)
+                        
+                except Exception as e:
+                    logger.warning(f"⚠️ Daily stats tablosu hatası: {e}")
             
-            # Haftalık mesaj sayısını artır
-            await conn.execute("""
-                UPDATE users 
-                SET weekly_messages = weekly_messages + 1
-                WHERE user_id = $1
-            """, user_id)
-            
-            logger.debug(f"📊 Daily stats güncellendi - User: {user_id}, Group: {group_id}")
+            logger.info(f"📊 Daily stats güncellendi - User: {user_id}, Group: {group_id}")
             
     except Exception as e:
         logger.error(f"❌ Daily stats güncelleme hatası: {e}")
@@ -107,9 +145,12 @@ async def update_daily_stats(user_id: int, group_id: int):
 async def monitor_group_message(message: Message) -> None:
     """Grup mesajlarını monitör et - Performance optimized"""
     
+    logger.info(f"🔍 MONITOR GROUP MESSAGE ÇAĞRILDI - User: {message.from_user.first_name if message.from_user else 'Unknown'}, Chat: {message.chat.id if message.chat else 'Unknown'}")
+    
     try:
         # Temel kontroller - Hızlı
         if not message.text or not message.from_user or not message.chat:
+            logger.info("❌ Temel kontroller başarısız - monitor_group_message")
             return
             
         user = message.from_user
@@ -132,9 +173,12 @@ async def monitor_group_message(message: Message) -> None:
         if message_text and message_text.startswith('/'):
             return
             
+        # Dinamik ayarları al
+        settings = await get_dynamic_settings()
+        
         # Mesaj uzunluğu kontrolü
         message_length = len(message_text)
-        min_length = MIN_MESSAGE_LENGTH
+        min_length = settings['min_message_length']
         
         if message_length < min_length:
             return
@@ -143,44 +187,88 @@ async def monitor_group_message(message: Message) -> None:
         words = message_text.split()
         unique_words = len(set(words))
         
+        # Spam kontrolü - Aynı kelimeler tekrar ediyorsa
         if unique_words < len(words):
+            return
+            
+        # Mesaj kalitesi kontrolü - Çok kısa veya anlamsız mesajlar
+        if len(words) < 2:  # En az 2 kelime olmalı
+            return
+            
+        # Emoji spam kontrolü
+        emoji_count = sum(1 for char in message_text if ord(char) > 127)
+        if emoji_count > len(message_text) * 0.5:  # %50'den fazla emoji varsa
+            return
+            
+        # Sayı spam kontrolü
+        number_count = sum(1 for char in message_text if char.isdigit())
+        if number_count > len(message_text) * 0.3:  # %30'dan fazla sayı varsa
             return
             
         # Kullanıcı kayıt durumu kontrolü
         is_registered = await is_user_registered(user.id)
+        
+        # Her durumda mesaj sayısını kaydet (kayıtlı olmayanlar için de)
+        # Mesaj sayısı her zaman kaydedilir
+        await update_daily_stats(user.id, chat.id)
+        logger.info(f"📊 Mesaj sayısı kaydedildi - User: {user.first_name} ({user.id})")
         
         if not is_registered:
             # Recruitment sistemi kontrolü
             if await check_recruitment_eligibility(user.id, user.username, user.first_name, chat.title):
                 await send_recruitment_message(user.id, user.username, user.first_name, chat.title)
         else:
-            # Kayıtlı kullanıcılar için point sistemi
-            point_per_message = await get_dynamic_point_amount()
-            
-            # Mevcut bakiyeyi al
-            current_balance = await get_user_points_cached(user.id)
-            old_balance = current_balance.get('kirve_points', 0.0) if current_balance else 0.0
-            
-            # Point ekle
-            await add_points_to_user(user.id, point_per_message)
-            
-            # Yeni bakiyeyi al
-            new_balance = old_balance + point_per_message
-            
-            # Milestone kontrolü - 1.00 KP'ye ulaştı mı?
-            if old_balance < 1.0 and new_balance >= 1.0:
-                await send_milestone_notification(user.id, user.first_name, new_balance)
-            
-            # Haftalık limit kontrolü
-            weekly_points = current_balance.get('weekly_points', 0.0) if current_balance else 0.0
-            new_weekly_points = weekly_points + point_per_message
-            
-            # Haftalık limit kontrolü (20.00 KP)
-            if weekly_points < 20.0 and new_weekly_points >= 20.0:
-                await send_weekly_limit_notification(user.id, user.first_name, 20.0)
-            
-            # Günlük istatistikleri güncelle
-            await update_daily_stats(user.id, chat.id)
+            # Kayıtlı kullanıcılar için yeni point sistemi
+            # 5 saniye flood protection kontrolü
+            if await check_flood_protection(user.id):
+                # Kullanıcının toplam mesaj sayısını al
+                current_balance = await get_user_points_cached(user.id)
+                total_messages = current_balance.get('total_messages', 0) if current_balance else 0
+                
+                # Yeni mesaj sayısı
+                new_total_messages = total_messages + 1
+                
+                # Dinamik mesaj sayısında point kazanılır
+                messages_for_point = settings['messages_for_point']
+                if new_total_messages % messages_for_point == 0:
+                    old_balance = current_balance.get('kirve_points', 0.0) if current_balance else 0.0
+                    
+                    # Günlük limit kontrolü
+                    daily_points = current_balance.get('daily_points', 0.0) if current_balance else 0.0
+                    settings = await get_system_settings()
+                    daily_limit = settings.get('daily_limit', 5.0)
+                    
+                    if daily_points >= daily_limit:
+                        logger.info(f"⏰ Günlük limit doldu - User: {user.first_name} ({user.id}), Daily: {daily_points}/{daily_limit}")
+                        return
+                    
+                    # Dinamik point miktarını al
+                    dynamic_point_amount = await get_dynamic_point_amount()
+                    
+                    # Point ekle
+                    await add_points_to_user(user.id, dynamic_point_amount, chat.id)
+                    
+                    # Yeni bakiyeyi al
+                    new_balance = old_balance + dynamic_point_amount
+                    new_daily_points = daily_points + dynamic_point_amount
+                    
+                    # Milestone kontrolü - 1.00 KP'ye ulaştı mı?
+                    if old_balance < 1.0 and new_balance >= 1.0:
+                        await send_milestone_notification(user.id, user.first_name, new_balance)
+                    
+                    # Haftalık limit kontrolü
+                    weekly_points = current_balance.get('weekly_points', 0.0) if current_balance else 0.0
+                    new_weekly_points = weekly_points + dynamic_point_amount
+                    
+                    # Haftalık limit kontrolü (20.00 KP)
+                    if weekly_points < 20.0 and new_weekly_points >= 20.0:
+                        await send_weekly_limit_notification(user.id, user.first_name, 20.0)
+                    
+                    logger.info(f"💎 Point eklendi - User: {user.first_name} ({user.id}), Points: +{dynamic_point_amount}, New Balance: {new_balance:.2f}, Daily: {new_daily_points:.2f}/{daily_limit}, Mesaj: {new_total_messages}")
+                else:
+                    logger.info(f"📝 Mesaj sayısı artırıldı - User: {user.first_name} ({user.id}), Mesaj: {new_total_messages}/{messages_for_point}")
+            else:
+                logger.info(f"⏰ Mesaj cooldown - User: {user.first_name} ({user.id}) 5 saniye beklemeli")
             
     except Exception as e:
         logger.error(f"❌ Group message handler hatası: {e}")
@@ -213,9 +301,13 @@ async def check_flood_protection(user_id: int) -> bool:
         if user_id in user_last_message:
             time_diff = now - user_last_message[user_id]
             
-            # Çok hızlı mesaj gönderiyorsa
-            if time_diff.total_seconds() < FLOOD_INTERVAL:
-                return False
+                    # Dinamik flood interval al
+        settings = await get_dynamic_settings()
+        flood_interval = settings['flood_interval']
+        
+        # Çok hızlı mesaj gönderiyorsa
+        if time_diff.total_seconds() < flood_interval:
+            return False
                 
         # Artık dakikalık limit kontrolü yok - sadece 10 saniye aralık
                 
@@ -416,20 +508,17 @@ async def get_dynamic_point_amount() -> float:
     Database'den dinamik point miktarını al
     """
     try:
-        if not db_pool:
-            return DEFAULT_POINT_PER_MESSAGE
-            
-        async with db_pool.acquire() as conn:
-            point_amount = await conn.fetchval("""
-                SELECT setting_value FROM point_settings 
-                WHERE setting_key = 'point_per_message'
-            """)
-            
-            return float(point_amount) if point_amount else DEFAULT_POINT_PER_MESSAGE
+        from handlers.admin_panel import get_system_settings
+        
+        settings = await get_system_settings()
+        point_amount = settings.get('points_per_message', 0.02)  # Default 0.02
+        
+        logger.info(f"💰 Dinamik point miktarı alındı: {point_amount}")
+        return point_amount
             
     except Exception as e:
         logger.error(f"❌ Dinamik point miktarı alınamadı: {e}")
-        return DEFAULT_POINT_PER_MESSAGE
+        return 0.02  # Default değer
 
 
 async def send_private_point_notification(user_id: int, first_name: str, total_points: float, total_messages: int, group_name: str, earned_points: float = 0.04, is_milestone: bool = False) -> None:

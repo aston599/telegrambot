@@ -10,6 +10,19 @@ import asyncio
 
 from config import get_config
 
+# Gelişmiş log sistemi import'ları - Circular import önlemek için kaldırıldı
+# from handlers.detailed_logging_system import (
+#     log_database_operation, log_error, log_missing_data,
+#     log_deadlock_detection, log_data_corruption, log_overflow_protection
+# )
+
+# Log sistemi yardımcı fonksiyonları
+from utils.logging_utils import (
+    log_database_operation, log_error, log_missing_data,
+    log_deadlock_detection, log_data_corruption, log_overflow_protection
+)
+from utils.database_logger import get_database_logger, log_database_operation as db_log_operation
+
 logger = logging.getLogger(__name__)
 
 # Global database pool
@@ -27,11 +40,17 @@ async def get_db_pool():
     """Ultra-fast database pool - Performance optimized"""
     global db_pool
     
+    # Database logger'ı al
+    db_logger = get_database_logger()
+    
     # Pool kontrolü - is_closed() yerine try-catch kullan
     if db_pool is None:
         try:
             config = get_config()
             db_url = config.DATABASE_URL
+            
+            # Bağlantı denemesi logu
+            await db_logger.log_connection_attempt(db_url)
             
             # URL encoding düzeltmesi
             if '!' in db_url:
@@ -71,8 +90,14 @@ async def get_db_pool():
                 # Connection retry ayarları
                 setup=setup_connection_fast
             )
+            
+            # Başarı logu
+            await db_logger.log_connection_success(db_url)
             logger.info(f"✅ Database pool oluşturuldu - Min: {POOL_MIN_SIZE}, Max: {POOL_MAX_SIZE}")
+            
         except Exception as e:
+            # Hata logu
+            await db_logger.log_connection_failure(db_url, str(e))
             logger.error(f"❌ Database pool hatası: {e}")
             return None
     else:
@@ -281,6 +306,11 @@ async def create_tables() -> None:
                 await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_registered BOOLEAN DEFAULT FALSE")
                 await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS registration_date TIMESTAMP")
                 await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS last_activity TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+                
+                # kirve_points kolonunu DECIMAL yap
+                await conn.execute("ALTER TABLE users ALTER COLUMN kirve_points TYPE DECIMAL(10,2)")
+                await conn.execute("ALTER TABLE users ALTER COLUMN daily_points TYPE DECIMAL(10,2)")
+                
                 logger.info("✅ Users tablosu kolonları güncellendi")
             except Exception as e:
                 logger.info(f"ℹ️ Users tablosu kolonları zaten mevcut: {e}")
@@ -294,18 +324,26 @@ async def create_tables() -> None:
                     registered_by BIGINT,
                     registration_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     is_active BOOLEAN DEFAULT TRUE,
-                    point_multiplier DECIMAL(3,2) DEFAULT 1.00
+                    point_multiplier DECIMAL(3,2) DEFAULT 1.00,
+                    unregistered_at TIMESTAMP
                 )
             """)
+            
+            # Eksik kolonları ekle (eğer yoksa)
+            try:
+                await conn.execute("ALTER TABLE registered_groups ADD COLUMN IF NOT EXISTS unregistered_at TIMESTAMP")
+                logger.info("✅ Registered groups tablosu kolonları güncellendi")
+            except Exception as e:
+                logger.info(f"ℹ️ Registered groups tablosu kolonları zaten mevcut: {e}")
             
             # Kullanıcı rütbeleri tablosu
             await conn.execute("""
                 CREATE TABLE IF NOT EXISTS user_ranks (
                     rank_id SERIAL PRIMARY KEY,
-                    rank_name VARCHAR(50) UNIQUE,
-                    rank_level INTEGER UNIQUE,
-                    permissions TEXT[],
-                    created_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    rank_name VARCHAR(100) NOT NULL UNIQUE,
+                    min_points DECIMAL(10,2) DEFAULT 0.00,
+                    max_points DECIMAL(10,2),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
             
@@ -342,10 +380,19 @@ async def create_tables() -> None:
                     message_count INTEGER DEFAULT 0,
                     points_earned DECIMAL(10,2) DEFAULT 0.00,
                     created_at TIMESTAMP DEFAULT NOW(),
-                    UNIQUE(user_id, group_id, message_date),
                     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
                 )
             """)
+            
+            # Unique constraint ekle (eğer yoksa)
+            try:
+                await conn.execute("""
+                    ALTER TABLE daily_stats 
+                    ADD CONSTRAINT daily_stats_unique 
+                    UNIQUE (user_id, group_id, message_date)
+                """)
+            except Exception as e:
+                logger.info(f"ℹ️ Unique constraint zaten var: {e}")
             
             # Bakiye logları tablosu
             await conn.execute("""
@@ -395,16 +442,18 @@ async def create_tables() -> None:
                 )
             """)
             
-            # Market ürünleri tablosu
+                        # Market ürünleri tablosu
             await conn.execute("""
                 CREATE TABLE IF NOT EXISTS market_products (
                     id SERIAL PRIMARY KEY,
+                    name VARCHAR(200) NOT NULL,
                     company_name VARCHAR(100) NOT NULL,
                     company_link VARCHAR(500),
                     product_name VARCHAR(200) NOT NULL,
                     category VARCHAR(100),
                     price DECIMAL(10,2) NOT NULL,
                     stock INTEGER DEFAULT 0,
+                    description TEXT,
                     is_active BOOLEAN DEFAULT TRUE,
                     created_by BIGINT NOT NULL,
                     created_at TIMESTAMP DEFAULT NOW()
@@ -437,13 +486,13 @@ async def create_tables() -> None:
             
             # Varsayılan rütbeleri ekle
             await conn.execute("""
-                INSERT INTO user_ranks (rank_name, rank_level, permissions) 
+                INSERT INTO user_ranks (rank_id, rank_name, min_points, max_points) 
                 VALUES 
-                    ('Üye', 1, ARRAY['basic_commands']),
-                    ('Admin 1', 2, ARRAY['basic_commands', 'moderate_chat']),
-                    ('Üst Yetkili - Admin 2', 3, ARRAY['basic_commands', 'moderate_chat', 'register_group', 'manage_points']),
-                    ('Super Admin', 4, ARRAY['basic_commands', 'moderate_chat', 'register_group', 'manage_points', 'admin_panel'])
-                ON CONFLICT (rank_name) DO NOTHING
+                    (1, 'Üye', 0.00, 0.00),
+                    (2, 'Admin 1', 0.00, 0.00),
+                    (3, 'Üst Yetkili - Admin 2', 0.00, 0.00),
+                    (4, 'Super Admin', 0.00, 0.00)
+                ON CONFLICT (rank_id) DO NOTHING
             """)
             
             # Varsayılan point ayarlarını ekle
@@ -457,12 +506,23 @@ async def create_tables() -> None:
                 ON CONFLICT (setting_key) DO NOTHING
             """)
             
-            # Bot status tablosu
+                        # Bot durumu tablosu
             await conn.execute("""
                 CREATE TABLE IF NOT EXISTS bot_status (
                     id SERIAL PRIMARY KEY,
-                    status TEXT NOT NULL,
+                    status VARCHAR(255) NOT NULL,
+                    message TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            
+            # Zamanlanmış mesajlar ayarları tablosu
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS scheduled_messages_settings (
+                    id SERIAL PRIMARY KEY,
+                    settings JSONB DEFAULT '{}',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
             
@@ -519,10 +579,10 @@ async def insert_test_data() -> None:
         if existing_count == 0:
             # Sadece hiç ürün yoksa ekle
             result = await conn.execute("""
-                INSERT INTO market_products (name, company_name, price, stock, description, created_by, is_active)
+                INSERT INTO market_products (name, company_name, product_name, price, stock, description, created_by, is_active)
                 VALUES 
-                ('Test Freespin Paketi', 'Test Casino', 25.00, 10, 'Test casino için 100 freespin paketi', 8154732274, TRUE),
-                ('Demo Bonus Paketi', 'Demo Casino', 15.00, 5, 'Demo casino için 50 bonus paketi', 8154732274, TRUE)
+                ('Test Freespin Paketi', 'Test Casino', 'Test Freespin Paketi', 25.00, 10, 'Test casino için 100 freespin paketi', 8154732274, TRUE),
+                ('Demo Bonus Paketi', 'Demo Casino', 'Demo Bonus Paketi', 15.00, 5, 'Demo casino için 50 bonus paketi', 8154732274, TRUE)
             """)
             logger.info(f"✅ Test market ürünleri eklendi! Result: {result}")
         else:
@@ -701,6 +761,9 @@ async def get_user_points(user_id: int) -> Dict[str, Any]:
     if not db_pool:
         return {}
     
+    start_time = datetime.now()
+    success = False
+    
     try:
         async with db_pool.acquire() as conn:
             result = await conn.fetchrow("""
@@ -710,6 +773,7 @@ async def get_user_points(user_id: int) -> Dict[str, Any]:
             """, user_id)
             
             if result:
+                success = True
                 return {
                     "kirve_points": float(result["kirve_points"]) if result["kirve_points"] else 0.0,
                     "daily_points": float(result["daily_points"]) if result["daily_points"] else 0.0,
@@ -722,6 +786,15 @@ async def get_user_points(user_id: int) -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"❌ Get user points hatası: {e}")
         return {}
+    finally:
+        # Detaylı log
+        duration_ms = (datetime.now() - start_time).total_seconds() * 1000
+        await log_database_operation(
+            operation="get_user_points",
+            table="users",
+            success=success,
+            duration_ms=duration_ms
+        )
 
 async def get_user_points_cached(user_id: int) -> Dict[str, Any]:
     """Kullanıcı point'lerini cache ile al"""
@@ -770,8 +843,8 @@ async def get_user_points_cached(user_id: int) -> Dict[str, Any]:
                     'last_activity': user_data['last_activity']
                 }
                 
-                # Cache'e kaydet (30 saniye TTL)
-                cache_manager.set_cache(cache_key, result, ttl=30)
+                # Cache'e kaydet (5 saniye TTL - daha kısa)
+                cache_manager.set_cache(cache_key, result, ttl=5)
                 return result
                 
         return {}
@@ -787,16 +860,16 @@ async def add_points_to_user(user_id: int, points: float, group_id: int = None) 
     
     try:
         async with db_pool.acquire() as conn:
-            today = date.today()
+            # Transaction başlat
+            async with conn.transaction():
+                today = date.today()
             
-            # Sistem ayarlarını al
+            # Sistem ayarlarını al (point_settings tablosundan)
             system_settings = await conn.fetchrow("""
                 SELECT 
-                    points_per_message,
-                    daily_limit,
-                    weekly_limit
-                FROM system_settings 
-                WHERE id = 1
+                    setting_value
+                FROM point_settings 
+                WHERE setting_key = 'daily_limit'
             """)
             
             # Varsayılan değerler
@@ -804,8 +877,7 @@ async def add_points_to_user(user_id: int, points: float, group_id: int = None) 
             weekly_limit = 20.0
             
             if system_settings:
-                daily_limit = float(system_settings['daily_limit'])
-                weekly_limit = float(system_settings['weekly_limit'])
+                daily_limit = float(system_settings['setting_value'])
             
             # Günlük limit kontrolü
             daily_points = await conn.fetchval("""
@@ -830,7 +902,7 @@ async def add_points_to_user(user_id: int, points: float, group_id: int = None) 
                 return False
             
             # Point ekle
-            await conn.execute("""
+            result = await conn.execute("""
                 UPDATE users 
                 SET kirve_points = kirve_points + $2,
                     daily_points = CASE 
@@ -843,20 +915,43 @@ async def add_points_to_user(user_id: int, points: float, group_id: int = None) 
                 WHERE user_id = $1
             """, user_id, points, today)
             
-            # Daily stats güncelle
+            # Update sonucunu kontrol et
+            logger.info(f"💎 Point ekleme sonucu: {result}")
+            
+            # Güncellenen satır sayısını kontrol et
+            if result == "UPDATE 0":
+                logger.warning(f"⚠️ Kullanıcı bulunamadı veya güncellenmedi - User: {user_id}")
+                return False
+            
+            # Daily stats güncelle (basit INSERT)
             if group_id:
-                await conn.execute("""
-                    INSERT INTO daily_stats (user_id, group_id, message_date, message_count, points_earned)
-                    VALUES ($1, $2, $3, 1, $4)
-                    ON CONFLICT (user_id, group_id, message_date)
-                    DO UPDATE SET
-                        message_count = daily_stats.message_count + 1,
-                        points_earned = daily_stats.points_earned + $4
-                """, user_id, group_id, today, points)
+                try:
+                    await conn.execute("""
+                        INSERT INTO daily_stats (user_id, group_id, message_date, message_count, points_earned)
+                        VALUES ($1, $2, $3, 1, $4)
+                    """, user_id, group_id, today, points)
+                except Exception as e:
+                    logger.warning(f"⚠️ Daily stats INSERT hatası: {e}")
+            
+            # Cache'i temizle
+            try:
+                from utils.memory_manager import memory_manager
+                cache_manager = memory_manager.get_cache_manager()
+                cache_key = f"user_points_{user_id}"
+                # Cache'i sil (farklı metod)
+                if hasattr(cache_manager, 'clear_cache'):
+                    cache_manager.clear_cache()
+                elif hasattr(cache_manager, 'delete_cache'):
+                    cache_manager.delete_cache(cache_key)
+                else:
+                    # Cache'i manuel olarak temizle
+                    cache_manager._cache.pop(cache_key, None)
+            except Exception as e:
+                logger.warning(f"⚠️ Cache temizleme hatası: {e}")
             
             logger.info(f"💎 Sistem aktivitesi - User: {user_id}")
             return True
-            
+                
     except Exception as e:
         logger.error(f"❌ Add points hatası: {e}")
         return False
@@ -910,6 +1005,31 @@ async def is_group_registered(group_id: int) -> bool:
         return False
 
 
+async def unregister_group(group_id: int) -> bool:
+    """Grubu sistemden kaldır"""
+    if not db_pool:
+        return False
+    
+    try:
+        async with db_pool.acquire() as conn:
+            result = await conn.execute("""
+                UPDATE registered_groups 
+                SET is_active = FALSE, unregistered_at = NOW()
+                WHERE group_id = $1
+            """, group_id)
+            
+            if result == "UPDATE 1":
+                logger.info(f"✅ Grup kaldırıldı - Group ID: {group_id}")
+                return True
+            else:
+                logger.warning(f"⚠️ Grup bulunamadı veya zaten kaldırılmış - Group ID: {group_id}")
+                return False
+            
+    except Exception as e:
+        logger.error(f"❌ Group unregister hatası: {e}")
+        return False
+
+
 # ==============================================
 # ADMIN & RANK FONKSİYONLARI
 # ==============================================
@@ -920,9 +1040,19 @@ async def get_user_rank(user_id: int) -> Dict[str, Any]:
         return {}
     
     try:
+        # Admin kontrolü
+        config = get_config()
+        if user_id == config.ADMIN_USER_ID:
+            return {
+                "rank_name": "Super Admin",
+                "rank_level": 10,
+                "permissions": ["basic_commands", "register_group", "admin_panel", "delete_group", "manage_users"],
+                "rank_id": 10
+            }
+        
         async with db_pool.acquire() as conn:
             result = await conn.fetchrow("""
-                SELECT ur.rank_name, ur.rank_level, ur.permissions, u.rank_id
+                SELECT ur.rank_name, ur.rank_id, u.rank_id
                 FROM users u
                 LEFT JOIN user_ranks ur ON u.rank_id = ur.rank_id
                 WHERE u.user_id = $1
@@ -931,8 +1061,8 @@ async def get_user_rank(user_id: int) -> Dict[str, Any]:
             if result:
                 return {
                     "rank_name": result["rank_name"] or "Üye",
-                    "rank_level": result["rank_level"] or 1,
-                    "permissions": result["permissions"] or ["basic_commands"],
+                    "rank_level": result["rank_id"] or 1,
+                    "permissions": ["basic_commands"],  # Basit yetkiler
                     "rank_id": result["rank_id"] or 1
                 }
             return {"rank_name": "Üye", "rank_level": 1, "permissions": ["basic_commands"], "rank_id": 1}
@@ -1136,7 +1266,7 @@ async def join_event(user_id: int, event_id: int, payment_amount: float) -> bool
         async with db_pool.acquire() as conn:
             # Daha önce katılım var mı kontrol et
             existing = await conn.fetchval("""
-                SELECT id FROM event_participations 
+                SELECT id FROM event_participants 
                 WHERE user_id = $1 AND event_id = $2
             """, user_id, event_id)
             
@@ -1146,7 +1276,7 @@ async def join_event(user_id: int, event_id: int, payment_amount: float) -> bool
             
             # Katılımı kaydet
             await conn.execute("""
-                INSERT INTO event_participations (user_id, event_id, payment_amount)
+                INSERT INTO event_participants (user_id, event_id, payment_amount)
                 VALUES ($1, $2, $3)
             """, user_id, event_id, payment_amount)
             
@@ -1166,7 +1296,7 @@ async def withdraw_from_event(user_id: int, event_id: int) -> bool:
         async with db_pool.acquire() as conn:
             # Katılımı bul
             participation = await conn.fetchrow("""
-                SELECT id, payment_amount, status FROM event_participations 
+                SELECT id, payment_amount, status FROM event_participants 
                 WHERE user_id = $1 AND event_id = $2 AND status = 'active'
             """, user_id, event_id)
             
@@ -1176,8 +1306,8 @@ async def withdraw_from_event(user_id: int, event_id: int) -> bool:
             
             # Çekilmeyi kaydet
             await conn.execute("""
-                UPDATE event_participations 
-                SET withdrew_at = NOW(), status = 'withdrawn', can_withdraw = FALSE
+                UPDATE event_participants 
+                SET status = 'withdrawn'
                 WHERE id = $1
             """, participation['id'])
             
@@ -1196,8 +1326,8 @@ async def get_user_event_participation(user_id: int, event_id: int) -> Optional[
     try:
         async with db_pool.acquire() as conn:
             participation = await conn.fetchrow("""
-                SELECT id, user_id, event_id, joined_at, withdrew_at, can_withdraw, payment_amount, status
-                FROM event_participations 
+                SELECT id, user_id, event_id, joined_at, payment_amount, status
+                FROM event_participants 
                 WHERE user_id = $1 AND event_id = $2
             """, user_id, event_id)
             
@@ -1218,7 +1348,7 @@ async def can_user_join_event(user_id: int, event_id: int) -> bool:
         async with db_pool.acquire() as conn:
             # Daha önce katılım var mı
             existing = await conn.fetchval("""
-                SELECT id FROM event_participations 
+                SELECT id FROM event_participants 
                 WHERE user_id = $1 AND event_id = $2
             """, user_id, event_id)
             
@@ -1227,10 +1357,10 @@ async def can_user_join_event(user_id: int, event_id: int) -> bool:
             
             # Etkinlik aktif mi
             event = await conn.fetchrow("""
-                SELECT id, status FROM events WHERE id = $1
+                SELECT id, is_active FROM events WHERE id = $1
             """, event_id)
             
-            if not event or event['status'] != 'active':
+            if not event or not event['is_active']:
                 return False
             
             return True
@@ -1247,7 +1377,7 @@ async def get_event_participant_count(event_id: int) -> int:
     try:
         async with db_pool.acquire() as conn:
             count = await conn.fetchval("""
-                SELECT COUNT(*) FROM event_participations 
+                SELECT COUNT(*) FROM event_participants 
                 WHERE event_id = $1 AND status = 'active'
             """, event_id)
             
@@ -1265,7 +1395,7 @@ async def get_event_info_for_end(event_id: int) -> dict:
     try:
         async with db_pool.acquire() as conn:
             event = await conn.fetchrow("""
-                SELECT id, title, max_winners, entry_cost, event_type
+                SELECT id, event_name, max_participants, event_type, created_by
                 FROM events WHERE id = $1
             """, event_id)
             
@@ -1284,21 +1414,13 @@ async def get_event_winners(event_id: int, winner_count: int) -> list:
     
     try:
         async with db_pool.acquire() as conn:
-            # Katılımcı sayısını kontrol et - Her iki tablodan kontrol et
+            # Katılımcı sayısını kontrol et
             participant_count = await conn.fetchval("""
-                SELECT COUNT(*) FROM event_participations 
+                SELECT COUNT(*) FROM event_participants 
                 WHERE event_id = $1 AND status = 'active'
             """, event_id)
             
             logger.info(f"🔍 Event {event_id} - get_event_winners participant_count: {participant_count}")
-            
-            # Eğer event_participations'da yoksa event_participants'tan kontrol et
-            if not participant_count or participant_count == 0:
-                participant_count = await conn.fetchval("""
-                    SELECT COUNT(*) FROM event_participants 
-                    WHERE event_id = $1 AND status = 'active'
-                """, event_id)
-                logger.info(f"🔍 Event {event_id} - get_event_winners participant_count2: {participant_count}")
             
             if participant_count == 0:
                 logger.info(f"🎯 No participants for event: {event_id}")
@@ -1307,9 +1429,7 @@ async def get_event_winners(event_id: int, winner_count: int) -> list:
             # Kazanan sayısını katılımcı sayısına göre ayarla
             actual_winners = min(winner_count, participant_count)
             
-            # Gelişmiş kazanan seçim algoritması
-            # 1. Önce event_participations tablosundan kontrol et
-            # 2. Eğer yoksa event_participants tablosundan kontrol et
+            # Kazanan seçim algoritması
             winners = await conn.fetch("""
                 WITH weighted_participants AS (
                     SELECT 
@@ -1320,7 +1440,7 @@ async def get_event_winners(event_id: int, winner_count: int) -> list:
                         u.username,
                         -- Katılım miktarına göre ağırlık (daha fazla ödeyen daha şanslı)
                         (ep.payment_amount * 10 + RANDOM()) as weight
-                    FROM event_participations ep
+                    FROM event_participants ep
                     JOIN users u ON ep.user_id = u.user_id
                     WHERE ep.event_id = $1 AND ep.status = 'active'
                 )
@@ -1330,31 +1450,7 @@ async def get_event_winners(event_id: int, winner_count: int) -> list:
                 LIMIT $2
             """, event_id, actual_winners)
             
-            logger.info(f"🔍 Event {event_id} - event_participations'tan kazananlar: {winners}")
-            
-            # Eğer event_participations'da kazanan bulunamadıysa event_participants'tan dene
-            if not winners:
-                logger.info(f"🔍 Event {event_id} - event_participations'da kazanan bulunamadı, event_participants'tan deneniyor")
-                winners = await conn.fetch("""
-                    WITH weighted_participants AS (
-                        SELECT 
-                            ep.user_id, 
-                            ep.payment_amount, 
-                            u.first_name, 
-                            u.last_name, 
-                            u.username,
-                            -- Katılım miktarına göre ağırlık (daha fazla ödeyen daha şanslı)
-                            (ep.payment_amount * 10 + RANDOM()) as weight
-                        FROM event_participants ep
-                        JOIN users u ON ep.user_id = u.user_id
-                        WHERE ep.event_id = $1 AND ep.status = 'active'
-                    )
-                    SELECT user_id, payment_amount, first_name, last_name, username
-                    FROM weighted_participants
-                    ORDER BY weight DESC
-                    LIMIT $2
-                """, event_id, actual_winners)
-                logger.info(f"🔍 Event {event_id} - event_participants'tan kazananlar: {winners}")
+            logger.info(f"🔍 Event {event_id} - event_participants'tan kazananlar: {winners}")
             
             result = [dict(winner) for winner in winners]
             logger.info(f"🎯 Get event winners - Event: {event_id}, Winners: {len(result)}, Participants: {participant_count}, Details: {result}")
@@ -1396,46 +1492,32 @@ async def end_event(event_id: int) -> bool:
         async with db_pool.acquire() as conn:
             # Etkinlik bilgilerini al
             event = await conn.fetchrow("""
-                SELECT id, title, max_winners, group_id, entry_cost FROM events 
-                WHERE id = $1 AND status = 'active'
+                SELECT id, event_name, max_participants, created_by FROM events 
+                WHERE id = $1 AND is_active = TRUE
             """, event_id)
             
             if not event:
                 return False
             
-            # Toplam katılımcı sayısını al - Her iki tablodan kontrol et
+            # Toplam katılımcı sayısını al
             participant_count = await conn.fetchval("""
-                SELECT COUNT(*) FROM event_participations 
+                SELECT COUNT(*) FROM event_participants 
                 WHERE event_id = $1 AND status = 'active'
             """, event_id)
             
-            logger.info(f"🔍 Event {event_id} - event_participations count: {participant_count}")
-            
-            # Eğer event_participations'da yoksa event_participants'tan kontrol et
-            if not participant_count or participant_count == 0:
-                participant_count = await conn.fetchval("""
-                    SELECT COUNT(*) FROM event_participants 
-                    WHERE event_id = $1 AND status = 'active'
-                """, event_id)
-                logger.info(f"🔍 Event {event_id} - event_participants count: {participant_count}")
+            logger.info(f"🔍 Event {event_id} - event_participants count: {participant_count}")
             
             # Detaylı katılımcı bilgilerini logla
             participants = await conn.fetch("""
-                SELECT user_id, payment_amount, status FROM event_participations 
+                SELECT user_id, payment_amount, status FROM event_participants 
                 WHERE event_id = $1
             """, event_id)
             logger.info(f"🔍 Event {event_id} - All participants: {participants}")
             
-            participants2 = await conn.fetch("""
-                SELECT user_id, payment_amount, status FROM event_participants 
-                WHERE event_id = $1
-            """, event_id)
-            logger.info(f"🔍 Event {event_id} - All participants2: {participants2}")
-            
             if participant_count == 0:
                 # Katılımcı yoksa etkinliği iptal et
                 await conn.execute("""
-                    UPDATE events SET status = 'cancelled', completed_at = NOW()
+                    UPDATE events SET is_active = FALSE
                     WHERE id = $1
                 """, event_id)
                 logger.info(f"✅ Event iptal edildi (katılımcı yok): {event_id}")
@@ -1443,7 +1525,7 @@ async def end_event(event_id: int) -> bool:
             
             # Etkinliği bitir (kazanan seçimi ve point dağıtımı end_lottery_command'da yapılacak)
             await conn.execute("""
-                UPDATE events SET status = 'completed', completed_at = NOW()
+                UPDATE events SET is_active = FALSE
                 WHERE id = $1
             """, event_id)
             
@@ -1463,8 +1545,8 @@ async def cancel_event(event_id: int) -> bool:
         async with db_pool.acquire() as conn:
             # Etkinlik bilgilerini al
             event = await conn.fetchrow("""
-                SELECT id, title, entry_cost, group_id FROM events 
-                WHERE id = $1 AND status = 'active'
+                SELECT id, event_name, created_by FROM events 
+                WHERE id = $1 AND is_active = TRUE
             """, event_id)
             
             if not event:
@@ -1478,7 +1560,7 @@ async def cancel_event(event_id: int) -> bool:
             
             # Etkinliği iptal et
             await conn.execute("""
-                UPDATE events SET status = 'cancelled', completed_at = NOW()
+                UPDATE events SET is_active = FALSE
                 WHERE id = $1
             """, event_id)
             
@@ -1510,7 +1592,7 @@ async def get_event_status(event_id: int) -> dict:
         async with db_pool.acquire() as conn:
             # Etkinlik bilgilerini al
             event = await conn.fetchrow("""
-                SELECT id, title, entry_cost, max_winners, status, created_at, completed_at
+                SELECT id, event_name, max_participants, is_active, created_at
                 FROM events WHERE id = $1
             """, event_id)
             
@@ -1525,13 +1607,13 @@ async def get_event_status(event_id: int) -> dict:
             
             return {
                 'id': event['id'],
-                'title': event['title'],
-                'entry_cost': event['entry_cost'],
-                'max_winners': event['max_winners'],
-                'status': event['status'],
+                'title': event['event_name'],
+                'entry_cost': 0,  # Şimdilik 0
+                'max_winners': event['max_participants'],
+                'status': 'active' if event['is_active'] else 'completed',
                 'participant_count': participant_count,
                 'created_at': event['created_at'].strftime('%d.%m.%Y %H:%M') if event['created_at'] else 'Bilinmiyor',
-                'completed_at': event['completed_at'].strftime('%d.%m.%Y %H:%M') if event['completed_at'] else None
+                'completed_at': None
             }
             
     except Exception as e:
@@ -1557,10 +1639,8 @@ async def get_market_products_with_details() -> list:
                     p.stock,
                     p.is_active,
                     p.created_at,
-                    c.name as category_name,
-                    c.emoji as category_emoji
+                    p.category as category_name
                 FROM market_products p
-                LEFT JOIN market_categories c ON p.category_id = c.id
                 WHERE p.is_active = TRUE
                 ORDER BY p.created_at DESC
             """)
@@ -1772,15 +1852,14 @@ async def get_product_by_id(product_id: int) -> dict:
             product = await conn.fetchrow("""
                 SELECT 
                     p.id,
-                    p.name,
+                    p.product_name,
                     p.description,
                     p.company_name,
                     p.price,
                     p.stock,
                     p.is_active,
                     p.created_at,
-                    c.name as category_name,
-                    c.emoji as category_emoji
+                    c.name as category_name
                 FROM market_products p
                 LEFT JOIN market_categories c ON p.category_id = c.id
                 WHERE p.id = $1 AND p.is_active = TRUE
@@ -2005,15 +2084,14 @@ async def add_custom_command(command_name: str, scope: int, response_message: st
     async with pool.acquire() as conn:
         try:
             await conn.execute('''
-                INSERT INTO custom_commands (command_name, scope, reply_text, button_text, button_url, created_by)
+                INSERT INTO custom_commands (command_name, scope, response_message, button_text, button_url, created_by)
                 VALUES ($1, $2, $3, $4, $5, $6)
-                ON CONFLICT (command_name) DO UPDATE SET
-                    scope = EXCLUDED.scope,
-                    reply_text = EXCLUDED.reply_text,
+                ON CONFLICT (command_name, scope) DO UPDATE SET
+                    response_message = EXCLUDED.response_message,
                     button_text = EXCLUDED.button_text,
                     button_url = EXCLUDED.button_url,
                     created_by = EXCLUDED.created_by,
-                    created_at = NOW()
+                    updated_at = NOW()
             ''', command_name, scope, response_message, button_text, button_url, created_by)
             logger.info(f"✅ Dinamik komut kaydedildi: {command_name}")
             return True
@@ -2027,8 +2105,14 @@ async def get_custom_command(command_name: str, scope: int) -> dict:
         return None
     async with pool.acquire() as conn:
         cmd = await conn.fetchrow('''
-            SELECT * FROM custom_commands WHERE command_name = $1 AND (scope = $2 OR scope = 3)
+            SELECT * FROM custom_commands WHERE command_name = $1 AND (scope = $2 OR scope = 3) AND is_active = TRUE
         ''', command_name, scope)
+        
+        if cmd:
+            logger.info(f"✅ Database'den komut bulundu - Command: {command_name}, Scope: {scope}")
+        else:
+            logger.info(f"❌ Database'de komut bulunamadı - Command: {command_name}, Scope: {scope}")
+            
         return dict(cmd) if cmd else None
 
 async def list_custom_commands() -> list:
@@ -2038,8 +2122,8 @@ async def list_custom_commands() -> list:
     async with pool.acquire() as conn:
         cmds = await conn.fetch('''
             SELECT 
-                id, command_name, scope, reply_text, 
-                button_text, button_url, created_by, created_at
+                id, command_name, scope, response_message, 
+                button_text, button_url, created_by, created_at, is_active
             FROM custom_commands 
             ORDER BY created_at DESC
         ''')
@@ -2221,7 +2305,7 @@ async def get_all_active_products() -> list:
     try:
         async with db_pool.acquire() as conn:
             products = await conn.fetch("""
-                SELECT id, name, description, company_name, price, stock, is_active
+                SELECT id, product_name, description, company_name, price, stock, is_active
                 FROM market_products 
                 WHERE is_active = TRUE
                 ORDER BY created_at DESC
@@ -2232,3 +2316,53 @@ async def get_all_active_products() -> list:
     except Exception as e:
         logger.error(f"❌ Get all active products hatası: {e}")
         return []
+
+
+async def delete_user_account(user_id: int) -> bool:
+    """Kullanıcı hesabını tamamen sil"""
+    try:
+        pool = await get_db_pool()
+        if not pool:
+            logger.error("❌ Database pool bulunamadı")
+            return False
+            
+        async with pool.acquire() as conn:
+            # Transaction başlat
+            async with conn.transaction():
+                # Önce kullanıcının var olup olmadığını kontrol et
+                user_exists = await conn.fetchval("""
+                    SELECT COUNT(*) FROM users WHERE user_id = $1
+                """, user_id)
+                
+                if user_exists == 0:
+                    logger.warning(f"⚠️ Kullanıcı zaten mevcut değil - User ID: {user_id}")
+                    return True  # Zaten silinmiş sayılır
+                
+                # Kullanıcının tüm verilerini sil
+                
+                # 1. Market siparişlerini sil
+                await conn.execute("""
+                    DELETE FROM market_orders WHERE user_id = $1
+                """, user_id)
+                
+                # 2. Event katılımlarını sil
+                await conn.execute("""
+                    DELETE FROM event_participants WHERE user_id = $1
+                """, user_id)
+                
+                # 3. Custom commands'ları sil (bu kullanıcı tarafından oluşturulan)
+                await conn.execute("""
+                    DELETE FROM custom_commands WHERE created_by = $1
+                """, user_id)
+                
+                # 4. Kullanıcı bilgilerini sil
+                result = await conn.execute("""
+                    DELETE FROM users WHERE user_id = $1
+                """, user_id)
+                
+                logger.critical(f"🚨 Kullanıcı hesabı tamamen silindi - User ID: {user_id}")
+                return True
+                    
+    except Exception as e:
+        logger.error(f"❌ Delete user account hatası: {e}")
+        return False

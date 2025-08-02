@@ -76,6 +76,16 @@ def get_admin_permissions(level: int) -> str:
 async def make_admin_command(message: Message) -> None:
     """Admin yetkisi verme: /adminyap @username SEVİYE veya reply ile /adminyap SEVİYE"""
     try:
+        # Detaylı log
+        from handlers.detailed_logging_system import log_command_execution, log_admin_action
+        await log_command_execution(
+            user_id=message.from_user.id,
+            username=message.from_user.username or message.from_user.first_name,
+            command="adminyap",
+            chat_id=message.chat.id,
+            chat_type=message.chat.type
+        )
+        
         # Admin seviye kontrolü (Admin 3+ gerekli)
         if not check_admin_permission(message.from_user.id, 3):
             await send_error_message(message, "❌ Bu komutu kullanmak için Admin 2+ seviyesi gerekli!")

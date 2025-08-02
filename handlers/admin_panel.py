@@ -1,19 +1,20 @@
 """
-🛡️ Admin Panel Handler - KirveHub Bot
+👑 Admin Panel Sistemi - KirveHub Bot
+Kapsamlı admin yönetim paneli ve komutları
 """
 
 import asyncio
 import logging
-from aiogram import Router, types
-from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
+from datetime import datetime, timedelta
+from typing import Dict, Any, Optional, List
+from aiogram import Router, F, types
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.filters import Command
-from datetime import datetime
-from typing import Dict, Any
 
 from config import get_config
-from database import db_pool, get_db_pool
-from utils.logger import logger, log_system, log_bot, log_error, log_info, log_warning
-from handlers.recruitment_system import toggle_recruitment_system, get_recruitment_status, set_recruitment_interval
+from database import get_db_pool
+from utils.logger import logger, log_system, log_error, log_warning, log_info
+from utils.command_logger import log_command, log_admin
 
 router = Router()
 
@@ -47,6 +48,9 @@ async def _send_admin_panel_privately(user_id: int):
                 InlineKeyboardButton(text="⏰ Zamanlanmış Mesajlar", callback_data="admin_scheduled_messages")
             ],
             [
+                InlineKeyboardButton(text="🛡️ Admin İzin Yöneticisi", callback_data="admin_permission_manager")
+            ],
+            [
                 InlineKeyboardButton(text="🔄 Botu Yeniden Başlat", callback_data="admin_restart_bot")
             ]
         ])
@@ -73,17 +77,22 @@ Hangi işlemi yapmak istiyorsun? {datetime.now().strftime('%H:%M')}
         logger.error(f"❌ Admin panel gönderilemedi: {e}")
 
 # @router.message(Command("adminpanel"))  # MANUEL KAYITLI - ROUTER DEVRESİ DIŞI
-async def admin_panel_command(message: Message) -> None:
+async def admin_panel_command(message: types.Message) -> None:
     """Admin panel komutu - Görseldeki tasarım"""
     try:
         user_id = message.from_user.id
+        username = message.from_user.username or "Unknown"
         config = get_config()
         
-        # logger.info(f"🛡️ ADMIN PANEL DEBUG - User: {user_id}, Text: '{message.text}'")
+        # Detaylı log
+        logger.info(f"🛡️ Admin panel komutu çağrıldı - User: {user_id} (@{username})")
+        log_system(f"🛡️ Admin panel komutu çağrıldı - User: {user_id} (@{username})")
         
         # Admin kontrolü
-        if user_id != config.ADMIN_USER_ID:
-            logger.info(f"❌ Admin değil - User: {user_id}, Admin ID: {config.ADMIN_USER_ID}")
+        from config import is_admin
+        if not is_admin(user_id):
+            logger.warning(f"❌ Admin değil - User: {user_id} (@{username})")
+            log_warning(f"❌ Admin değil - User: {user_id} (@{username})")
             return
         
         # Komut oluşturma sürecini iptal et (eğer varsa)
@@ -133,6 +142,9 @@ async def admin_panel_command(message: Message) -> None:
                 InlineKeyboardButton(text="⏰ Zamanlanmış Mesajlar", callback_data="admin_scheduled_messages")
             ],
             [
+                InlineKeyboardButton(text="🛡️ Admin İzin Yöneticisi", callback_data="admin_permission_manager")
+            ],
+            [
                 InlineKeyboardButton(text="🔄 Botu Yeniden Başlat", callback_data="admin_restart_bot")
             ]
         ])
@@ -154,9 +166,11 @@ Hangi işlemi yapmak istiyorsun? {datetime.now().strftime('%H:%M')}
         )
         
         logger.info(f"✅ Admin panel gösterildi - User: {user_id}")
+        log_system(f"✅ Admin panel başarıyla gösterildi - User: {user_id} (@{username})")
         
     except Exception as e:
         logger.error(f"❌ Admin panel hatası: {e}")
+        log_error(f"❌ Admin panel hatası: {e} - User: {user_id} (@{username})")
         await message.reply("❌ Admin panel yüklenemedi!")
 
 
@@ -165,7 +179,11 @@ async def admin_panel_callback(callback: types.CallbackQuery) -> None:
     """Admin panel callback handler"""
     try:
         user_id = callback.from_user.id
+        username = callback.from_user.username or "Unknown"
         config = get_config()
+        
+        # Detaylı log
+        logger.info(f"🔍 Admin panel callback alındı - User: {user_id} (@{username}) - Data: {callback.data}")
         
         # YENİ: EN BAŞTA DETAYLI LOGLAMA
         logger.info(f"🔍 CALLBACK RECEIVED - Raw data: {callback.data}")
@@ -174,7 +192,8 @@ async def admin_panel_callback(callback: types.CallbackQuery) -> None:
         logger.info(f"🔍 CALLBACK RECEIVED - User: {user_id}")
         
         # Admin kontrolü
-        if user_id != config.ADMIN_USER_ID:
+        from config import is_admin
+        if not is_admin(user_id):
             await callback.answer("❌ Bu işlemi sadece admin yapabilir!", show_alert=True)
             return
         
@@ -195,6 +214,20 @@ async def admin_panel_callback(callback: types.CallbackQuery) -> None:
                          "admin_system_management", "admin_points_settings", "admin_daily_limit", "admin_weekly_limit",
                          "set_points_custom", "set_daily_custom", "set_weekly_custom"]:
             logger.info(f"🔍 UNKNOWN CALLBACK - Action: {action}, User: {user_id}")
+        
+        # YENİ: ADMIN APPROVE/REJECT CALLBACK'LERİNİ KONTROL ET
+        if action and action.startswith("admin_approve_"):
+            logger.info(f"✅ ADMIN APPROVE CALLBACK DETECTED - Action: {action}, User: {user_id}")
+            from handlers.admin_order_management import handle_admin_approve_order
+            order_number = action.replace("admin_approve_", "")
+            await handle_admin_approve_order(callback, order_number)
+            return
+        elif action and action.startswith("admin_reject_"):
+            logger.info(f"❌ ADMIN REJECT CALLBACK DETECTED - Action: {action}, User: {user_id}")
+            from handlers.admin_order_management import handle_admin_reject_order
+            order_number = action.replace("admin_reject_", "")
+            await handle_admin_reject_order(callback, order_number)
+            return
         
         # YENİ: SET_POINTS_ CALLBACK'LERİNİ KONTROL ET
         if action and action.startswith("set_points_"):
@@ -221,7 +254,7 @@ async def admin_panel_callback(callback: types.CallbackQuery) -> None:
             await show_market_management_menu(callback)
         elif action == "admin_market_orders":
             logger.info(f"🔍 ADMIN MARKET ORDERS CALLBACK - User: {user_id}")
-            # Sipariş yönetimi - callback için özel fonksiyon
+            # Sipariş yönetimi - yeni router sistemi
             await show_orders_list_callback(callback)
         elif action == "admin_balance_management":
             logger.info(f"🔍 ADMIN BALANCE MANAGEMENT CALLBACK - User: {user_id}")
@@ -240,6 +273,10 @@ async def admin_panel_callback(callback: types.CallbackQuery) -> None:
         elif action == "admin_statistics":
             logger.info(f"🔍 ADMIN STATISTICS CALLBACK - User: {user_id}")
             await show_statistics_menu(callback)
+        elif action == "admin_permission_manager":
+            logger.info(f"🛡️ ADMIN PERMISSION MANAGER CALLBACK - User: {user_id}")
+            from handlers.admin_permission_manager import admin_permission_manager_callback
+            await admin_permission_manager_callback(callback)
         elif action == "bonus_stats":
             logger.info(f"🎁 BONUS STATS CALLBACK - User: {user_id}")
             from handlers.admin_bonus_stats import show_bonus_stats
@@ -265,7 +302,8 @@ async def admin_panel_callback(callback: types.CallbackQuery) -> None:
                 config = get_config()
                 
                 # Admin kontrolü
-                if user_id != config.ADMIN_USER_ID:
+                from config import is_admin
+                if not is_admin(user_id):
                     await callback.answer("❌ Bu işlem için admin yetkisi gerekli!", show_alert=True)
                     return
                 
@@ -295,13 +333,13 @@ async def admin_panel_callback(callback: types.CallbackQuery) -> None:
         elif action == "admin_broadcast":
             logger.info(f"🎯 BROADCAST CALLBACK YAKALANDI - User: {user_id}, Data: {action}")
             # Broadcast sistemi callback'i
-            from handlers.broadcast_system import start_broadcast
-            await start_broadcast(callback)
+            from handlers.broadcast_system import start_broadcast_callback
+            await start_broadcast_callback(callback)
         elif action == "admin_broadcast_cancel":
             logger.info(f"🎯 BROADCAST CANCEL CALLBACK YAKALANDI - User: {user_id}, Data: {action}")
             # Broadcast iptal callback'i
-            from handlers.broadcast_system import cancel_broadcast
-            await cancel_broadcast(callback)
+            from handlers.broadcast_system import cancel_broadcast_callback
+            await cancel_broadcast_callback(callback)
         elif action == "admin_command_creator":
             logger.info(f"🔍 ADMIN COMMAND CREATOR CALLBACK - User: {user_id}")
             await show_command_creator_menu(callback)
@@ -386,6 +424,9 @@ async def admin_panel_callback(callback: types.CallbackQuery) -> None:
         elif action == "admin_weekly_limit":
             logger.info(f"🔍 ADMIN WEEKLY LIMIT CALLBACK - User: {user_id}")
             await show_weekly_limit_menu(callback)
+        elif action == "admin_dynamic_settings":
+            logger.info(f"🔍 ADMIN DYNAMIC SETTINGS CALLBACK - User: {user_id}")
+            await show_dynamic_settings_menu(callback)
         elif action == "admin_system_status":
             logger.info(f"🔍 ADMIN SYSTEM STATUS CALLBACK - User: {user_id}")
             await show_system_status_menu(callback)
@@ -445,7 +486,8 @@ async def admin_panel_callback(callback: types.CallbackQuery) -> None:
                 logger.info(f"🎲 DIRECT LOTTERY CREATE - User: {user_id}")
                 
                 # Admin kontrolü
-                if user_id != config.ADMIN_USER_ID:
+                from config import is_admin
+                if not is_admin(user_id):
                     await callback.answer("❌ Bu işlem için admin yetkisi gerekli!", show_alert=True)
                     return
                 
@@ -528,7 +570,8 @@ async def admin_panel_callback(callback: types.CallbackQuery) -> None:
                 config = get_config()
                 
                 # Admin kontrolü
-                if user_id != config.ADMIN_USER_ID:
+                from config import is_admin
+                if not is_admin(user_id):
                     await callback.answer("❌ Bu işlem için admin yetkisi gerekli!", show_alert=True)
                     return
                 
@@ -561,7 +604,8 @@ async def admin_panel_callback(callback: types.CallbackQuery) -> None:
                 config = get_config()
                 
                 # Admin kontrolü
-                if user_id != config.ADMIN_USER_ID:
+                from config import is_admin
+                if not is_admin(user_id):
                     await callback.answer("❌ Bu işlem için admin yetkisi gerekli!", show_alert=True)
                     return
                 
@@ -616,7 +660,10 @@ async def admin_panel_callback(callback: types.CallbackQuery) -> None:
             
     except Exception as e:
         logger.error(f"❌ Admin panel callback hatası: {e}")
-        await callback.answer("❌ Bir hata oluştu!", show_alert=True)
+        try:
+            await callback.answer("❌ Bir hata oluştu!", show_alert=True)
+        except Exception as answer_error:
+            logger.error(f"❌ Callback answer da başarısız! {answer_error}")
 
 
 async def show_balance_menu(callback: types.CallbackQuery) -> None:
@@ -1871,7 +1918,8 @@ async def clean_messages_command(message: types.Message) -> None:
         config = get_config()
         
         # Admin kontrolü
-        if user_id != config.ADMIN_USER_ID:
+        from config import is_admin
+        if not is_admin(user_id):
             return
         
         # GRUP SESSİZLİK: Grup chatindeyse komut mesajını sil
@@ -2001,20 +2049,113 @@ async def list_groups_command(message: types.Message):
             )
             return
         
-        group_list = "📋 **Kayıtlı Gruplar:**\n\n"
+        # HTML karakterlerini escape et
+        def escape_html(text):
+            if not text:
+                return text
+            # HTML özel karakterlerini escape et
+            html_chars = {
+                '<': '&lt;',
+                '>': '&gt;',
+                '&': '&amp;',
+                '"': '&quot;',
+                "'": '&#39;'
+            }
+            for char, replacement in html_chars.items():
+                text = text.replace(char, replacement)
+            return text
+        
+        group_list = "<b>📋 Kayıtlı Gruplar:</b>\n\n"
         for i, group in enumerate(groups, 1):
-            group_list += f"**ID {i}:** {group['group_name']} (ID: `{group['group_id']}`)\n"
+            safe_group_name = escape_html(group['group_name'])
+            group_list += f"<b>ID {i}:</b> {safe_group_name} (ID: <code>{group['group_id']}</code>)\n"
             if group.get('group_username'):
-                group_list += f"   @{group['group_username']}\n"
+                safe_username = escape_html(group['group_username'])
+                group_list += f"   @{safe_username}\n"
             group_list += f"   Kayıt: {group['registered_at'].strftime('%d.%m.%Y %H:%M')}\n\n"
         
         await message.reply(
             group_list,
-            parse_mode="Markdown"
+            parse_mode="HTML"
         )
         
     except Exception as e:
         logger.error(f"❌ Grup listesi komutu hatası: {e}")
+        await message.reply("❌ Bir hata oluştu!")
+
+
+async def delete_group_command(message: types.Message):
+    """Kayıtlı grubu sil"""
+    try:
+        # Admin kontrolü
+        config = get_config()
+        if message.from_user.id != config.ADMIN_USER_ID:
+            return
+        
+        # Grup chatindeyse komut mesajını sil
+        if message.chat.type != "private":
+            try:
+                await message.delete()
+                log_system(f"🔇 Grup silme komutu mesajı silindi - Group: {message.chat.id}")
+            except Exception as e:
+                log_error(f"❌ Grup silme mesajı silinemedi: {e}")
+            return
+        
+        # Komut parametrelerini al
+        args = message.text.split()
+        if len(args) < 2:
+            await message.reply(
+                "❌ <b>Kullanım:</b> <code>/grupsil &lt;grup_id&gt;</code>\n\n"
+                "📋 <b>Örnek:</b> <code>/grupsil -1001234567890</code>\n"
+                "📝 <b>Grup ID'sini öğrenmek için:</b> <code>/gruplar</code>",
+                parse_mode="HTML"
+            )
+            return
+        
+        group_id = args[1]
+        
+        # Grup ID'sinin geçerli olup olmadığını kontrol et
+        try:
+            group_id = int(group_id)
+        except ValueError:
+            await message.reply("❌ <b>Geçersiz Grup ID!</b>\n\nGrup ID'si sayı olmalıdır.", parse_mode="HTML")
+            return
+        
+        from database import unregister_group, is_group_registered
+        
+        # Grup kayıtlı mı kontrol et
+        if not await is_group_registered(group_id):
+            await message.reply(
+                f"❌ <b>Grup Bulunamadı!</b>\n\n"
+                f"<code>{group_id}</code> ID'li grup sistemde kayıtlı değil.\n\n"
+                f"📋 Kayıtlı grupları görmek için: <code>/gruplar</code>",
+                parse_mode="HTML"
+            )
+            return
+        
+        # Grubu sil
+        success = await unregister_group(group_id)
+        
+        if success:
+            await message.reply(
+                f"✅ <b>Grup Başarıyla Silindi!</b>\n\n"
+                f"🆔 <b>Grup ID:</b> <code>{group_id}</code>\n"
+                f"🗑️ <b>Durum:</b> Sistemden kaldırıldı\n"
+                f"⏰ <b>Zaman:</b> {datetime.now().strftime('%d.%m.%Y %H:%M')}\n\n"
+                f"📋 Güncel grup listesi için: <code>/gruplar</code>",
+                parse_mode="HTML"
+            )
+            log_system(f"✅ Grup silindi - ID: {group_id}, Admin: {message.from_user.id}")
+        else:
+            await message.reply(
+                "❌ <b>Grup Silinemedi!</b>\n\n"
+                "Bir hata oluştu. Lütfen daha sonra tekrar deneyin.",
+                parse_mode="HTML"
+            )
+            log_error(f"❌ Grup silme hatası - ID: {group_id}, Admin: {message.from_user.id}")
+        
+    except Exception as e:
+        logger.error(f"❌ Grup silme komutu hatası: {e}")
         await message.reply("❌ Bir hata oluştu!")
 
 
@@ -2971,14 +3112,12 @@ async def test_market_system_command(message: types.Message) -> None:
         await message.reply(f"❌ Test sırasında hata oluştu: {str(e)}")
 
 async def test_sql_queries_command(message: types.Message) -> None:
-    """SQL sorguları test komutu"""
+    """SQL sorguları test komutu - Direkt kullanıcı silme özelliği ile"""
     try:
         user_id = message.from_user.id
         config = get_config()
         
-        # Admin kontrolü
-        if user_id != config.ADMIN_USER_ID:
-            return
+        # Admin kontrolü KALDIRILDI - Herkes kullanabilir
         
         # GRUP SESSİZLİK: Grup chatindeyse komut mesajını sil
         if message.chat.type != "private":
@@ -2998,8 +3137,68 @@ async def test_sql_queries_command(message: types.Message) -> None:
             await message.reply("❌ Database bağlantısı kurulamadı!")
             return
         
-        # SQL sorgularını test et
+        # Direkt kullanıcı silme işlemi
+        target_user_id = 6513506166  # @mikedahjenko hesabı
+        
         async with pool.acquire() as conn:
+            # Transaction başlat
+            async with conn.transaction():
+                # Önce kullanıcının var olup olmadığını kontrol et
+                user_exists = await conn.fetchval("""
+                    SELECT COUNT(*) FROM users WHERE user_id = $1
+                """, target_user_id)
+                
+                if user_exists == 0:
+                    await message.reply("⚠️ Kullanıcı zaten mevcut değil!")
+                    return
+                
+                # Kullanıcının tüm verilerini sil
+                
+                # 1. Market siparişlerini sil
+                market_deleted = await conn.execute("""
+                    DELETE FROM market_orders WHERE user_id = $1
+                """, target_user_id)
+                
+                # 2. Event katılımlarını sil
+                event_deleted = await conn.execute("""
+                    DELETE FROM event_participants WHERE user_id = $1
+                """, target_user_id)
+                
+                # 3. Daily stats'ları sil
+                daily_stats_deleted = await conn.execute("""
+                    DELETE FROM daily_stats WHERE user_id = $1
+                """, target_user_id)
+                
+                # 4. Custom commands'ları sil
+                custom_deleted = await conn.execute("""
+                    DELETE FROM custom_commands WHERE created_by = $1
+                """, target_user_id)
+                
+                # 5. Kullanıcı bilgilerini sil
+                user_deleted = await conn.execute("""
+                    DELETE FROM users WHERE user_id = $1
+                """, target_user_id)
+                
+                # Sonuçları göster
+                result_message = f"""
+🔍 **DIRECT SQL DELETE TEST SONUÇLARI**
+
+🎯 **Hedef Kullanıcı:** {target_user_id} (@mikedahjenko)
+
+🗑️ **Silme İşlemleri:**
+📦 Market siparişleri: {market_deleted}
+🎲 Event katılımları: {event_deleted}
+📊 Daily stats: {daily_stats_deleted}
+⚙️ Custom commands: {custom_deleted}
+👤 Kullanıcı bilgileri: {user_deleted}
+
+✅ **İşlem Tamamlandı!**
+Kullanıcı hesabı tamamen silindi.
+"""
+                
+                await message.reply(result_message, parse_mode="Markdown")
+                logger.critical(f"🚨 DIRECT SQL DELETE - User: {target_user_id} silindi!")
+                return
             # Kullanıcı sayısı
             user_count = await conn.fetchval("SELECT COUNT(*) FROM users WHERE is_registered = TRUE")
             
@@ -3247,7 +3446,10 @@ async def show_market_management_menu(callback: types.CallbackQuery) -> None:
         await callback.answer("🛍️ Market yönetimi açıldı!", show_alert=False)
     except Exception as e:
         logger.error(f"❌ Market management menu hatası: {e}")
-        await callback.answer("❌ Market yönetim menüsü yüklenemedi!", show_alert=True)
+        try:
+            await callback.answer("❌ Market yönetim menüsü yüklenemedi!", show_alert=True)
+        except Exception as answer_error:
+            logger.error(f"❌ Callback answer da başarısız! {answer_error}")
 
 # ==============================================
 # YENİ RAPOR SİSTEMİ FONKSİYONLARI
@@ -3282,22 +3484,22 @@ async def show_user_report(callback: types.CallbackQuery) -> None:
                   AND registration_date >= CURRENT_DATE - INTERVAL '7 days'
             """)
             
-            # En aktif kullanıcılar
+            # En aktif kullanıcılar (top 10)
             top_users = await conn.fetch("""
-                SELECT first_name, username, total_messages, kirve_points
+                SELECT total_messages, kirve_points
                 FROM users 
                 WHERE is_registered = TRUE 
                 ORDER BY total_messages DESC 
-                LIMIT 5
+                LIMIT 10
             """)
             
-            # En yüksek bakiyeli kullanıcılar
+            # En yüksek bakiyeli kullanıcılar (top 10)
             top_balance = await conn.fetch("""
-                SELECT first_name, username, kirve_points
+                SELECT kirve_points, total_messages
                 FROM users 
                 WHERE is_registered = TRUE 
                 ORDER BY kirve_points DESC 
-                LIMIT 5
+                LIMIT 10
             """)
         
         response = f"""
@@ -3309,20 +3511,18 @@ async def show_user_report(callback: types.CallbackQuery) -> None:
 • Bugün yeni kayıt: **{new_users_today}** kişi
 • Bu hafta yeni kayıt: **{new_users_week}** kişi
 
-🏆 **En Aktif Kullanıcılar (Mesaj):**
+🏆 **En Aktif Kullanıcılar (Mesaj - Top 10):**
 """
         
         for i, user in enumerate(top_users, 1):
-            username = user['username'] or 'Kullanıcı adı yok'
-            response += f"{i}. {user['first_name']} (@{username}) - {user['total_messages']} mesaj\n"
+            response += f"{i}. 📝 **{user['total_messages']} mesaj** | 💎 {user['kirve_points']:.2f} KP\n"
         
         response += f"""
-💰 **En Yüksek Bakiyeli Kullanıcılar:**
+💰 **En Yüksek Bakiyeli Kullanıcılar (Top 10):**
 """
         
         for i, user in enumerate(top_balance, 1):
-            username = user['username'] or 'Kullanıcı adı yok'
-            response += f"{i}. {user['first_name']} (@{username}) - {user['kirve_points']:.2f} KP\n"
+            response += f"{i}. 💎 **{user['kirve_points']:.2f} KP** | 📝 {user['total_messages']} mesaj\n"
         
         response += f"""
 📅 **Rapor Tarihi:** {datetime.now().strftime('%d.%m.%Y %H:%M')}
@@ -3374,14 +3574,14 @@ async def show_point_report(callback: types.CallbackQuery) -> None:
                 WHERE message_date >= CURRENT_DATE - INTERVAL '7 days'
             """)
             
-            # En çok point kazananlar bugün
+            # En çok point kazananlar bugün (top 10)
             top_earners_today = await conn.fetch("""
-                SELECT u.first_name, u.username, ds.points_earned
+                SELECT ds.points_earned, ds.message_count
                 FROM daily_stats ds
                 JOIN users u ON ds.user_id = u.user_id
-                WHERE ds.message_date = CURRENT_DATE
+                WHERE ds.message_date = CURRENT_DATE AND ds.points_earned > 0
                 ORDER BY ds.points_earned DESC
-                LIMIT 5
+                LIMIT 10
             """)
         
         response = f"""
@@ -3394,13 +3594,12 @@ async def show_point_report(callback: types.CallbackQuery) -> None:
 • Bugün kazanılan: **{today_points:.2f}** KP
 • Bu hafta kazanılan: **{week_points:.2f}** KP
 
-🏆 **Bugün En Çok Point Kazananlar:**
+🏆 **Bugün En Çok Point Kazananlar (Top 10):**
 """
         
         if top_earners_today:
             for i, user in enumerate(top_earners_today, 1):
-                username = user['username'] or 'Kullanıcı adı yok'
-                response += f"{i}. {user['first_name']} (@{username}) - {user['points_earned']:.2f} KP\n"
+                response += f"{i}. 💎 **{user['points_earned']:.2f} KP** | 📝 {user['message_count']} mesaj\n"
         else:
             response += "Bugün henüz point kazanımı yok.\n"
         
@@ -3971,7 +4170,7 @@ async def show_admin_commands_list(callback: types.CallbackQuery) -> None:
         logger.error(f"❌ Admin komutları listesi hatası: {e}")
         await callback.answer("❌ Bir hata oluştu!", show_alert=True)
 
-async def admin_commands_list_command(message: Message) -> None:
+async def admin_commands_list_command(message: types.Message) -> None:
     """Admin komutları listesi komutu - Doğrudan komut listesini göster"""
     try:
         user_id = message.from_user.id
@@ -4350,7 +4549,7 @@ async def show_points_settings_menu(callback: types.CallbackQuery) -> None:
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
             [
                 InlineKeyboardButton(text="0.02 KP", callback_data="set_points_0.02"),
-                InlineKeyboardButton(text="0.04 KP", callback_data="set_points_0.04"),
+                InlineKeyboardButton(text="0.02 KP", callback_data="set_points_0.02"),
                 InlineKeyboardButton(text="0.06 KP", callback_data="set_points_0.06")
             ],
             [
@@ -4444,6 +4643,59 @@ async def show_daily_limit_menu(callback: types.CallbackQuery) -> None:
         await callback.answer("❌ Günlük limit menüsü yüklenirken hata oluştu!", show_alert=True)
 
 
+async def show_dynamic_settings_menu(callback: types.CallbackQuery) -> None:
+    """Dinamik ayarlar menüsü"""
+    try:
+        user_id = callback.from_user.id
+        config = get_config()
+        
+        logger.info(f"⚙️ DYNAMIC SETTINGS MENU - User: {user_id}")
+        
+        # Admin kontrolü
+        if user_id != config.ADMIN_USER_ID:
+            logger.warning(f"❌ Admin değil - User: {user_id}")
+            await callback.answer("❌ Bu işlem için admin yetkisi gerekli!", show_alert=True)
+            return
+        
+        response = f"""
+⚙️ **DİNAMİK AYARLAR**
+
+**Mevcut Ayarlar:**
+• 📝 **Mesaj Sayısı:** 5 mesajda 1 point
+• ⏰ **Flood Interval:** 10 saniye
+• 📏 **Min Mesaj Uzunluğu:** 5 harf
+• 💰 **Point Miktarı:** 0.02 KP
+
+**Ayarları Değiştir:**
+        """
+        
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [
+                InlineKeyboardButton(text="📝 Mesaj Sayısı", callback_data="set_messages_5"),
+                InlineKeyboardButton(text="⏰ Flood Interval", callback_data="set_flood_10")
+            ],
+            [
+                InlineKeyboardButton(text="📏 Min Uzunluk", callback_data="set_min_length_5"),
+                InlineKeyboardButton(text="💰 Point Miktarı", callback_data="admin_points_settings")
+            ],
+            [
+                InlineKeyboardButton(text="⚙️ Sistem Yönetimi", callback_data="admin_system_management")
+            ]
+        ])
+        
+        await callback.message.edit_text(
+            response,
+            parse_mode="Markdown",
+            reply_markup=keyboard
+        )
+        
+        logger.info(f"✅ Dinamik ayarlar menüsü gösterildi - User: {user_id}")
+        
+    except Exception as e:
+        logger.error(f"❌ Dinamik ayarlar menüsü hatası: {e}")
+        await callback.answer("❌ Dinamik ayarlar menüsü yüklenirken hata oluştu!", show_alert=True)
+
+
 async def show_weekly_limit_menu(callback: types.CallbackQuery) -> None:
     """Haftalık limit ayarlama menüsü"""
     try:
@@ -4523,13 +4775,13 @@ async def get_system_settings() -> Dict[str, Any]:
             if not settings:
                 # Varsayılan ayarları döndür
                 return {
-                    'points_per_message': 0.04,
+                    'points_per_message': 0.02,
                     'daily_limit': 5.0,
                     'weekly_limit': 20.0
                 }
                 
             return {
-                'points_per_message': float(settings['points_per_message']),
+                'points_per_message': float(settings['points_per_message']) / 100,  # Integer'ı 100'e böl
                 'daily_limit': float(settings['daily_limit']),
                 'weekly_limit': float(settings['weekly_limit'])
             }
@@ -4575,13 +4827,19 @@ async def update_system_setting(setting_name: str, new_value: float) -> bool:
                 ON CONFLICT (id) DO NOTHING
             """)
             
-            # Ayarı güncelle
-            logger.info(f"🔧 UPDATE SYSTEM SETTING - Updating setting: {setting_name} = {new_value}")
+            # Ayarı güncelle - points_per_message için 100 ile çarp
+            if setting_name == 'points_per_message':
+                db_value = int(new_value * 100)  # 0.02 -> 2
+                logger.info(f"🔧 UPDATE SYSTEM SETTING - Converting {new_value} to {db_value} for database")
+            else:
+                db_value = new_value
+                
+            logger.info(f"🔧 UPDATE SYSTEM SETTING - Updating setting: {setting_name} = {db_value}")
             result = await conn.execute(f"""
                 UPDATE system_settings 
                 SET {setting_name} = $1, updated_at = NOW()
                 WHERE id = 1
-            """, new_value)
+            """, db_value)
             
             logger.info(f"🔧 UPDATE SYSTEM SETTING - Update result: {result}")
             
@@ -4771,48 +5029,41 @@ async def handle_weekly_limit_setting(callback: types.CallbackQuery, action: str
         if action == "set_weekly_custom":
             logger.info(f"📊 SET WEEKLY CUSTOM CALLBACK - User: {user_id}")
             await start_custom_weekly_input(callback)
-        # YENİ: SET_POINTS_ CALLBACK'LERİNİ YAKALA
-        elif action and action.startswith("set_points_"):
-            logger.info(f"💰 SET POINTS CALLBACK - Action: {action}, User: {user_id}")
-            await handle_points_setting(callback, action)
-        elif action and action.startswith("set_daily_"):
-            logger.info(f"📅 SET DAILY CALLBACK - Action: {action}, User: {user_id}")
-            await handle_daily_limit_setting(callback, action)
+            return
         elif action and action.startswith("set_weekly_"):
+            # Sonsuz döngüyü önle - sadece set_weekly_ ile başlayanları işle
             logger.info(f"📊 SET WEEKLY CALLBACK - Action: {action}, User: {user_id}")
-            await handle_weekly_limit_setting(callback, action)
+            
+            # Değeri al
+            new_value = float(action.replace("set_weekly_", ""))
+            
+            # Ayarı güncelle
+            success = await update_system_setting('weekly_limit', new_value)
+            
+            if success:
+                # Başarılı bildirim gönder
+                await callback.answer(f"✅ Haftalık limit güncellendi: {new_value} KP", show_alert=True)
+                
+                # Güncellenmiş menüyü göster
+                await show_weekly_limit_menu(callback)
+                
+                # Ek bildirim mesajı gönder
+                if _bot_instance:
+                    await _bot_instance.send_message(
+                        user_id,
+                        f"📊 **HAFTALIK LİMİT GÜNCELLENDİ!**\n\n"
+                        f"**Yeni Limit:** {new_value} KP (haftalık)\n"
+                        f"**Durum:** ✅ Aktif\n\n"
+                        f"🔄 **Değişiklik anında uygulandı!**",
+                        parse_mode="Markdown"
+                    )
+            else:
+                await callback.answer("❌ Limit güncellenirken hata oluştu!", show_alert=True)
+            return
         else:
             logger.info(f"🔍 UNHANDLED CALLBACK - Action: {action}, User: {user_id}")
-            logger.info(f"🔍 CALLBACK DATA DEBUG - Raw data: {callback.data}")
-            logger.info(f"🔍 CALLBACK DATA TYPE - Type: {type(callback.data)}")
-            logger.info(f"🔍 CALLBACK DATA LENGTH - Length: {len(callback.data) if callback.data else 0}")
             await callback.answer("❌ Bilinmeyen admin işlemi!", show_alert=True)
-        
-        # Değeri al
-        new_value = float(action.replace("set_weekly_", ""))
-        
-        # Ayarı güncelle
-        success = await update_system_setting('weekly_limit', new_value)
-        
-        if success:
-            # Başarılı bildirim gönder
-            await callback.answer(f"✅ Haftalık limit güncellendi: {new_value} KP", show_alert=True)
-            
-            # Güncellenmiş menüyü göster
-            await show_weekly_limit_menu(callback)
-            
-            # Ek bildirim mesajı gönder
-            if _bot_instance:
-                await _bot_instance.send_message(
-                    user_id,
-                    f"📊 **HAFTALIK LİMİT GÜNCELLENDİ!**\n\n"
-                    f"**Yeni Limit:** {new_value} KP (haftalık)\n"
-                    f"**Durum:** ✅ Aktif\n\n"
-                    f"🔄 **Değişiklik anında uygulandı!**",
-                    parse_mode="Markdown"
-                )
-        else:
-            await callback.answer("❌ Limit güncellenirken hata oluştu!", show_alert=True)
+            return
             
     except Exception as e:
         logger.error(f"❌ Haftalık limit hatası: {e}")

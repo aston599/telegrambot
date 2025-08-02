@@ -5,11 +5,15 @@ Telegram uyumlu admin sipariş onay/red sistemi
 
 import logging
 from datetime import datetime
-from aiogram import types
+from aiogram import types, Router, F
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.filters import Command
 from database import get_db_pool
 
 logger = logging.getLogger(__name__)
+
+# Router oluştur
+router = Router()
 
 # Admin sipariş durumları - Global olarak erişilebilir
 admin_order_states = {}
@@ -18,6 +22,121 @@ def get_admin_order_states():
     """Global admin_order_states'e erişim"""
     return admin_order_states
 
+# ==============================================
+# KOMUT HANDLER'LARI
+# ==============================================
+
+@router.message(Command("siparisliste"))
+async def siparis_liste_command(message: types.Message) -> None:
+    """Sipariş listesi komutu"""
+    try:
+        # Admin kontrolü
+        from config import get_config
+        config = get_config()
+        if message.from_user.id != config.ADMIN_USER_ID:
+            return
+        
+        # Grup chatindeyse komut mesajını sil
+        if message.chat.type != "private":
+            try:
+                await message.delete()
+                logger.info(f"🔇 Sipariş listesi komutu mesajı silindi - Group: {message.chat.id}")
+            except Exception as e:
+                logger.error(f"❌ Sipariş listesi mesajı silinemedi: {e}")
+            return
+        
+        await show_orders_list_modern(message)
+        
+    except Exception as e:
+        logger.error(f"❌ Sipariş listesi komutu hatası: {e}")
+        await message.reply("❌ Sipariş listesi yüklenemedi!")
+
+@router.message(Command("siparisonayla"))
+async def siparis_onayla_command(message: types.Message) -> None:
+    """Sipariş onaylama komutu"""
+    try:
+        # Admin kontrolü
+        from config import get_config
+        config = get_config()
+        if message.from_user.id != config.ADMIN_USER_ID:
+            return
+        
+        # Grup chatindeyse komut mesajını sil
+        if message.chat.type != "private":
+            try:
+                await message.delete()
+                logger.info(f"🔇 Sipariş onaylama komutu mesajı silindi - Group: {message.chat.id}")
+            except Exception as e:
+                logger.error(f"❌ Sipariş onaylama mesajı silinemedi: {e}")
+            return
+        
+        # Sipariş listesini göster
+        await show_orders_list_modern(message)
+        
+    except Exception as e:
+        logger.error(f"❌ Sipariş onaylama komutu hatası: {e}")
+        await message.reply("❌ Sipariş onaylama sistemi yüklenemedi!")
+
+# ==============================================
+# CALLBACK HANDLER'LARI
+# ==============================================
+
+@router.callback_query(F.data.startswith("admin_approve_"))
+async def admin_approve_callback(callback: types.CallbackQuery) -> None:
+    """Admin sipariş onaylama callback'i"""
+    try:
+        order_number = callback.data.replace("admin_approve_", "")
+        await handle_admin_approve_order(callback, order_number)
+    except Exception as e:
+        logger.error(f"❌ Admin onay callback hatası: {e}")
+        await callback.answer("❌ Onay işlemi başarısız!", show_alert=True)
+
+@router.callback_query(F.data.startswith("admin_reject_"))
+async def admin_reject_callback(callback: types.CallbackQuery) -> None:
+    """Admin sipariş reddetme callback'i"""
+    try:
+        order_number = callback.data.replace("admin_reject_", "")
+        await handle_admin_reject_order(callback, order_number)
+    except Exception as e:
+        logger.error(f"❌ Admin red callback hatası: {e}")
+        await callback.answer("❌ Red işlemi başarısız!", show_alert=True)
+
+@router.callback_query(F.data == "admin_orders_list")
+async def admin_orders_list_callback(callback: types.CallbackQuery) -> None:
+    """Admin sipariş listesi callback'i"""
+    try:
+        # Callback'i message'a çevir
+        class MessageWrapper:
+            def __init__(self, callback):
+                self.callback = callback
+                self.chat = callback.message.chat
+                self.from_user = callback.from_user
+                self.reply = callback.message.answer
+                self.answer = callback.message.answer
+                
+        message_wrapper = MessageWrapper(callback)
+        await show_orders_list_modern(message_wrapper)
+        await callback.answer("📋 Sipariş listesi güncellendi!")
+        
+    except Exception as e:
+        logger.error(f"❌ Admin sipariş listesi callback hatası: {e}")
+        await callback.answer("❌ Sipariş listesi yüklenemedi!", show_alert=True)
+
+# ==============================================
+# MESAJ HANDLER'LARI
+# ==============================================
+
+@router.message(F.chat.type == "private")
+async def admin_order_message_handler(message: types.Message) -> None:
+    """Admin'in sipariş onay/red mesajını yakala"""
+    try:
+        await handle_admin_order_message(message)
+    except Exception as e:
+        logger.error(f"❌ Admin sipariş mesaj handler hatası: {e}")
+
+# ==============================================
+# MEVCUT FONKSİYONLAR
+# ==============================================
 
 async def show_orders_list_modern(message: types.Message) -> None:
     """Modern sipariş listesi göster"""
@@ -93,9 +212,9 @@ async def handle_admin_approve_order(callback: types.CallbackQuery, order_number
         logger.info(f"✅ Admin onay butonu tıklandı - User: {user_id}, Order: {order_number}")
         
         # Admin kontrolü
-        from config import get_config
+        from config import get_config, is_admin
         config = get_config()
-        if user_id != config.ADMIN_USER_ID:
+        if not is_admin(user_id):
             await callback.answer("❌ Yetkiniz yok!", show_alert=True)
             return
         
@@ -150,9 +269,9 @@ async def handle_admin_reject_order(callback: types.CallbackQuery, order_number:
         logger.info(f"❌ Admin red butonu tıklandı - User: {user_id}, Order: {order_number}")
         
         # Admin kontrolü
-        from config import get_config
+        from config import get_config, is_admin
         config = get_config()
-        if user_id != config.ADMIN_USER_ID:
+        if not is_admin(user_id):
             await callback.answer("❌ Yetkiniz yok!", show_alert=True)
             return
         

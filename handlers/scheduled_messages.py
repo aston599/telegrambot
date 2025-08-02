@@ -2,14 +2,18 @@ import asyncio
 import logging
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
-from aiogram import Bot
-from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram import Bot, Router, F, types
+from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
+from aiogram.filters import Command
 from database import get_config, get_db_pool
 from utils.logger import setup_logger
 from utils.memory_manager import memory_manager
 import time
 
 logger = setup_logger()
+
+# Router oluştur
+router = Router()
 
 # Zamanlayıcı sistemi durumu
 scheduled_messages_active = False
@@ -34,6 +38,255 @@ scheduled_settings = {
     "last_message_time": {},
     "bot_profiles": DEFAULT_BOT_PROFILES  # Bot profillerini de dahil et
 }
+
+# ==============================================
+# EKSİK KOMUT FONKSİYONLARI
+# ==============================================
+
+@router.message(Command("zamanlanmesmesaj"))
+async def create_scheduled_bot_command(message: Message) -> None:
+    """Zamanlanmış mesaj oluşturma komutu"""
+    try:
+        # Admin kontrolü
+        config = get_config()
+        if message.from_user.id != config.ADMIN_USER_ID:
+            return
+        
+        # 🔥 GRUP SESSİZLİK: Grup chatindeyse sil ve özel mesajla yanıt ver
+        if message.chat.type != "private":
+            try:
+                await message.delete()
+                logger.info(f"🔇 Zamanlanmış mesaj komutu silindi - Group: {message.chat.id}")
+                
+                # ÖZELİNDE YANIT VER
+                if _bot_instance:
+                    await _send_scheduled_messages_privately(message.from_user.id)
+                return
+                
+            except Exception as e:
+                logger.error(f"❌ Komut mesajı silinemedi: {e}")
+                return
+        
+        logger.info(f"📝 Zamanlanmış mesaj komutu - User: {message.from_user.first_name} ({message.from_user.id})")
+        
+        # Zamanlanmış mesajlar menüsünü göster
+        await show_scheduled_messages_menu(message)
+        
+    except Exception as e:
+        logger.error(f"❌ Zamanlanmış mesaj komut hatası: {e}")
+        await message.reply("❌ Bir hata oluştu! Lütfen daha sonra tekrar dene.")
+
+@router.message(Command("zamanlimesajlar"))
+async def list_scheduled_bots_command(message: Message) -> None:
+    """Zamanlanmış mesajları listeleme komutu"""
+    try:
+        # Admin kontrolü
+        config = get_config()
+        if message.from_user.id != config.ADMIN_USER_ID:
+            return
+        
+        # 🔥 GRUP SESSİZLİK: Grup chatindeyse sil ve özel mesajla yanıt ver
+        if message.chat.type != "private":
+            try:
+                await message.delete()
+                logger.info(f"🔇 Zamanlanmış mesajlar listesi komutu silindi - Group: {message.chat.id}")
+                
+                # ÖZELİNDE YANIT VER
+                if _bot_instance:
+                    await _send_scheduled_messages_privately(message.from_user.id)
+                return
+                
+            except Exception as e:
+                logger.error(f"❌ Komut mesajı silinemedi: {e}")
+                return
+        
+        logger.info(f"📋 Zamanlanmış mesajlar listesi - User: {message.from_user.first_name} ({message.from_user.id})")
+        
+        # Zamanlanmış mesajlar durumunu göster
+        await show_scheduled_status_menu(message)
+        
+    except Exception as e:
+        logger.error(f"❌ Zamanlanmış mesajlar listesi hatası: {e}")
+        await message.reply("❌ Bir hata oluştu! Lütfen daha sonra tekrar dene.")
+
+@router.message(Command("zamanlimesajduzenle"))
+async def edit_scheduled_bot_command(message: Message) -> None:
+    """Zamanlanmış mesaj düzenleme komutu"""
+    try:
+        # Admin kontrolü
+        config = get_config()
+        if message.from_user.id != config.ADMIN_USER_ID:
+            return
+        
+        # 🔥 GRUP SESSİZLİK: Grup chatindeyse sil ve özel mesajla yanıt ver
+        if message.chat.type != "private":
+            try:
+                await message.delete()
+                logger.info(f"🔇 Zamanlanmış mesaj düzenleme komutu silindi - Group: {message.chat.id}")
+                
+                # ÖZELİNDE YANIT VER
+                if _bot_instance:
+                    await _send_scheduled_messages_privately(message.from_user.id)
+                return
+                
+            except Exception as e:
+                logger.error(f"❌ Komut mesajı silinemedi: {e}")
+                return
+        
+        logger.info(f"✏️ Zamanlanmış mesaj düzenleme - User: {message.from_user.first_name} ({message.from_user.id})")
+        
+        # Bot yönetimi menüsünü göster
+        await show_scheduled_bot_management_menu(message)
+        
+    except Exception as e:
+        logger.error(f"❌ Zamanlanmış mesaj düzenleme hatası: {e}")
+        await message.reply("❌ Bir hata oluştu! Lütfen daha sonra tekrar dene.")
+
+@router.message(Command("zamanlimesajsil"))
+async def delete_scheduled_bot_command(message: Message) -> None:
+    """Zamanlanmış mesaj silme komutu"""
+    try:
+        # Admin kontrolü
+        config = get_config()
+        if message.from_user.id != config.ADMIN_USER_ID:
+            return
+        
+        # 🔥 GRUP SESSİZLİK: Grup chatindeyse sil ve özel mesajla yanıt ver
+        if message.chat.type != "private":
+            try:
+                await message.delete()
+                logger.info(f"🔇 Zamanlanmış mesaj silme komutu silindi - Group: {message.chat.id}")
+                
+                # ÖZELİNDE YANIT VER
+                if _bot_instance:
+                    await _send_scheduled_messages_privately(message.from_user.id)
+                return
+                
+            except Exception as e:
+                logger.error(f"❌ Komut mesajı silinemedi: {e}")
+                return
+        
+        logger.info(f"🗑️ Zamanlanmış mesaj silme - User: {message.from_user.first_name} ({message.from_user.id})")
+        
+        # Bot yönetimi menüsünü göster (silme seçeneği orada)
+        await show_scheduled_bot_management_menu(message)
+        
+    except Exception as e:
+        logger.error(f"❌ Zamanlanmış mesaj silme hatası: {e}")
+        await message.reply("❌ Bir hata oluştu! Lütfen daha sonra tekrar dene.")
+
+# ==============================================
+# YARDIMCI FONKSİYONLAR
+# ==============================================
+
+async def show_scheduled_messages_menu(message: Message) -> None:
+    """Zamanlanmış mesajlar ana menüsünü göster"""
+    try:
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🤖 Bot Yönetimi", callback_data="scheduled_bot_management")],
+            [InlineKeyboardButton(text="📊 Durum", callback_data="scheduled_status")],
+            [InlineKeyboardButton(text="➕ Yeni Bot Oluştur", callback_data="scheduled_create_bot")],
+            [InlineKeyboardButton(text="❌ İptal", callback_data="scheduled_cancel")]
+        ])
+        
+        await message.reply(
+            "📝 **ZAMANLANMIŞ MESAJLAR SİSTEMİ**\n\n"
+            "🤖 **Bot Yönetimi:** Mevcut botları düzenle/sil\n"
+            "📊 **Durum:** Sistem durumunu gör\n"
+            "➕ **Yeni Bot Oluştur:** Yeni zamanlanmış bot ekle\n\n"
+            "💡 **Özellikler:**\n"
+            "• Otomatik mesaj gönderimi\n"
+            "• Özelleştirilebilir aralıklar\n"
+            "• Resim ve link desteği\n"
+            "• Çoklu grup desteği",
+            parse_mode="Markdown",
+            reply_markup=keyboard
+        )
+        
+    except Exception as e:
+        logger.error(f"❌ Zamanlanmış mesajlar menü hatası: {e}")
+
+async def show_scheduled_bot_management_menu(message: Message) -> None:
+    """Bot yönetimi menüsünü göster"""
+    try:
+        # Mevcut botları al
+        settings = await get_scheduled_settings()
+        active_bots = settings.get('active_bots', {})
+        bot_profiles = settings.get('bot_profiles', {})
+        
+        keyboard = []
+        
+        if bot_profiles:
+            for bot_id, profile in bot_profiles.items():
+                bot_name = profile.get('name', f'Bot {bot_id}')
+                is_active = active_bots.get(bot_id, False)
+                status = "🟢 Aktif" if is_active else "🔴 Pasif"
+                
+                keyboard.append([
+                    InlineKeyboardButton(
+                        text=f"{bot_name} - {status}", 
+                        callback_data=f"scheduled_edit_bot_{bot_id}"
+                    )
+                ])
+        
+        keyboard.extend([
+            [InlineKeyboardButton(text="➕ Yeni Bot Oluştur", callback_data="scheduled_create_bot")],
+            [InlineKeyboardButton(text="📊 Durum", callback_data="scheduled_status")],
+            [InlineKeyboardButton(text="⬅️ Geri", callback_data="scheduled_main_menu")],
+            [InlineKeyboardButton(text="❌ İptal", callback_data="scheduled_cancel")]
+        ])
+        
+        await message.reply(
+            "🤖 **BOT YÖNETİMİ**\n\n"
+            f"📋 **Mevcut Botlar:** {len(bot_profiles)}\n"
+            f"🟢 **Aktif Botlar:** {sum(1 for active in active_bots.values() if active)}\n"
+            f"🔴 **Pasif Botlar:** {len(bot_profiles) - sum(1 for active in active_bots.values() if active)}\n\n"
+            "💡 **Bot seçerek düzenleyebilir veya silebilirsiniz.**",
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard)
+        )
+        
+    except Exception as e:
+        logger.error(f"❌ Bot yönetimi menü hatası: {e}")
+
+async def show_scheduled_status_menu(message: Message) -> None:
+    """Zamanlanmış mesajlar durum menüsünü göster"""
+    try:
+        settings = await get_scheduled_settings()
+        active_bots = settings.get('active_bots', {})
+        groups = settings.get('groups', [])
+        bot_profiles = settings.get('bot_profiles', {})
+        
+        active_count = sum(1 for active in active_bots.values() if active)
+        total_bots = len(bot_profiles)
+        
+        status_text = "🟢 Aktif" if scheduled_messages_active else "🔴 Pasif"
+        
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🔄 Yenile", callback_data="scheduled_status")],
+            [InlineKeyboardButton(text="🤖 Bot Yönetimi", callback_data="scheduled_bot_management")],
+            [InlineKeyboardButton(text="⬅️ Geri", callback_data="scheduled_main_menu")],
+            [InlineKeyboardButton(text="❌ İptal", callback_data="scheduled_cancel")]
+        ])
+        
+        await message.reply(
+            f"📊 **ZAMANLANMIŞ MESAJLAR DURUMU**\n\n"
+            f"🔄 **Sistem Durumu:** {status_text}\n"
+            f"🤖 **Toplam Bot:** {total_bots}\n"
+            f"🟢 **Aktif Bot:** {active_count}\n"
+            f"🔴 **Pasif Bot:** {total_bots - active_count}\n"
+            f"👥 **Hedef Grup:** {len(groups)}\n\n"
+            f"💡 **Son Güncelleme:** {datetime.now().strftime('%d.%m.%Y %H:%M')}",
+            parse_mode="Markdown",
+            reply_markup=keyboard
+        )
+        
+    except Exception as e:
+        logger.error(f"❌ Durum menü hatası: {e}")
+
+# ==============================================
+# MEVCUT FONKSİYONLAR (DEĞİŞMEDİ)
+# ==============================================
 
 async def get_scheduled_settings() -> Dict[str, Any]:
     """Zamanlayıcı ayarlarını veritabanından al"""
@@ -103,6 +356,17 @@ async def get_scheduled_settings() -> Dict[str, Any]:
                     "last_message_time": {},
                     "bot_profiles": DEFAULT_BOT_PROFILES
                 }
+                
+                import json
+                from datetime import datetime, timedelta
+                
+                def json_serial(obj):
+                    if isinstance(obj, datetime):
+                        return obj.isoformat()
+                    elif isinstance(obj, timedelta):
+                        return str(obj.total_seconds())
+                    raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
+                
                 await conn.execute(
                     "INSERT INTO scheduled_messages_settings (id, settings) VALUES (1, $1)",
                     json.dumps(default_settings, default=json_serial)
@@ -650,131 +914,6 @@ async def delete_bot_profile(bot_id: str) -> bool:
         logger.error(f"❌ Bot profili silinirken hata: {e}")
         return False
 
-# Admin komutları
-async def scheduled_messages_command(message: Message) -> None:
-    """Zamanlanmış mesajlar komutu"""
-    try:
-        user_id = message.from_user.id
-        config = get_config()
-        
-        # 🔥 GRUP SESSİZLİK: Grup chatindeyse sil ve özel mesajla yanıt ver
-        if message.chat.type != "private":
-            try:
-                await message.delete()
-                logger.info(f"🔇 Scheduled messages komutu mesajı silindi - Group: {message.chat.id}")
-                
-                # ÖZELİNDE YANIT VER
-                if _bot_instance:
-                    await _send_scheduled_messages_privately(user_id)
-                return
-                
-            except Exception as e:
-                logger.error(f"❌ Komut mesajı silinemedi: {e}")
-                return
-        
-        if user_id != config.ADMIN_USER_ID:
-            await message.answer("❌ Bu komutu sadece admin kullanabilir!")
-            return
-            
-        status = await get_scheduled_status()
-        
-        response = f"""
-📅 **Zamanlanmış Mesajlar Sistemi**
-
-**Mevcut Botlar:**
-"""
-        
-        for bot_id in status.get('available_bots', []):
-            profile = status.get('bot_profiles', {}).get(bot_id, {})
-            active = status.get('active_bots', {}).get(bot_id, False)
-            active_mark = "✅" if active else "❌"
-            response += f"• {active_mark} {profile.get('name', bot_id)} ({profile.get('interval', 30)}dk)\n"
-            
-        keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [
-                InlineKeyboardButton(
-                    text="⚙️ Bot Yönetimi",
-                    callback_data="scheduled_bot_management"
-                ),
-                InlineKeyboardButton(
-                    text="📊 Durum",
-                    callback_data="scheduled_status"
-                )
-            ],
-            [
-                InlineKeyboardButton(
-                    text="⬅️ Geri",
-                    callback_data="admin_system_management"
-                )
-            ]
-        ])
-        
-        await message.answer(response, parse_mode="Markdown", reply_markup=keyboard)
-        
-    except Exception as e:
-        logger.error(f"❌ Zamanlanmış mesajlar komutu hatası: {e}")
-        await message.answer("❌ Bir hata oluştu!")
-
-async def _send_scheduled_messages_privately(user_id: int):
-    """Scheduled messages mesajını özel mesajla gönder"""
-    try:
-        if not _bot_instance:
-            logger.error("❌ Bot instance bulunamadı!")
-            return
-        
-        # Admin kontrolü
-        from config import get_config
-        config = get_config()
-        if user_id != config.ADMIN_USER_ID:
-            await _bot_instance.send_message(user_id, "❌ Bu komutu sadece admin kullanabilir!")
-            return
-        
-        status = await get_scheduled_status()
-        
-        response = f"""
-📅 **Zamanlanmış Mesajlar Sistemi**
-
-**Mevcut Botlar:**
-        """
-        
-        for bot_id in status.get('available_bots', []):
-            profile = status.get('bot_profiles', {}).get(bot_id, {})
-            active = status.get('active_bots', {}).get(bot_id, False)
-            active_mark = "✅" if active else "❌"
-            response += f"• {active_mark} {profile.get('name', bot_id)} ({profile.get('interval', 30)}dk)\n"
-            
-        keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [
-                InlineKeyboardButton(
-                    text="⚙️ Bot Yönetimi",
-                    callback_data="scheduled_bot_management"
-                ),
-                InlineKeyboardButton(
-                    text="📊 Durum",
-                    callback_data="scheduled_status"
-                )
-            ],
-            [
-                InlineKeyboardButton(
-                    text="⬅️ Geri",
-                    callback_data="admin_system_management"
-                )
-            ]
-        ])
-        
-        await _bot_instance.send_message(
-            user_id,
-            response,
-            parse_mode="Markdown",
-            reply_markup=keyboard
-        )
-        
-        logger.info(f"✅ Scheduled messages mesajı özel mesajla gönderildi - User: {user_id}")
-        
-    except Exception as e:
-        logger.error(f"❌ Private scheduled messages hatası: {e}")
-        await _bot_instance.send_message(user_id, "❌ Zamanlanmış mesajlar gönderilemedi!")
-
 async def scheduled_callback_handler(callback) -> None:
     """Zamanlanmış mesajlar callback handler"""
     try:
@@ -784,7 +923,8 @@ async def scheduled_callback_handler(callback) -> None:
         user_id = callback.from_user.id
         config = get_config()
         
-        if user_id != config.ADMIN_USER_ID:
+        from config import is_admin
+        if not is_admin(user_id):
             await callback.answer("❌ Bu işlemi sadece admin yapabilir!", show_alert=True)
             return
             
@@ -1545,8 +1685,8 @@ async def show_scheduled_messages_menu(callback) -> None:
         logger.error(f"❌ SCHEDULED MENU TRACEBACK: {traceback.format_exc()}")
         try:
             await callback.answer("❌ Bir hata oluştu!", show_alert=True)
-        except:
-            logger.error(f"❌ Callback answer da başarısız!")
+        except Exception as answer_error:
+            logger.error(f"❌ Callback answer da başarısız! {answer_error}")
         return
 
 async def show_scheduled_bot_management_menu(callback) -> None:

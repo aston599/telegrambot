@@ -1,0 +1,1 @@
+2025-08-02 07:34:56.696994 - Sipariş reddedildi: ORD-AF5990EA - Admin: 8154732274 - Sebep: testtestest - İade: 25.00 KP

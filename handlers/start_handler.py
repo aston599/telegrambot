@@ -8,10 +8,15 @@ from aiogram.filters import CommandStart
 from aiogram.types import Message
 
 from database import get_db_stats, save_user_info
-from .first_user_bonus import check_and_give_first_user_bonus
 
 logger = logging.getLogger(__name__)
 
+# Bot instance setter
+_bot_instance = None
+
+def set_bot_instance(bot_instance):
+    global _bot_instance
+    _bot_instance = bot_instance
 
 async def start_command(message: Message) -> None:
     """
@@ -50,12 +55,15 @@ async def start_command(message: Message) -> None:
         # Kullanıcı bilgilerini kaydet
         await save_user_info(user.id, user.username, user.first_name, user.last_name)
         
-        # İlk üye bonusu kontrol et (sadece özel mesajda)
-        if message.chat.type == "private":
-            bonus_given = await check_and_give_first_user_bonus(message)
-            if bonus_given:
-                # Bonus verildi, mesaj zaten gönderildi
-                return
+        # Detaylı log
+        from handlers.detailed_logging_system import log_command_execution
+        await log_command_execution(
+            user_id=user.id,
+            username=user.username or user.first_name,
+            command="start",
+            chat_id=message.chat.id,
+            chat_type=message.chat.type
+        )
         
         # Database istatistiklerini al
         db_stats = await get_db_stats()
@@ -66,190 +74,191 @@ async def start_command(message: Message) -> None:
             is_registered = await is_user_registered(user.id)
             
             if is_registered:
-                # Kayıtlı kullanıcı için hoş geldin mesajı
+                # Zaten kayıtlı kullanıcı için hoş geldin mesajı
+                from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+                
+                keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                    [InlineKeyboardButton(text="🎮 Ana Menü", callback_data="menu_command")],
+                    [InlineKeyboardButton(text="🛍️ Market", callback_data="market_command")],
+                    [InlineKeyboardButton(text="🎯 Etkinlikler", callback_data="events_command")],
+                    [InlineKeyboardButton(text="📊 Profilim", callback_data="profile_command")],
+                    [InlineKeyboardButton(text="🏆 Sıralama", callback_data="ranking_command")]
+                ])
+                
                 response_text = f"""
+**Tekrar Hoş Geldin {user.first_name}!** 🎉
+
+**KirveHub**'a geri döndün! Zaten kayıtlısın ve tüm özellikleri kullanabilirsin.
+
+**💎 Kirve Point Sistemi:**
+• Her mesajın **1 Kirve Point** kazandırır
+• Point'lerini **Market'te** freespinler, bakiyeler için kullanabilirsin
+• **Etkinliklere** point'lerinle katılabilirsin
+• Günlük **5 bonus point** kazanabilirsin
+
+**🛍️ Market Özellikleri:**
+• Point'lerini **freespinler** için kullan
+• **Site bakiyeleri** satın al
+• **Bonus paketleri** al
+• **Özel indirimler**den yararlan
+
+**🎯 Etkinlik Sistemi:**
+• Point'lerinle **çekilişlere** katıl
+• **Bonus hunt** etkinliklerine katıl
+• **Özel yarışmalara** katıl
+• **Sınırlı süreli** etkinlikleri kaçırma
+
+**📊 Profil ve Sıralama:**
+• **İstatistiklerini** görüntüle
+• **Sıralamada** yer al
+• **Başarılarını** takip et
+• **Gelişimini** izle
+
+**🎮 Ana Menü:**
+Tüm özelliklere **Ana Menü**'den ulaşabilirsin!
+
+**Hemen başla:**
+✅ Zaten kayıtlısın!
+💎 Grup sohbetlerinde mesaj at, point kazan!
+🛍️ Market'te point'lerini kullan!
+🎯 Etkinliklere katıl, bonuslar kazan!
+🎮 Ana Menü'den her şeye ulaş!
+
+_💡 Her mesajın 1 Kirve Point kazandırır!_
+_🎯 Market'te point'lerini freespinler için kullanabilirsin!_
+_🏆 Etkinliklerde point'lerinle özel ödüller kazanabilirsin!_
+_🎮 Ana Menü'den tüm özelliklere ulaşabilirsin!_
+                """
+                
+                await message.reply(
+                    response_text,
+                    parse_mode="Markdown",
+                    reply_markup=keyboard
+                )
+                
+            else:
+                # Otomatik kayıt işlemi
+                from database import register_user
+                registration_success = await register_user(user.id)
+                
+                if registration_success:
+                    # Başarılı kayıt - Güzel tanıtım mesajı
+                    from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+                    
+                    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                        [InlineKeyboardButton(text="🎮 Ana Menü", callback_data="menu_command")],
+                        [InlineKeyboardButton(text="🛍️ Market", callback_data="market_command")],
+                        [InlineKeyboardButton(text="🎯 Etkinlikler", callback_data="events_command")],
+                        [InlineKeyboardButton(text="📊 Profilim", callback_data="profile_command")],
+                        [InlineKeyboardButton(text="🏆 Sıralama", callback_data="ranking_command")]
+                    ])
+                    
+                    response_text = f"""
+**Hoş Geldin {user.first_name}!** 🎉
+
+**KirveHub**'a başarıyla kayıt oldun! Artık tüm özellikleri kullanabilirsin.
+
+**💎 Kirve Point Sistemi:**
+• Her mesajın **1 Kirve Point** kazandırır
+• Point'lerini **Market'te** freespinler, bakiyeler için kullanabilirsin
+• **Etkinliklere** point'lerinle katılabilirsin
+• Günlük **5 bonus point** kazanabilirsin
+
+**🛍️ Market Özellikleri:**
+• Point'lerini **freespinler** için kullan
+• **Site bakiyeleri** satın al
+• **Bonus paketleri** al
+• **Özel indirimler**den yararlan
+
+**🎯 Etkinlik Sistemi:**
+• Point'lerinle **çekilişlere** katıl
+• **Bonus hunt** etkinliklerine katıl
+• **Özel yarışmalara** katıl
+• **Sınırlı süreli** etkinlikleri kaçırma
+
+**📊 Profil ve Sıralama:**
+• **İstatistiklerini** görüntüle
+• **Sıralamada** yer al
+• **Başarılarını** takip et
+• **Gelişimini** izle
+
+**🎮 Ana Menü:**
+Tüm özelliklere **Ana Menü**'den ulaşabilirsin!
+
+**Hemen başla:**
+✅ Kayıt tamamlandı!
+💎 Grup sohbetlerinde mesaj at, point kazan!
+🛍️ Market'te point'lerini kullan!
+🎯 Etkinliklere katıl, bonuslar kazan!
+🎮 Ana Menü'den her şeye ulaş!
+
+_💡 Her mesajın 1 Kirve Point kazandırır!_
+_🎯 Market'te point'lerini freespinler için kullanabilirsin!_
+_🏆 Etkinliklerde point'lerinle özel ödüller kazanabilirsin!_
+_🎮 Ana Menü'den tüm özelliklere ulaşabilirsin!_
+                    """
+                    
+                    await message.reply(
+                        response_text,
+                        parse_mode="Markdown",
+                        reply_markup=keyboard
+                    )
+                else:
+                    # Kayıt başarısız
+                    response_text = f"""
+❌ **Kayıt Hatası!**
+
+**KirveHub**'a kayıt olurken bir sorun oluştu.
+
+🔄 **Lütfen daha sonra tekrar dene:**
+• Bot'u yeniden başlat
+• `/start` komutunu tekrar yaz
+• Teknik destek için admin ile iletişime geç
+
+⚠️ **Sistem geçici olarak bakımda olabilir.**
+                    """
+                    
+                    await message.reply(
+                        response_text,
+                        parse_mode="Markdown"
+                    )
+        else:
+            # Database bağlantısı yok
+            response_text = f"""
 🎉 **Merhaba {user.first_name}!**
 
-**KirveHub**'a tekrar hoş geldin! 💎
+**KirveHub**'a hoş geldin! 💎
 
-✅ **Zaten kayıtlısın!** Artık tüm özellikleri kullanabilirsin.
+⚠️ **Sistem geçici olarak bakımda!** Lütfen daha sonra tekrar dene.
 
-🎮 **Ne yapabilirsin:**
+🎮 **Sistem aktif olduğunda yapabileceklerin:**
 • 💎 **Point kazan** - Her mesajın point kazandırır!
 • 🛍️ **Market alışverişi** - Freespinler, site bakiyeleri
 • 🎯 **Etkinliklere katıl** - Çekilişler, bonus hunt'lar
 • 📊 **Profilini gör** - İstatistiklerin ve sıralaman
 • 🏆 **Sıralamada yarış** - En aktif üyeler arasında yer al!
 
-🎯 **Hızlı Komutlar:**
-• `/menu` - Profil menüsü ve detaylı istatistikler
-• `/market` - Market ürünleri ve alışveriş sistemi
-• `/etkinlikler` - Aktif etkinlikler ve çekilişler
-• `/yardim` - Detaylı yardım menüsü ve rehber
-
-💎 **Hemen sohbete katıl ve point kazanmaya başla!** 🚀
-
-_💡 İpucu: Grup sohbetlerinde mesaj atarak günlük 5 Kirve Point kazanabilirsin!_
-_🎯 Bonus: Etkinliklere katılarak ekstra bonuslar kazanabilirsin!_
-                """
-            else:
-                # Kayıtsız kullanıcı için kayıt teşviki
-                response_text = f"""
-🎉 **Merhaba {user.first_name}!**
-
-**KirveHub**'a hoş geldin! 💎
-
-❌ **Henüz kayıtlı değilsin!** Kayıt olarak çok daha fazlasını kazanabilirsin.
-
-🎁 **Kayıt olduktan sonra:**
-• 💎 **Günlük 5 Kirve Point** - Her mesajın point kazandırır!
-• 🛍️ **Market sistemi** - Freespinler, site bakiyeleri ve daha fazlası!
-• 🎮 **Etkinliklere katılım** - Çekilişler, bonus hunt'lar, büyük ödüller!
-• 📊 **Detaylı istatistikler** - Sıralamadaki yerini takip et!
-• 🏆 **Özel ayrıcalıklar** - Sadece kayıtlı üyeler!
-• 🚀 **Hızlı kazanım** - Hemen point kazanmaya başla!
-
-👥 **Şu anda {db_stats.get('registered_users', 0)} kişi kayıtlı!**
-
-🎯 **Hemen kayıt ol:**
-• `/kirvekayit` - Hemen kayıt ol
-• `/yardim` - Detaylı bilgi ve yardım
-
-💎 **Kayıt ol ve KirveHub'ın bir parçası ol!** 🚀
-
-_💡 İpucu: Kayıt olduktan sonra grup sohbetlerinde mesaj atarak hemen point kazanmaya başlayabilirsin!_
-_🎯 Bonus: Etkinliklere katılarak ekstra bonuslar kazanabilirsin!_
-                """
-        else:
-            error_info = db_stats.get("error", "Bilinmeyen hata")
-            response_text = f"""
-🎉 **Merhaba {user.first_name}!**
-
-**KirveHub Bot**'a hoş geldiniz! 🤖
-
-📊 **Sistem Durumu:**
-✅ Bot: Aktif ve çalışıyor
-❌ Database: {error_info}
-✅ Temel işlevler: Mevcut
-⚠️ Komutlar: Sınırlı
-
-🎯 **Kullanılabilir Komutlar:**
-• `/start` - Ana menü ve bot durumu (sınırlı)
-• `/menu` - Profil (sınırlı)
-• `/yardim` - Yardım menüsü
-
-⚠️ **Database bağlantısı olmadığı için bazı özellikler sınırlı!**
+🔄 **Lütfen daha sonra tekrar dene!**
             """
-        
-        await message.answer(response_text, parse_mode="Markdown")
-        logger.info(f"✅ START mesajı gönderildi - User: {user.id}")
-        
+            
+            await message.reply(
+                response_text,
+                parse_mode="Markdown"
+            )
+            
     except Exception as e:
-        logger.error(f"❌ START handler hatası: {e}")
-        await message.answer("Bir hata oluştu! Lütfen daha sonra tekrar deneyin.")
+        logger.error(f"❌ Start command hatası: {e}")
+        await message.reply("❌ Bir hata oluştu! Lütfen daha sonra tekrar dene.")
 
 async def _send_start_privately(user_id: int):
-    """Start mesajını özel mesajla gönder"""
+    """Özel mesajla start komutunu gönder"""
     try:
-        if not _bot_instance:
-            logger.error("❌ Bot instance bulunamadı!")
-            return
-        
-        # Kullanıcı bilgilerini al
-        from database import get_user_info
-        user_info = await get_user_info(user_id)
-        user_name = user_info.get('first_name', 'Kullanıcı') if user_info else 'Kullanıcı'
-        
-        # Kullanıcı bilgilerini kaydet
-        await save_user_info(user_id, user_info.get('username'), user_name, user_info.get('last_name'))
-        
-        # Database istatistiklerini al
-        db_stats = await get_db_stats()
-        
-        if db_stats.get("database_active", False):
-            # Kayıtlı mı kontrol et
-            from database import is_user_registered
-            is_registered = await is_user_registered(user_id)
-            
-            if is_registered:
-                # Kayıtlı kullanıcı için hoş geldin mesajı
-                response_text = f"""
-🎉 **Merhaba {user_name}!**
-
-**KirveHub**'a tekrar hoş geldin! 💎
-
-✅ **Zaten kayıtlısın!** Artık tüm özellikleri kullanabilirsin.
-
-🎮 **Ne yapabilirsin:**
-• 💎 **Point kazan** - Her mesajın point kazandırır!
-• 🛍️ **Market alışverişi** - Freespinler, site bakiyeleri
-• 🎯 **Etkinliklere katıl** - Çekilişler, bonus hunt'lar
-• 📊 **Profilini gör** - İstatistiklerin ve sıralaman
-• 🏆 **Sıralamada yarış** - En aktif üyeler arasında yer al!
-
-🎯 **Hızlı Komutlar:**
-• `/menu` - Profil menüsü ve detaylı istatistikler
-• `/market` - Market ürünleri ve alışveriş sistemi
-• `/etkinlikler` - Aktif etkinlikler ve çekilişler
-• `/yardim` - Detaylı yardım menüsü ve rehber
-
-💎 **Hemen sohbete katıl ve point kazanmaya başla!** 🚀
-
-_💡 İpucu: Grup sohbetlerinde mesaj atarak günlük 5 Kirve Point kazanabilirsin!_
-_🎯 Bonus: Etkinliklere katılarak ekstra bonuslar kazanabilirsin!_
-                """
-            else:
-                # Kayıtsız kullanıcı için kayıt teşviki
-                response_text = f"""
-🎉 **Merhaba {user_name}!**
-
-**KirveHub**'a hoş geldin! 💎
-
-❌ **Henüz kayıtlı değilsin!** Kayıt olarak çok daha fazlasını kazanabilirsin.
-
-🎁 **Kayıt olduktan sonra:**
-• 💎 **Günlük 5 Kirve Point** - Her mesajın point kazandırır!
-• 🛍️ **Market sistemi** - Freespinler, site bakiyeleri ve daha fazlası!
-• 🎮 **Etkinliklere katılım** - Çekilişler, bonus hunt'lar, büyük ödüller!
-• 📊 **Detaylı istatistikler** - Sıralamadaki yerini takip et!
-• 🏆 **Özel ayrıcalıklar** - Sadece kayıtlı üyeler!
-• 🚀 **Hızlı kazanım** - Hemen point kazanmaya başla!
-
-👥 **Şu anda {db_stats.get('registered_users', 0)} kişi kayıtlı!**
-
-🎯 **Hemen kayıt ol:**
-• `/kirvekayit` - Hemen kayıt ol
-• `/yardim` - Detaylı bilgi ve yardım
-
-💎 **Kayıt ol ve KirveHub'ın bir parçası ol!** 🚀
-
-_💡 İpucu: Kayıt olduktan sonra grup sohbetlerinde mesaj atarak hemen point kazanmaya başlayabilirsin!_
-_🎯 Bonus: Etkinliklere katılarak ekstra bonuslar kazanabilirsin!_
-                """
-        else:
-            error_info = db_stats.get("error", "Bilinmeyen hata")
-            response_text = f"""
-🎉 **Merhaba {user_name}!**
-
-**KirveHub Bot**'a hoş geldiniz! 🤖
-
-📊 **Sistem Durumu:**
-✅ Bot: Aktif ve çalışıyor
-❌ Database: {error_info}
-✅ Temel işlevler: Mevcut
-⚠️ Komutlar: Sınırlı
-
-🎯 **Kullanılabilir Komutlar:**
-• `/start` - Ana menü ve bot durumu (sınırlı)
-• `/menu` - Profil (sınırlı)
-• `/yardim` - Yardım menüsü
-
-⚠️ **Database bağlantısı olmadığı için bazı özellikler sınırlı!**
-            """
-        
-        await _bot_instance.send_message(user_id, response_text, parse_mode="Markdown")
-        logger.info(f"✅ START mesajı özel mesajla gönderildi - User: {user_id}")
-        
+        if _bot_instance:
+            await _bot_instance.send_message(
+                user_id,
+                "🎯 **Start komutu özel mesajda çalışır!**\n\n"
+                "Lütfen botun özel mesajına gidip `/start` yazın.",
+                parse_mode="Markdown"
+            )
     except Exception as e:
-        logger.error(f"❌ Private start hatası: {e}")
-        await _bot_instance.send_message(user_id, "❌ Start mesajı gönderilemedi!") 
+        logger.error(f"❌ Özel start mesajı gönderilemedi: {e}") 

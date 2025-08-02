@@ -68,13 +68,22 @@ async def get_comprehensive_stats() -> Dict[str, Any]:
             completed_events = await conn.fetchval("SELECT COUNT(*) FROM events WHERE status = 'completed'")
             total_participants = await conn.fetchval("SELECT COUNT(*) FROM event_participations WHERE withdrew_at IS NULL")
             
-            # En aktif kullanıcılar (top 5)
-            top_users = await conn.fetch("""
+            # En aktif kullanıcılar (top 10) - KP sıralaması
+            top_users_kp = await conn.fetch("""
                 SELECT u.first_name, u.username, u.kirve_points, u.total_messages
                 FROM users u
                 WHERE u.is_registered = TRUE AND u.kirve_points > 0
                 ORDER BY u.kirve_points DESC
-                LIMIT 5
+                LIMIT 10
+            """)
+            
+            # En aktif kullanıcılar (top 10) - Mesaj sıralaması
+            top_users_messages = await conn.fetch("""
+                SELECT u.first_name, u.username, u.kirve_points, u.total_messages
+                FROM users u
+                WHERE u.is_registered = TRUE AND u.total_messages > 0
+                ORDER BY u.total_messages DESC
+                LIMIT 10
             """)
             
             # En aktif gruplar
@@ -129,7 +138,8 @@ async def get_comprehensive_stats() -> Dict[str, Any]:
                 "total_participants": total_participants or 0,
                 
                 # Top listeler
-                "top_users": [dict(user) for user in top_users] if top_users else [],
+                "top_users_kp": [dict(user) for user in top_users_kp] if top_users_kp else [],
+                "top_users_messages": [dict(user) for user in top_users_messages] if top_users_messages else [],
                 "top_groups": [dict(group) for group in top_groups] if top_groups else [],
                 "rank_distribution": [dict(rank) for rank in rank_distribution] if rank_distribution else [],
                 
@@ -234,13 +244,11 @@ async def system_stats_command(message: Message) -> None:
         user_id = message.from_user.id
         config = get_config()
         
-        # Admin kontrolü (en az Admin 1)
-        if user_id != config.ADMIN_USER_ID:
-            # Rütbe kontrolü sistemi - Gerçek implementasyon
-            from database import has_permission
-            if not await has_permission(user_id, "view_system_stats"):
-                logger.warning(f"⚠️ System stats unauthorized access: {user_id}")
-                return
+        # Admin kontrolü - Sadece admin kullanabilir
+        from config import is_admin
+        if not is_admin(user_id):
+            logger.warning(f"⚠️ System stats unauthorized access: {user_id}")
+            return
         
         # 🔥 GRUP SESSİZLİK: Grup chatindeyse sil ve özel mesajla yanıt ver
         if message.chat.type != "private":
@@ -568,6 +576,62 @@ async def send_system_stats_to_user(user_id: int, message_obj) -> None:
 
 
 # ==============================================
+# KOMUT HANDLER'LARI
+# ==============================================
+
+@router.message(Command("adminstats"))
+async def admin_stats_command_handler(message: Message) -> None:
+    """Admin istatistikleri komutu"""
+    try:
+        user_id = message.from_user.id
+        config = get_config()
+        
+        # Admin kontrolü
+        if user_id != config.ADMIN_USER_ID:
+            return
+        
+        # Grup chatindeyse komut mesajını sil
+        if message.chat.type != "private":
+            try:
+                await message.delete()
+                logger.info(f"🔇 Admin stats komutu mesajı silindi - Group: {message.chat.id}")
+            except Exception as e:
+                logger.error(f"❌ Admin stats mesajı silinemedi: {e}")
+            return
+        
+        await admin_stats_command(message)
+        
+    except Exception as e:
+        logger.error(f"❌ Admin stats komut hatası: {e}")
+        await message.reply("❌ İstatistikler yüklenemedi!")
+
+@router.message(Command("sistemistatistik"))
+async def system_stats_command_handler(message: Message) -> None:
+    """Sistem istatistikleri komutu"""
+    try:
+        user_id = message.from_user.id
+        config = get_config()
+        
+        # Admin kontrolü
+        if user_id != config.ADMIN_USER_ID:
+            return
+        
+        # Grup chatindeyse komut mesajını sil
+        if message.chat.type != "private":
+            try:
+                await message.delete()
+                logger.info(f"🔇 System stats komutu mesajı silindi - Group: {message.chat.id}")
+            except Exception as e:
+                logger.error(f"❌ System stats mesajı silinemedi: {e}")
+            return
+        
+        await system_stats_command(message)
+        
+    except Exception as e:
+        logger.error(f"❌ System stats komut hatası: {e}")
+        await message.reply("❌ İstatistikler yüklenemedi!")
+
+# ==============================================
 # CALLBACK HANDLER'LARI
 # ==============================================
 
@@ -593,6 +657,10 @@ async def handle_stats_callback(callback: types.CallbackQuery) -> None:
             await show_performance_stats(callback)
         elif action == "stats_top_users":
             await show_top_users(callback)
+        elif action == "stats_top_users_kp":
+            await show_top_users_kp(callback)
+        elif action == "stats_top_users_messages":
+            await show_top_users_messages(callback)
         elif action == "stats_top_groups":
             await show_top_groups(callback)
         elif action == "stats_ranks":
@@ -703,22 +771,26 @@ async def show_top_users(callback: types.CallbackQuery) -> None:
     """En aktif kullanıcıları göster"""
     try:
         stats = await get_comprehensive_stats()
-        top_users = stats.get('top_users', [])
+        top_users_kp = stats.get('top_users_kp', [])
+        top_users_messages = stats.get('top_users_messages', [])
         
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [
+                InlineKeyboardButton(text="💎 KP Sıralaması", callback_data="stats_top_users_kp"),
+                InlineKeyboardButton(text="📝 Mesaj Sıralaması", callback_data="stats_top_users_messages")
+            ],
             [InlineKeyboardButton(text="⬅️ Geri", callback_data="stats_back_admin")]
         ])
         
+        # KP sıralaması göster
         users_text = ""
-        if top_users:
-            for i, user in enumerate(top_users, 1):
-                name = user.get('first_name', 'Anonim')
-                username = f"@{user.get('username')}" if user.get('username') else ""
+        if top_users_kp:
+            for i, user in enumerate(top_users_kp, 1):
+                # Kullanıcı bilgilerini gizle, sadece sıra ve değerleri göster
                 points = user.get('kirve_points', 0)
                 messages = user.get('total_messages', 0)
                 
-                users_text += f"{i}. <b>{name}</b> {username}\n"
-                users_text += f"   💎 {points:.2f} KP | 📝 {messages} mesaj\n\n"
+                users_text += f"{i}. 💎 <b>{points:.2f} KP</b> | 📝 {messages} mesaj\n"
         else:
             users_text = "Henüz veri yok"
         
@@ -727,7 +799,7 @@ async def show_top_users(callback: types.CallbackQuery) -> None:
 ║ 👥 <b>EN AKTİF KULLANICILAR</b> 👥 ║
 ╚══════════════════════╝
 
-🏆 <b>TOP 5 KULLANICI (Point Sıralaması):</b>
+🏆 <b>TOP 10 KULLANICI (Point Sıralaması):</b>
 
 {users_text}
 
@@ -739,6 +811,84 @@ async def show_top_users(callback: types.CallbackQuery) -> None:
     except Exception as e:
         logger.error(f"❌ Top users hatası: {e}")
         await callback.answer("❌ Kullanıcı verileri alınamadı!", show_alert=True)
+
+
+async def show_top_users_kp(callback: types.CallbackQuery) -> None:
+    """KP sıralaması göster"""
+    try:
+        stats = await get_comprehensive_stats()
+        top_users_kp = stats.get('top_users_kp', [])
+        
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="⬅️ Geri", callback_data="stats_top_users")]
+        ])
+        
+        users_text = ""
+        if top_users_kp:
+            for i, user in enumerate(top_users_kp, 1):
+                points = user.get('kirve_points', 0)
+                messages = user.get('total_messages', 0)
+                
+                users_text += f"{i}. 💎 <b>{points:.2f} KP</b> | 📝 {messages} mesaj\n"
+        else:
+            users_text = "Henüz veri yok"
+        
+        message = f"""
+╔══════════════════════╗
+║ 💎 <b>TOP 10 KP SIRALAMASI</b> 💎 ║
+╚══════════════════════╝
+
+🏆 <b>EN YÜKSEK POİNT KULLANICILARI:</b>
+
+{users_text}
+
+💡 <b>Point kazanımı grup mesajlarına dayalıdır.</b>
+        """
+        
+        await callback.message.edit_text(message, parse_mode="HTML", reply_markup=keyboard)
+        
+    except Exception as e:
+        logger.error(f"❌ Top users KP hatası: {e}")
+        await callback.answer("❌ KP verileri alınamadı!", show_alert=True)
+
+
+async def show_top_users_messages(callback: types.CallbackQuery) -> None:
+    """Mesaj sıralaması göster"""
+    try:
+        stats = await get_comprehensive_stats()
+        top_users_messages = stats.get('top_users_messages', [])
+        
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="⬅️ Geri", callback_data="stats_top_users")]
+        ])
+        
+        users_text = ""
+        if top_users_messages:
+            for i, user in enumerate(top_users_messages, 1):
+                points = user.get('kirve_points', 0)
+                messages = user.get('total_messages', 0)
+                
+                users_text += f"{i}. 📝 <b>{messages} mesaj</b> | 💎 {points:.2f} KP\n"
+        else:
+            users_text = "Henüz veri yok"
+        
+        message = f"""
+╔══════════════════════╗
+║ 📝 <b>TOP 10 MESAJ SIRALAMASI</b> 📝 ║
+╚══════════════════════╝
+
+🏆 <b>EN AKTİF MESAJ KULLANICILARI:</b>
+
+{users_text}
+
+💡 <b>Mesaj sayısı grup aktivitesine dayalıdır.</b>
+        """
+        
+        await callback.message.edit_text(message, parse_mode="HTML", reply_markup=keyboard)
+        
+    except Exception as e:
+        logger.error(f"❌ Top users messages hatası: {e}")
+        await callback.answer("❌ Mesaj verileri alınamadı!", show_alert=True)
 
 
 async def show_top_groups(callback: types.CallbackQuery) -> None:
