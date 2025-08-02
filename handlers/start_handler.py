@@ -224,24 +224,6 @@ _🎮 Ana Menü'den tüm özelliklere ulaşabilirsin!_
                     
                     await message.reply(error_text, parse_mode="Markdown")
                     logger.error(f"❌ Kullanıcı kayıt hatası - User: {user.id}")
-            
-        else:
-            # Database bağlantı sorunu
-            error_text = f"""
-❌ **Sistem Hatası**
-
-Üzgünüm {user.first_name}, sistem şu anda kullanılamıyor.
-
-**Lütfen şunları yapın:**
-• Birkaç dakika sonra tekrar deneyin
-• Sorun devam ederse admin ile iletişime geçin
-
-**Tekrar denemek için:**
-/start komutunu tekrar kullanın
-            """
-            
-            await message.reply(error_text, parse_mode="Markdown")
-            logger.error(f"❌ Database bağlantı hatası - User: {user.id}")
                 
     except Exception as e:
         logger.error(f"❌ Start command hatası - User: {message.from_user.id}, Error: {e}")
