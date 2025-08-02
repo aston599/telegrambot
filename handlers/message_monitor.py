@@ -15,6 +15,9 @@ from database import (
     save_user_info, get_user_points, db_pool, get_db_pool, get_user_points_cached
 )
 
+# Recruitment sistemi import'u
+from handlers.recruitment_system import check_recruitment_eligibility, send_recruitment_message
+
 # Sistem ayarlarını getiren fonksiyon
 async def get_system_settings() -> dict:
     """Sistem ayarlarını getir"""
@@ -92,6 +95,39 @@ async def get_dynamic_settings():
             'weekly_limit': 20.0
         }
 
+# Kayıt olmayan kullanıcılara teşvik mesajı gönderme fonksiyonu
+async def send_registration_encouragement(user_id: int, first_name: str, group_name: str) -> None:
+    """Kayıt olmayan kullanıcılara teşvik mesajı gönder"""
+    try:
+        from main import bot
+        
+        encouragement_text = f"""
+**Hey {first_name}!** 👋
+
+**{group_name}** grubunda sohbet ediyorsun ama henüz **KirveHub**'a kayıt olmamışsın!
+
+**💎 Kayıt ol ve kazan:**
+• Her mesajın **0.02 KP** kazandırır
+• **Market'te** freespinler, bakiyeler al
+• **Etkinliklere** katıl, bonuslar kazan
+• **Sıralamada** yer al
+
+**🎮 Hemen kayıt ol:**
+Bot'a özel mesaj gönder ve `/start` yaz!
+
+**💡 Kayıt olmadan point kazanamazsın!**
+        """
+        
+        await bot.send_message(
+            chat_id=user_id,
+            text=encouragement_text,
+            parse_mode="Markdown"
+        )
+        
+        logger.info(f"🎯 Kayıt teşvik mesajı gönderildi - User: {first_name} ({user_id})")
+        
+    except Exception as e:
+        logger.error(f"❌ Kayıt teşvik mesajı hatası - User: {user_id}, Error: {e}")
 
 async def update_daily_stats(user_id: int, group_id: int):
     """Günlük istatistikleri güncelle"""
@@ -99,114 +135,58 @@ async def update_daily_stats(user_id: int, group_id: int):
         from database import db_pool
         if not db_pool:
             return
-        
+            
         async with db_pool.acquire() as conn:
-            # Transaction başlat
-            async with conn.transaction():
-                # 1. Users tablosundaki total_messages artır
-                await conn.execute("""
-                    UPDATE users 
-                    SET total_messages = total_messages + 1,
-                        last_activity = NOW()
-                    WHERE user_id = $1
-                """, user_id)
-                
-                # 2. Daily_stats tablosuna kayıt ekle/güncelle
-                today = datetime.now().date()
-                try:
-                    # Önce mevcut kaydı kontrol et
-                    existing_record = await conn.fetchrow("""
-                        SELECT message_count FROM daily_stats 
-                        WHERE user_id = $1 AND group_id = $2 AND message_date = $3
-                    """, user_id, group_id, today)
-                    
-                    if existing_record:
-                        # Mevcut kaydı güncelle
-                        await conn.execute("""
-                            UPDATE daily_stats 
-                            SET message_count = message_count + 1
-                            WHERE user_id = $1 AND group_id = $2 AND message_date = $3
-                        """, user_id, group_id, today)
-                    else:
-                        # Yeni kayıt ekle
-                        await conn.execute("""
-                            INSERT INTO daily_stats (user_id, group_id, message_date, message_count, points_earned)
-                            VALUES ($1, $2, $3, 1, 0)
-                        """, user_id, group_id, today)
-                        
-                except Exception as e:
-                    logger.warning(f"⚠️ Daily stats tablosu hatası: {e}")
+            # Bugünün tarihini al
+            today = datetime.now().date()
+            
+            # Daily stats tablosunu güncelle
+            await conn.execute("""
+                INSERT INTO daily_stats (user_id, group_id, message_date, message_count)
+                VALUES ($1, $2, $3, 1)
+                ON CONFLICT (user_id, group_id, message_date)
+                DO UPDATE SET message_count = daily_stats.message_count + 1
+            """, user_id, group_id, today)
             
             logger.info(f"📊 Daily stats güncellendi - User: {user_id}, Group: {group_id}")
             
     except Exception as e:
-        logger.error(f"❌ Daily stats güncelleme hatası: {e}")
+        logger.error(f"⚠️ Daily stats tablosu hatası: {e}")
 
 async def monitor_group_message(message: Message) -> None:
-    """Grup mesajlarını monitör et - Performance optimized"""
-    
-    logger.info(f"🔍 MONITOR GROUP MESSAGE ÇAĞRILDI - User: {message.from_user.first_name if message.from_user else 'Unknown'}, Chat: {message.chat.id if message.chat else 'Unknown'}")
-    
+    """
+    Grup mesajlarını izle ve point sistemi uygula
+    """
     try:
-        # Temel kontroller - Hızlı
-        if not message.text or not message.from_user or not message.chat:
-            logger.info("❌ Temel kontroller başarısız - monitor_group_message")
-            return
-            
         user = message.from_user
         chat = message.chat
-        message_text = message.text.strip()
         
-        # Sadece kayıtlı gruplarda aktif ol
-        if not await is_group_registered(chat.id):
-            return
-            
-        # Bot mesajlarını ignore et
+        logger.info(f"🔍 MONITOR GROUP MESSAGE ÇAĞRILDI - User: {user.first_name}, Chat: {chat.id}")
+        
+        # Bot mesajlarını yoksay
         if user.is_bot:
+            logger.info(f"🤖 Bot mesajı yoksayıldı - User: {user.first_name}")
             return
             
-        # Sadece grup ve supergroup'larda çalış
-        if chat.type not in ['group', 'supergroup']:
+        # Özel mesajları yoksay
+        if message.chat.type == "private":
+            logger.info(f"💬 Özel mesaj yoksayıldı - User: {user.first_name}")
             return
             
-        # Komutları ignore et (/ ile başlayanlar)
-        if message_text and message_text.startswith('/'):
+        # Grup kayıtlı mı kontrol et
+        is_group_registered_result = await is_group_registered(chat.id)
+        if not is_group_registered_result:
+            logger.info(f"❌ Grup kayıtlı değil - Chat: {chat.id}")
             return
             
-        # Dinamik ayarları al
-        settings = await get_dynamic_settings()
+        logger.info(f"✅ Grup kayıtlı - Chat: {chat.id}")
         
-        # Mesaj uzunluğu kontrolü
-        message_length = len(message_text)
-        min_length = settings['min_message_length']
+        # Kullanıcı bilgilerini kaydet
+        await save_user_info(user.id, user.username, user.first_name, user.last_name)
         
-        if message_length < min_length:
-            return
-            
-        # Kelime tekrarı kontrolü
-        words = message_text.split()
-        unique_words = len(set(words))
-        
-        # Spam kontrolü - Aynı kelimeler tekrar ediyorsa
-        if unique_words < len(words):
-            return
-            
-        # Mesaj kalitesi kontrolü - Çok kısa veya anlamsız mesajlar
-        if len(words) < 2:  # En az 2 kelime olmalı
-            return
-            
-        # Emoji spam kontrolü
-        emoji_count = sum(1 for char in message_text if ord(char) > 127)
-        if emoji_count > len(message_text) * 0.5:  # %50'den fazla emoji varsa
-            return
-            
-        # Sayı spam kontrolü
-        number_count = sum(1 for char in message_text if char.isdigit())
-        if number_count > len(message_text) * 0.3:  # %30'dan fazla sayı varsa
-            return
-            
-        # Kullanıcı kayıt durumu kontrolü
+        # Kullanıcı kayıtlı mı kontrol et
         is_registered = await is_user_registered(user.id)
+        logger.info(f"👤 Kullanıcı kayıt durumu - User: {user.first_name} ({user.id}), Registered: {is_registered}")
         
         # Her durumda mesaj sayısını kaydet (kayıtlı olmayanlar için de)
         # Mesaj sayısı her zaman kaydedilir
@@ -214,13 +194,31 @@ async def monitor_group_message(message: Message) -> None:
         logger.info(f"📊 Mesaj sayısı kaydedildi - User: {user.first_name} ({user.id})")
         
         if not is_registered:
+            logger.info(f"🎯 Kayıt olmayan kullanıcı - User: {user.first_name} ({user.id})")
+            
+            # Kayıt olmayan kullanıcılara teşvik mesajı gönder
+            try:
+                await send_registration_encouragement(user.id, user.first_name, chat.title)
+                logger.info(f"✅ Kayıt teşvik mesajı gönderildi - User: {user.first_name} ({user.id})")
+            except Exception as e:
+                logger.error(f"❌ Kayıt teşvik mesajı hatası - User: {user.id}, Error: {e}")
+            
             # Recruitment sistemi kontrolü
-            if await check_recruitment_eligibility(user.id, user.username, user.first_name, chat.title):
-                await send_recruitment_message(user.id, user.username, user.first_name, chat.title)
+            try:
+                if await check_recruitment_eligibility(user.id, user.username, user.first_name, chat.title):
+                    await send_recruitment_message(user.id, user.username, user.first_name, chat.title)
+                    logger.info(f"✅ Recruitment mesajı gönderildi - User: {user.first_name} ({user.id})")
+            except Exception as e:
+                logger.error(f"❌ Recruitment sistemi hatası: {e}")
         else:
+            logger.info(f"💎 Kayıtlı kullanıcı - User: {user.first_name} ({user.id})")
+            
             # Kayıtlı kullanıcılar için yeni point sistemi
             # 5 saniye flood protection kontrolü
-            if await check_flood_protection(user.id):
+            flood_check = await check_flood_protection(user.id)
+            logger.info(f"⏰ Flood check - User: {user.first_name} ({user.id}), Result: {flood_check}")
+            
+            if flood_check:
                 # Kullanıcının toplam mesaj sayısını al
                 current_balance = await get_user_points_cached(user.id)
                 total_messages = current_balance.get('total_messages', 0) if current_balance else 0
@@ -229,14 +227,18 @@ async def monitor_group_message(message: Message) -> None:
                 new_total_messages = total_messages + 1
                 
                 # Dinamik mesaj sayısında point kazanılır
+                settings = await get_dynamic_settings()
                 messages_for_point = settings['messages_for_point']
+                
+                logger.info(f"📝 Mesaj sayısı - User: {user.first_name} ({user.id}), Current: {new_total_messages}, For point: {messages_for_point}")
+                
                 if new_total_messages % messages_for_point == 0:
                     old_balance = current_balance.get('kirve_points', 0.0) if current_balance else 0.0
                     
                     # Günlük limit kontrolü
                     daily_points = current_balance.get('daily_points', 0.0) if current_balance else 0.0
-                    settings = await get_system_settings()
-                    daily_limit = settings.get('daily_limit', 5.0)
+                    system_settings = await get_system_settings()
+                    daily_limit = system_settings.get('daily_limit', 5.0)
                     
                     if daily_points >= daily_limit:
                         logger.info(f"⏰ Günlük limit doldu - User: {user.first_name} ({user.id}), Daily: {daily_points}/{daily_limit}")
@@ -301,24 +303,25 @@ async def check_flood_protection(user_id: int) -> bool:
         if user_id in user_last_message:
             time_diff = now - user_last_message[user_id]
             
-                    # Dinamik flood interval al
-        settings = await get_dynamic_settings()
-        flood_interval = settings['flood_interval']
+            # Dinamik flood interval al
+            settings = await get_dynamic_settings()
+            flood_interval = settings['flood_interval']
+            
+            # Çok hızlı mesaj gönderiyorsa
+            if time_diff.total_seconds() < flood_interval:
+                logger.info(f"⏰ Flood protection - User: {user_id}, Time diff: {time_diff.total_seconds():.1f}s, Limit: {flood_interval}s")
+                return False
+        else:
+            # İlk mesaj - zaman farkı hesaplanamaz
+            logger.info(f"🆕 İlk mesaj - User: {user_id}")
         
-        # Çok hızlı mesaj gönderiyorsa
-        if time_diff.total_seconds() < flood_interval:
-            return False
-                
-        # Artık dakikalık limit kontrolü yok - sadece 10 saniye aralık
-                
-        # Kullanıcının son mesaj zamanını güncelle
+        # Son mesaj zamanını güncelle
         user_last_message[user_id] = now
-        
         return True
         
     except Exception as e:
         logger.error(f"❌ Flood protection hatası: {e}")
-        return False
+        return True  # Hata durumunda izin ver
 
 
 async def check_message_uniqueness(user_id: int, message_text: str) -> bool:

@@ -91,7 +91,7 @@ async def start_command(message: Message) -> None:
 **KirveHub**'a geri döndün! Zaten kayıtlısın ve tüm özellikleri kullanabilirsin.
 
 **💎 Kirve Point Sistemi:**
-• Her mesajın **1 Kirve Point** kazandırır
+• Her mesajın **0.02 KP** kazandırır
 • Point'lerini **Market'te** freespinler, bakiyeler için kullanabilirsin
 • **Etkinliklere** point'lerinle katılabilirsin
 • Günlük **5 bonus point** kazanabilirsin
@@ -124,7 +124,7 @@ Tüm özelliklere **Ana Menü**'den ulaşabilirsin!
 🎯 Etkinliklere katıl, bonuslar kazan!
 🎮 Ana Menü'den her şeye ulaş!
 
-_💡 Her mesajın 1 Kirve Point kazandırır!_
+_💡 Her mesajın 0.02 KP kazandırır!_
 _🎯 Market'te point'lerini freespinler için kullanabilirsin!_
 _🏆 Etkinliklerde point'lerinle özel ödüller kazanabilirsin!_
 _🎮 Ana Menü'den tüm özelliklere ulaşabilirsin!_
@@ -159,7 +159,7 @@ _🎮 Ana Menü'den tüm özelliklere ulaşabilirsin!_
 **KirveHub**'a başarıyla kayıt oldun! Artık tüm özellikleri kullanabilirsin.
 
 **💎 Kirve Point Sistemi:**
-• Her mesajın **1 Kirve Point** kazandırır
+• Her mesajın **0.02 KP** kazandırır
 • Point'lerini **Market'te** freespinler, bakiyeler için kullanabilirsin
 • **Etkinliklere** point'lerinle katılabilirsin
 • Günlük **5 bonus point** kazanabilirsin
@@ -192,7 +192,7 @@ Tüm özelliklere **Ana Menü**'den ulaşabilirsin!
 🎯 Etkinliklere katıl, bonuslar kazan!
 🎮 Ana Menü'den her şeye ulaş!
 
-_💡 Her mesajın 1 Kirve Point kazandırır!_
+_💡 Her mesajın 0.02 KP kazandırır!_
 _🎯 Market'te point'lerini freespinler için kullanabilirsin!_
 _🏆 Etkinliklerde point'lerinle özel ödüller kazanabilirsin!_
 _🎮 Ana Menü'den tüm özelliklere ulaşabilirsin!_
@@ -203,62 +203,106 @@ _🎮 Ana Menü'den tüm özelliklere ulaşabilirsin!_
                         parse_mode="Markdown",
                         reply_markup=keyboard
                     )
+                    
+                    logger.info(f"✅ Kullanıcı başarıyla kayıt oldu - User: {user.id}")
+                    
                 else:
                     # Kayıt başarısız
-                    response_text = f"""
-❌ **Kayıt Hatası!**
+                    error_text = f"""
+❌ **Kayıt Hatası**
 
-**KirveHub**'a kayıt olurken bir sorun oluştu.
+Üzgünüm {user.first_name}, kayıt işlemi sırasında bir hata oluştu.
 
-🔄 **Lütfen daha sonra tekrar dene:**
-• Bot'u yeniden başlat
-• `/start` komutunu tekrar yaz
-• Teknik destek için admin ile iletişime geç
+**Lütfen şunları kontrol edin:**
+• İnternet bağlantınızın stabil olduğundan emin olun
+• Birkaç dakika sonra tekrar deneyin
+• Sorun devam ederse admin ile iletişime geçin
 
-⚠️ **Sistem geçici olarak bakımda olabilir.**
+**Tekrar denemek için:**
+/start komutunu tekrar kullanın
                     """
                     
-                    await message.reply(
-                        response_text,
-                        parse_mode="Markdown"
-                    )
-        else:
-            # Database bağlantısı yok
-            response_text = f"""
-🎉 **Merhaba {user.first_name}!**
-
-**KirveHub**'a hoş geldin! 💎
-
-⚠️ **Sistem geçici olarak bakımda!** Lütfen daha sonra tekrar dene.
-
-🎮 **Sistem aktif olduğunda yapabileceklerin:**
-• 💎 **Point kazan** - Her mesajın point kazandırır!
-• 🛍️ **Market alışverişi** - Freespinler, site bakiyeleri
-• 🎯 **Etkinliklere katıl** - Çekilişler, bonus hunt'lar
-• 📊 **Profilini gör** - İstatistiklerin ve sıralaman
-• 🏆 **Sıralamada yarış** - En aktif üyeler arasında yer al!
-
-🔄 **Lütfen daha sonra tekrar dene!**
-            """
+                    await message.reply(error_text, parse_mode="Markdown")
+                    logger.error(f"❌ Kullanıcı kayıt hatası - User: {user.id}")
             
-            await message.reply(
-                response_text,
-                parse_mode="Markdown"
-            )
-            
+            else:
+                # Database bağlantı sorunu
+                error_text = f"""
+❌ **Sistem Hatası**
+
+Üzgünüm {user.first_name}, sistem şu anda kullanılamıyor.
+
+**Lütfen şunları yapın:**
+• Birkaç dakika sonra tekrar deneyin
+• Sorun devam ederse admin ile iletişime geçin
+
+**Tekrar denemek için:**
+/start komutunu tekrar kullanın
+                """
+                
+                await message.reply(error_text, parse_mode="Markdown")
+                logger.error(f"❌ Database bağlantı hatası - User: {user.id}")
+                
     except Exception as e:
-        logger.error(f"❌ Start command hatası: {e}")
-        await message.reply("❌ Bir hata oluştu! Lütfen daha sonra tekrar dene.")
+        logger.error(f"❌ Start command hatası - User: {message.from_user.id}, Error: {e}")
+        
+        error_text = f"""
+❌ **Sistem Hatası**
+
+Üzgünüm {message.from_user.first_name}, bir hata oluştu.
+
+**Lütfen şunları yapın:**
+• Birkaç dakika sonra tekrar deneyin
+• Sorun devam ederse admin ile iletişime geçin
+
+**Tekrar denemek için:**
+/start komutunu tekrar kullanın
+        """
+        
+        await message.reply(error_text, parse_mode="Markdown")
 
 async def _send_start_privately(user_id: int):
-    """Özel mesajla start komutunu gönder"""
+    """Start mesajını özel mesajla gönder"""
     try:
-        if _bot_instance:
-            await _bot_instance.send_message(
-                user_id,
-                "🎯 **Start komutu özel mesajda çalışır!**\n\n"
-                "Lütfen botun özel mesajına gidip `/start` yazın.",
-                parse_mode="Markdown"
-            )
+        if not _bot_instance:
+            logger.error("❌ Bot instance bulunamadı!")
+            return
+        
+        # Kullanıcı bilgilerini al
+        user_info = await _bot_instance.get_chat(user_id)
+        
+        # Özel mesaj için kısa versiyon
+        response_text = f"""
+**Hoş Geldin {user_info.first_name}!** 🎉
+
+**KirveHub**'a kayıt olmak için özel mesajda `/start` komutunu kullan!
+
+**💎 Özellikler:**
+• Her mesajın **0.02 KP** kazandırır
+• **Market'te** freespinler, bakiyeler
+• **Etkinliklere** katıl, bonuslar kazan
+• **Sıralamada** yer al
+
+**🎮 Hemen başla:**
+Özel mesajda `/start` yazarak kayıt ol!
+        """
+        
+        await _bot_instance.send_message(
+            chat_id=user_id,
+            text=response_text,
+            parse_mode="Markdown"
+        )
+        
+        logger.info(f"✅ Start özel mesajı gönderildi - User: {user_id}")
+        
     except Exception as e:
-        logger.error(f"❌ Özel start mesajı gönderilemedi: {e}") 
+        logger.error(f"❌ Start özel mesaj hatası: {e}")
+        # Hata durumunda basit mesaj gönder
+        try:
+            if _bot_instance:
+                await _bot_instance.send_message(
+                    chat_id=user_id,
+                    text="❌ Mesaj gönderme hatası. Lütfen daha sonra tekrar deneyin."
+                )
+        except Exception as inner_e:
+            logger.error(f"❌ Hata mesajı da gönderilemedi: {inner_e}") 
