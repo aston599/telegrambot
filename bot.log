@@ -1244,3 +1244,972 @@ task: <Task pending name='Task-118' coro=<TelegramLogHandler.send_logs() running
 2025-08-02 10:31:12,136 - Polling stopped for bot @KirveLastBot id=7633083532 - 'Kirve Bot'
 2025-08-02 10:31:12,450 - Task was destroyed but it is pending!
 task: <Task pending name='Task-140' coro=<TelegramLogHandler.send_logs() running at C:\Users\gamin\Desktop\telegrambot\utils\telegram_logger.py:116> wait_for=<_OverlappedFuture cancelled>>
+2025-08-02 10:59:16,514 - ✅ Bot lock file oluşturuldu - PID: 5808
+2025-08-02 10:59:16,514 - Bot başlatılıyor...
+2025-08-02 10:59:16,514 - Konfigürasyon doğrulandı
+2025-08-02 10:59:16,514 - Database bağlantısı kuruluyor...
+2025-08-02 10:59:16,515 - Database bağlantısı kuruluyor...
+2025-08-02 10:59:18,318 - ✅ Users tablosu kolonları güncellendi
+2025-08-02 10:59:18,450 - ✅ Registered groups tablosu kolonları güncellendi
+2025-08-02 10:59:18,778 - ℹ️ Unique constraint zaten var: relation "daily_stats_unique" already exists
+2025-08-02 10:59:19,174 - ✅ Eski unit_price kolonu kaldırıldı
+2025-08-02 10:59:19,501 - ✅ Tüm tablolar başarıyla oluşturuldu/güncellendi
+2025-08-02 10:59:20,225 - ✅ Custom commands tablosu güncellendi
+2025-08-02 10:59:20,360 - 🔍 Test kullanıcıları ekleniyor...
+2025-08-02 10:59:20,426 - ✅ Test kullanıcıları eklendi! Result: INSERT 0 0
+2025-08-02 10:59:20,556 - ✅ Database'de toplam 90 kullanıcı var
+2025-08-02 10:59:20,556 - 🔍 Test market ürünleri kontrol ediliyor...
+2025-08-02 10:59:20,687 - 🔍 Mevcut ürün sayısı: 3
+2025-08-02 10:59:20,883 - ✅ Duplicate ürünler temizlendi! Kalan ürün sayısı: 3
+2025-08-02 10:59:20,949 - Database bağlantısı ve tablolar hazır!
+2025-08-02 10:59:20,950 - ✅ Database bağlantısı başarılı!
+2025-08-02 10:59:20,951 - Bot instance oluşturuluyor...
+2025-08-02 10:59:21,159 - Bot instance handler'lara aktarılıyor...
+2025-08-02 10:59:21,165 - ✅ Bot instance tüm handler'lara aktarıldı!
+2025-08-02 10:59:21,166 - Handler'lar kaydediliyor...
+2025-08-02 10:59:21,166 - Callback handler'lar kaydedildi
+2025-08-02 10:59:21,170 - Router'lar kayıtlandı!
+2025-08-02 10:59:21,172 - Tüm handler'lar kaydedildi!
+2025-08-02 10:59:21,172 - Background cleanup task başlatıldı!
+2025-08-02 10:59:21,172 - 🎯 Kayıt teşvik sistemi başlatıldı!
+2025-08-02 10:59:21,172 - 🔍 Bot bilgileri alınıyor...
+2025-08-02 10:59:21,173 - 🧹 Memory cleanup task başlatıldı!
+2025-08-02 10:59:21,173 - 🎯 Recruitment background task başlatıldı
+2025-08-02 10:59:21,617 - 🔍 DEBUG - Yeni bot profili eklendi: bot_1753833578
+2025-08-02 10:59:21,618 - 🔍 DEBUG - BOT_PROFILES güncellendi: ['bot_1753833578']
+2025-08-02 10:59:21,695 - 🤖 Bot: @KirveLastBot - Kirve Bot
+2025-08-02 10:59:21,696 - 👤 Admin ID: 8154732274
+2025-08-02 10:59:21,697 - 🚀 Bot başarıyla çalışmaya başladı!
+2025-08-02 10:59:21,697 - ⏹️ Durdurmak için Ctrl+C
+2025-08-02 10:59:21,698 - 📱 Telegram logger başarıyla kuruldu
+2025-08-02 10:59:22,762 - 📢 Startup bildirimi hazırlanıyor...
+2025-08-02 10:59:22,763 - 🚀 Bot polling başlatılıyor...
+2025-08-02 10:59:22,763 - ✅ Bot başarıyla çalışıyor! Komutlar hazır.
+2025-08-02 10:59:22,763 - Start polling
+2025-08-02 10:59:22,764 - Database pool hazır, startup bildirimi gönderiliyor (attempt 1)
+2025-08-02 10:59:22,959 - 🔔 Admin startup bildirimi başlatılıyor...
+2025-08-02 10:59:23,040 - Run polling for bot @KirveLastBot id=7633083532 - 'Kirve Bot'
+2025-08-02 10:59:23,127 - 📨 Özel mesaj alındı - User: 8154732274 (@kirvehubaff)
+2025-08-02 10:59:23,128 - 📨 Özel mesaj alındı - User: 8154732274 (@kirvehubaff)
+2025-08-02 10:59:23,129 - 🛡️ Admin panel komutu çağrıldı - User: 8154732274 (@kirvehubaff)
+2025-08-02 10:59:23,129 - 🛡️ Admin panel komutu çağrıldı - User: 8154732274 (@kirvehubaff)
+2025-08-02 10:59:23,129 - ℹ️ Komut oluşturma süreci yoktu - User: 8154732274
+2025-08-02 10:59:23,129 - 🛡️ Admin panel komutu ÖZELİNDE - User: KirveHub (8154732274)
+2025-08-02 10:59:23,155 - 📬 1 admin'e startup bildirimi gönderiliyor...
+2025-08-02 10:59:23,320 - 🎯 INPUT STATE GET - User: 8154732274, State: None
+2025-08-02 10:59:23,321 - 🎯 INPUT STATE GET - User: 8154732274, State: None
+2025-08-02 10:59:23,393 - ✅ Admin panel gösterildi - User: 8154732274
+2025-08-02 10:59:23,395 - ✅ Admin panel başarıyla gösterildi - User: 8154732274 (@kirvehubaff)
+2025-08-02 10:59:23,395 - Update id=69400440 is handled. Duration 270 ms by bot id=7633083532
+2025-08-02 10:59:23,507 - 🎯 Kayıt teşvik mesajı gönderildi - User: 7530713440 (1dk cooldown aktif)
+2025-08-02 10:59:23,818 - ✅ Admin startup bildirimi tamamlandı - Başarılı: 1, Başarısız: 0
+2025-08-02 10:59:23,960 - 📝 Özelden mesaj sayısı artırıldı - User: 8154732274, Mesaj: 147/10
+2025-08-02 10:59:23,963 - 📝 Özelden mesaj sayısı artırıldı - User: 8154732274, Mesaj: 147/10
+2025-08-02 10:59:23,963 - ⏰ Özelden menü cooldown'da - User: 8154732274
+2025-08-02 10:59:23,963 - ✅ Özel mesaj işlendi - User: 8154732274
+2025-08-02 10:59:23,963 - Update id=69400439 is handled. Duration 838 ms by bot id=7633083532
+2025-08-02 10:59:24,103 - 💬 Özelden menü gösterildi - User: 8154732274
+2025-08-02 10:59:24,106 - ✅ Özel mesaj işlendi - User: 8154732274
+2025-08-02 10:59:24,106 - Update id=69400438 is handled. Duration 981 ms by bot id=7633083532
+2025-08-02 10:59:52,741 - 🔍 SQL sorguları test komutu - User: mike (6513506166)
+2025-08-02 10:59:53,803 - 🚨 DIRECT SQL DELETE - User: 6513506166 silindi!
+2025-08-02 10:59:53,934 - Update id=69400441 is handled. Duration 1193 ms by bot id=7633083532
+2025-08-02 11:00:01,309 - 🔍 MONITOR GROUP MESSAGE ÇAĞRILDI - User: mike, Chat: -1002746043354
+2025-08-02 11:00:01,501 - ✅ Grup kayıtlı - Chat: -1002746043354
+2025-08-02 11:00:01,889 - 👤 Kullanıcı kayıt durumu - User: mike (6513506166), Registered: False
+2025-08-02 11:00:02,018 - 📊 Daily stats güncellendi - User: 6513506166, Group: -1002746043354
+2025-08-02 11:00:02,083 - 📊 Mesaj sayısı kaydedildi - User: mike (6513506166)
+2025-08-02 11:00:02,083 - 🎯 Kayıt olmayan kullanıcı - User: mike (6513506166)
+2025-08-02 11:00:02,097 - ❌ Kayıt teşvik mesajı hatası - User: 6513506166, Error: cannot import name 'bot' from 'main' (C:\Users\gamin\Desktop\telegrambot\main.py)
+2025-08-02 11:00:02,097 - ✅ Kayıt teşvik mesajı gönderildi - User: mike (6513506166)
+2025-08-02 11:00:02,416 - ❌ Recruitment sistemi hatası: column "id" does not exist
+2025-08-02 11:00:02,417 - Update id=69400442 is handled. Duration 1108 ms by bot id=7633083532
+2025-08-02 11:00:02,639 - 🔍 MONITOR GROUP MESSAGE ÇAĞRILDI - User: mike, Chat: -1002746043354
+2025-08-02 11:00:02,830 - ✅ Grup kayıtlı - Chat: -1002746043354
+2025-08-02 11:00:03,217 - 👤 Kullanıcı kayıt durumu - User: mike (6513506166), Registered: False
+2025-08-02 11:00:03,256 - 🔍 MONITOR GROUP MESSAGE ÇAĞRILDI - User: mike, Chat: -1002746043354
+2025-08-02 11:00:03,346 - 📊 Daily stats güncellendi - User: 6513506166, Group: -1002746043354
+2025-08-02 11:00:03,411 - 📊 Mesaj sayısı kaydedildi - User: mike (6513506166)
+2025-08-02 11:00:03,411 - 🎯 Kayıt olmayan kullanıcı - User: mike (6513506166)
+2025-08-02 11:00:03,412 - ❌ Kayıt teşvik mesajı hatası - User: 6513506166, Error: cannot import name 'bot' from 'main' (C:\Users\gamin\Desktop\telegrambot\main.py)
+2025-08-02 11:00:03,413 - ✅ Kayıt teşvik mesajı gönderildi - User: mike (6513506166)
+2025-08-02 11:00:03,450 - ✅ Grup kayıtlı - Chat: -1002746043354
+2025-08-02 11:00:03,732 - ❌ Recruitment sistemi hatası: column "id" does not exist
+2025-08-02 11:00:03,732 - Update id=69400443 is handled. Duration 1094 ms by bot id=7633083532
+2025-08-02 11:00:03,837 - 👤 Kullanıcı kayıt durumu - User: mike (6513506166), Registered: False
+2025-08-02 11:00:03,966 - 📊 Daily stats güncellendi - User: 6513506166, Group: -1002746043354
+2025-08-02 11:00:04,031 - 📊 Mesaj sayısı kaydedildi - User: mike (6513506166)
+2025-08-02 11:00:04,031 - 🎯 Kayıt olmayan kullanıcı - User: mike (6513506166)
+2025-08-02 11:00:04,032 - ❌ Kayıt teşvik mesajı hatası - User: 6513506166, Error: cannot import name 'bot' from 'main' (C:\Users\gamin\Desktop\telegrambot\main.py)
+2025-08-02 11:00:04,032 - ✅ Kayıt teşvik mesajı gönderildi - User: mike (6513506166)
+2025-08-02 11:00:04,351 - ❌ Recruitment sistemi hatası: column "id" does not exist
+2025-08-02 11:00:04,351 - Update id=69400444 is handled. Duration 1096 ms by bot id=7633083532
+2025-08-02 11:01:24,095 - 📭 Spam koruması: Tüm kullanıcılar cooldown'da
+2025-08-02 11:03:25,491 - 🎯 Kayıt teşvik mesajı gönderildi - User: 6513506166 (1dk cooldown aktif)
+2025-08-02 11:05:26,090 - 📭 Spam koruması: Tüm kullanıcılar cooldown'da
+2025-08-02 11:06:37,634 - Polling stopped
+2025-08-02 11:06:37,897 - 🧹 Temizlik işlemleri başlatılıyor...
+2025-08-02 11:06:37,962 - 🗄️ Database bağlantısı kapatıldı.
+2025-08-02 11:06:37,963 - ✅ Bot lock file kaldırıldı
+2025-08-02 11:06:37,963 - ✅ Temizlik işlemleri tamamlandı!
+2025-08-02 11:06:37,963 - Polling stopped for bot @KirveLastBot id=7633083532 - 'Kirve Bot'
+2025-08-02 11:06:40,362 - ✅ Bot lock file oluşturuldu - PID: 15804
+2025-08-02 11:06:40,363 - Bot başlatılıyor...
+2025-08-02 11:06:40,363 - Konfigürasyon doğrulandı
+2025-08-02 11:06:40,363 - Database bağlantısı kuruluyor...
+2025-08-02 11:06:40,364 - Database bağlantısı kuruluyor...
+2025-08-02 11:06:42,087 - ✅ Users tablosu kolonları güncellendi
+2025-08-02 11:06:42,217 - ✅ Registered groups tablosu kolonları güncellendi
+2025-08-02 11:06:42,538 - ℹ️ Unique constraint zaten var: relation "daily_stats_unique" already exists
+2025-08-02 11:06:42,926 - ✅ Eski unit_price kolonu kaldırıldı
+2025-08-02 11:06:43,246 - ✅ Tüm tablolar başarıyla oluşturuldu/güncellendi
+2025-08-02 11:06:43,960 - ✅ Custom commands tablosu güncellendi
+2025-08-02 11:06:44,091 - 🔍 Test kullanıcıları ekleniyor...
+2025-08-02 11:06:44,156 - ✅ Test kullanıcıları eklendi! Result: INSERT 0 0
+2025-08-02 11:06:44,284 - ✅ Database'de toplam 90 kullanıcı var
+2025-08-02 11:06:44,284 - 🔍 Test market ürünleri kontrol ediliyor...
+2025-08-02 11:06:44,412 - 🔍 Mevcut ürün sayısı: 3
+2025-08-02 11:06:44,604 - ✅ Duplicate ürünler temizlendi! Kalan ürün sayısı: 3
+2025-08-02 11:06:44,669 - Database bağlantısı ve tablolar hazır!
+2025-08-02 11:06:44,670 - ✅ Database bağlantısı başarılı!
+2025-08-02 11:06:44,670 - Bot instance oluşturuluyor...
+2025-08-02 11:06:44,886 - Bot instance handler'lara aktarılıyor...
+2025-08-02 11:06:44,893 - ✅ Bot instance tüm handler'lara aktarıldı!
+2025-08-02 11:06:44,893 - Handler'lar kaydediliyor...
+2025-08-02 11:06:44,894 - Callback handler'lar kaydedildi
+2025-08-02 11:06:44,898 - Router'lar kayıtlandı!
+2025-08-02 11:06:44,899 - Tüm handler'lar kaydedildi!
+2025-08-02 11:06:44,899 - Background cleanup task başlatıldı!
+2025-08-02 11:06:44,899 - 🎯 Kayıt teşvik sistemi başlatıldı!
+2025-08-02 11:06:44,899 - 🔍 Bot bilgileri alınıyor...
+2025-08-02 11:06:44,900 - 🧹 Memory cleanup task başlatıldı!
+2025-08-02 11:06:44,936 - 📝 Recruitment sistemi - Sadece özel mesajda teşvik yapılır
+2025-08-02 11:06:45,156 - 🔍 DEBUG - Yeni bot profili eklendi: bot_1753833578
+2025-08-02 11:06:45,156 - 🔍 DEBUG - BOT_PROFILES güncellendi: ['bot_1753833578']
+2025-08-02 11:06:45,193 - 🤖 Bot: @KirveLastBot - Kirve Bot
+2025-08-02 11:06:45,194 - 👤 Admin ID: 8154732274
+2025-08-02 11:06:45,194 - 🚀 Bot başarıyla çalışmaya başladı!
+2025-08-02 11:06:45,194 - ⏹️ Durdurmak için Ctrl+C
+2025-08-02 11:06:45,195 - 📱 Telegram logger başarıyla kuruldu
+2025-08-02 11:06:46,259 - 📢 Startup bildirimi hazırlanıyor...
+2025-08-02 11:06:46,260 - 🚀 Bot polling başlatılıyor...
+2025-08-02 11:06:46,261 - ✅ Bot başarıyla çalışıyor! Komutlar hazır.
+2025-08-02 11:06:46,261 - Start polling
+2025-08-02 11:06:46,261 - Database pool hazır, startup bildirimi gönderiliyor (attempt 1)
+2025-08-02 11:06:46,468 - 🔔 Admin startup bildirimi başlatılıyor...
+2025-08-02 11:06:46,549 - Run polling for bot @KirveLastBot id=7633083532 - 'Kirve Bot'
+2025-08-02 11:06:46,661 - 📬 1 admin'e startup bildirimi gönderiliyor...
+2025-08-02 11:06:47,326 - ✅ Admin startup bildirimi tamamlandı - Başarılı: 1, Başarısız: 0
+2025-08-02 11:06:53,084 - 🔍 MONITOR GROUP MESSAGE ÇAĞRILDI - User: mike, Chat: -1002746043354
+2025-08-02 11:06:53,277 - ✅ Grup kayıtlı - Chat: -1002746043354
+2025-08-02 11:06:53,664 - 👤 Kullanıcı kayıt durumu - User: mike (6513506166), Registered: False
+2025-08-02 11:06:53,793 - 📊 Daily stats güncellendi - User: 6513506166, Group: -1002746043354
+2025-08-02 11:06:53,858 - 📊 Mesaj sayısı kaydedildi - User: mike (6513506166)
+2025-08-02 11:06:53,858 - 🎯 Kayıt olmayan kullanıcı - User: mike (6513506166)
+2025-08-02 11:06:54,516 - 🔍 MONITOR GROUP MESSAGE ÇAĞRILDI - User: mike, Chat: -1002746043354
+2025-08-02 11:06:54,599 - 🎯 Kayıt teşvik mesajı gönderildi - User: mike (6513506166)
+2025-08-02 11:06:54,600 - ✅ Kayıt teşvik mesajı gönderildi - User: mike (6513506166)
+2025-08-02 11:06:54,713 - ✅ Grup kayıtlı - Chat: -1002746043354
+2025-08-02 11:06:54,716 - 🔍 MONITOR GROUP MESSAGE ÇAĞRILDI - User: mike, Chat: -1002746043354
+2025-08-02 11:06:54,908 - ✅ Grup kayıtlı - Chat: -1002746043354
+2025-08-02 11:06:55,101 - 👤 Kullanıcı kayıt durumu - User: mike (6513506166), Registered: False
+2025-08-02 11:06:55,116 - ❌ Recruitment sent today hatası: relation "recruitment_logs" does not exist
+2025-08-02 11:06:55,390 - 📊 Daily stats güncellendi - User: 6513506166, Group: -1002746043354
+2025-08-02 11:06:55,454 - 👤 Kullanıcı kayıt durumu - User: mike (6513506166), Registered: False
+2025-08-02 11:06:55,455 - 📊 Mesaj sayısı kaydedildi - User: mike (6513506166)
+2025-08-02 11:06:55,456 - 🎯 Kayıt olmayan kullanıcı - User: mike (6513506166)
+2025-08-02 11:06:55,733 - 📊 Daily stats güncellendi - User: 6513506166, Group: -1002746043354
+2025-08-02 11:06:55,798 - 📊 Mesaj sayısı kaydedildi - User: mike (6513506166)
+2025-08-02 11:06:55,798 - 🎯 Kayıt olmayan kullanıcı - User: mike (6513506166)
+2025-08-02 11:06:56,335 - ❌ Mark recruitment sent hatası: relation "recruitment_logs" does not exist
+2025-08-02 11:06:56,425 - 🎯 Kayıt teşvik mesajı gönderildi - User: mike (6513506166)
+2025-08-02 11:06:56,427 - ✅ Kayıt teşvik mesajı gönderildi - User: mike (6513506166)
+2025-08-02 11:06:56,596 - ✅ Recruitment mesajı gönderildi - User: mike (6513506166)
+2025-08-02 11:06:56,598 - ✅ Recruitment mesajı gönderildi - User: mike (6513506166)
+2025-08-02 11:06:56,598 - Update id=69400445 is handled. Duration 3514 ms by bot id=7633083532
+2025-08-02 11:06:56,620 - 🎯 Kayıt teşvik mesajı gönderildi - User: mike (6513506166)
+2025-08-02 11:06:56,622 - ✅ Kayıt teşvik mesajı gönderildi - User: mike (6513506166)
+2025-08-02 11:06:56,942 - ❌ Recruitment sent today hatası: relation "recruitment_logs" does not exist
+2025-08-02 11:06:56,943 - Update id=69400446 is handled. Duration 2428 ms by bot id=7633083532
+2025-08-02 11:06:57,137 - ❌ Recruitment sent today hatası: relation "recruitment_logs" does not exist
+2025-08-02 11:06:57,137 - ❌ Text too short or empty
+2025-08-02 11:06:57,138 - Update id=69400447 is handled. Duration 2422 ms by bot id=7633083532
+2025-08-02 11:08:44,949 - 📝 Recruitment sistemi - Sadece özel mesajda teşvik yapılır
+2025-08-02 11:10:44,958 - 📝 Recruitment sistemi - Sadece özel mesajda teşvik yapılır
+2025-08-02 11:12:44,969 - 📝 Recruitment sistemi - Sadece özel mesajda teşvik yapılır
+2025-08-02 11:12:57,948 - 🔍 MONITOR GROUP MESSAGE ÇAĞRILDI - User: Liya, Chat: -1002231486317
+2025-08-02 11:12:59,053 - ✅ Grup kayıtlı - Chat: -1002231486317
+2025-08-02 11:12:59,513 - 👤 Kullanıcı kayıt durumu - User: Liya (7530713440), Registered: False
+2025-08-02 11:12:59,652 - 📊 Daily stats güncellendi - User: 7530713440, Group: -1002231486317
+2025-08-02 11:12:59,721 - 📊 Mesaj sayısı kaydedildi - User: Liya (7530713440)
+2025-08-02 11:12:59,721 - 🎯 Kayıt olmayan kullanıcı - User: Liya (7530713440)
+2025-08-02 11:13:00,467 - ❌ Kayıt teşvik mesajı hatası - User: 7530713440, Error: Telegram server says - Forbidden: bot can't initiate conversation with a user
+2025-08-02 11:13:00,467 - Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x000001ED82666E90>
+2025-08-02 11:13:00,469 - Unclosed connector
+connections: ['deque([(<aiohttp.client_proto.ResponseHandler object at 0x000001ED826ABEF0>, 60285.2703051)])']
+connector: <aiohttp.connector.TCPConnector object at 0x000001ED8274D350>
+2025-08-02 11:13:00,470 - ✅ Kayıt teşvik mesajı gönderildi - User: Liya (7530713440)
+2025-08-02 11:13:01,042 - ❌ Recruitment sent today hatası: relation "recruitment_logs" does not exist
+2025-08-02 11:13:01,495 - ❌ Recruitment message hatası - User: 7530713440, Error: Telegram server says - Forbidden: bot can't initiate conversation with a user
+2025-08-02 11:13:01,495 - Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x000001ED8270C7D0>
+2025-08-02 11:13:01,496 - Unclosed connector
+connections: ['deque([(<aiohttp.client_proto.ResponseHandler object at 0x000001ED8277FDD0>, 60286.2983723)])']
+connector: <aiohttp.connector.TCPConnector object at 0x000001ED8274E520>
+2025-08-02 11:13:01,496 - ✅ Recruitment mesajı gönderildi - User: Liya (7530713440)
+2025-08-02 11:13:01,497 - Update id=69400448 is handled. Duration 3549 ms by bot id=7633083532
+2025-08-02 11:14:44,971 - 📝 Recruitment sistemi - Sadece özel mesajda teşvik yapılır
+2025-08-02 11:14:58,725 - Polling stopped
+2025-08-02 11:14:58,986 - 🧹 Temizlik işlemleri başlatılıyor...
+2025-08-02 11:14:59,078 - 🗄️ Database bağlantısı kapatıldı.
+2025-08-02 11:14:59,079 - ✅ Bot lock file kaldırıldı
+2025-08-02 11:14:59,079 - ✅ Temizlik işlemleri tamamlandı!
+2025-08-02 11:14:59,080 - Polling stopped for bot @KirveLastBot id=7633083532 - 'Kirve Bot'
+2025-08-02 11:15:01,756 - ✅ Bot lock file oluşturuldu - PID: 5508
+2025-08-02 11:15:01,757 - Bot başlatılıyor...
+2025-08-02 11:15:01,757 - Konfigürasyon doğrulandı
+2025-08-02 11:15:01,757 - Database bağlantısı kuruluyor...
+2025-08-02 11:15:01,758 - Database bağlantısı kuruluyor...
+2025-08-02 11:15:04,431 - ✅ Users tablosu kolonları güncellendi
+2025-08-02 11:15:04,583 - ✅ Registered groups tablosu kolonları güncellendi
+2025-08-02 11:15:04,965 - ℹ️ Unique constraint zaten var: relation "daily_stats_unique" already exists
+2025-08-02 11:15:05,475 - ✅ Eski unit_price kolonu kaldırıldı
+2025-08-02 11:15:05,899 - ✅ Tüm tablolar başarıyla oluşturuldu/güncellendi
+2025-08-02 11:15:06,712 - ✅ Custom commands tablosu güncellendi
+2025-08-02 11:15:06,874 - 🔍 Test kullanıcıları ekleniyor...
+2025-08-02 11:15:06,959 - ✅ Test kullanıcıları eklendi! Result: INSERT 0 0
+2025-08-02 11:15:07,128 - ✅ Database'de toplam 90 kullanıcı var
+2025-08-02 11:15:07,129 - 🔍 Test market ürünleri kontrol ediliyor...
+2025-08-02 11:15:07,281 - 🔍 Mevcut ürün sayısı: 3
+2025-08-02 11:15:07,529 - ✅ Duplicate ürünler temizlendi! Kalan ürün sayısı: 3
+2025-08-02 11:15:07,614 - Database bağlantısı ve tablolar hazır!
+2025-08-02 11:15:07,615 - ✅ Database bağlantısı başarılı!
+2025-08-02 11:15:07,615 - Bot instance oluşturuluyor...
+2025-08-02 11:15:07,854 - Bot instance handler'lara aktarılıyor...
+2025-08-02 11:15:07,863 - ✅ Bot instance tüm handler'lara aktarıldı!
+2025-08-02 11:15:07,863 - Handler'lar kaydediliyor...
+2025-08-02 11:15:07,863 - Callback handler'lar kaydedildi
+2025-08-02 11:15:07,867 - Router'lar kayıtlandı!
+2025-08-02 11:15:07,869 - Tüm handler'lar kaydedildi!
+2025-08-02 11:15:07,869 - Background cleanup task başlatıldı!
+2025-08-02 11:15:07,869 - 🎯 Kayıt teşvik sistemi başlatıldı!
+2025-08-02 11:15:07,870 - 🔍 Bot bilgileri alınıyor...
+2025-08-02 11:15:07,870 - 🧹 Memory cleanup task başlatıldı!
+2025-08-02 11:15:07,913 - 📝 Recruitment sistemi - Sadece özel mesajda teşvik yapılır
+2025-08-02 11:15:08,519 - 🔍 DEBUG - Yeni bot profili eklendi: bot_1753833578
+2025-08-02 11:15:08,520 - 🔍 DEBUG - BOT_PROFILES güncellendi: ['bot_1753833578']
+2025-08-02 11:15:08,583 - 🤖 Bot: @KirveLastBot - Kirve Bot
+2025-08-02 11:15:08,584 - 👤 Admin ID: 8154732274
+2025-08-02 11:15:08,584 - 🚀 Bot başarıyla çalışmaya başladı!
+2025-08-02 11:15:08,584 - ⏹️ Durdurmak için Ctrl+C
+2025-08-02 11:15:08,585 - 📱 Telegram logger başarıyla kuruldu
+2025-08-02 11:15:09,661 - 📢 Startup bildirimi hazırlanıyor...
+2025-08-02 11:15:09,662 - 🚀 Bot polling başlatılıyor...
+2025-08-02 11:15:09,662 - ✅ Bot başarıyla çalışıyor! Komutlar hazır.
+2025-08-02 11:15:09,663 - Start polling
+2025-08-02 11:15:09,663 - Database pool hazır, startup bildirimi gönderiliyor (attempt 1)
+2025-08-02 11:15:09,886 - 🔔 Admin startup bildirimi başlatılıyor...
+2025-08-02 11:15:09,986 - Run polling for bot @KirveLastBot id=7633083532 - 'Kirve Bot'
+2025-08-02 11:15:10,128 - 📬 1 admin'e startup bildirimi gönderiliyor...
+2025-08-02 11:15:10,842 - ✅ Admin startup bildirimi tamamlandı - Başarılı: 1, Başarısız: 0
+2025-08-02 11:15:14,834 - 🔍 MONITOR GROUP MESSAGE ÇAĞRILDI - User: mike, Chat: -1002746043354
+2025-08-02 11:15:15,098 - ✅ Grup kayıtlı - Chat: -1002746043354
+2025-08-02 11:15:15,593 - 👤 Kullanıcı kayıt durumu - User: mike (6513506166), Registered: False
+2025-08-02 11:15:15,758 - 📊 Daily stats güncellendi - User: 6513506166, Group: -1002746043354
+2025-08-02 11:15:15,856 - 📊 Mesaj sayısı kaydedildi - User: mike (6513506166)
+2025-08-02 11:15:15,856 - 🎯 Kayıt olmayan kullanıcı - User: mike (6513506166)
+2025-08-02 11:15:16,207 - 🔍 MONITOR GROUP MESSAGE ÇAĞRILDI - User: mike, Chat: -1002746043354
+2025-08-02 11:15:16,435 - ✅ Grup kayıtlı - Chat: -1002746043354
+2025-08-02 11:15:16,633 - 🎯 Kayıt teşvik mesajı gönderildi - User: mike (6513506166)
+2025-08-02 11:15:16,865 - 👤 Kullanıcı kayıt durumu - User: mike (6513506166), Registered: False
+2025-08-02 11:15:17,023 - 📊 Daily stats güncellendi - User: 6513506166, Group: -1002746043354
+2025-08-02 11:15:17,108 - 📊 Mesaj sayısı kaydedildi - User: mike (6513506166)
+2025-08-02 11:15:17,108 - 🎯 Kayıt olmayan kullanıcı - User: mike (6513506166)
+2025-08-02 11:15:17,109 - ⏰ Kayıt teşvik cooldown - User: mike (6513506166), Kalan: 299s
+2025-08-02 11:15:17,892 - ⏰ Recruitment cooldown - User: mike (6513506166), Kalan: 300s
+2025-08-02 11:15:17,893 - Update id=69400450 is handled. Duration 1688 ms by bot id=7633083532
+2025-08-02 11:15:18,376 - ✅ Recruitment mesajı gönderildi - User: mike (6513506166)
+2025-08-02 11:15:18,377 - ✅ Recruitment mesajı gönderildi - User: mike (6513506166)
+2025-08-02 11:15:18,377 - Update id=69400449 is handled. Duration 3544 ms by bot id=7633083532
+2025-08-02 11:15:21,092 - 🔍 MONITOR GROUP MESSAGE ÇAĞRILDI - User: mike, Chat: -1002746043354
+2025-08-02 11:15:21,288 - ✅ Grup kayıtlı - Chat: -1002746043354
+2025-08-02 11:15:21,431 - 🔍 MONITOR GROUP MESSAGE ÇAĞRILDI - User: mike, Chat: -1002746043354
+2025-08-02 11:15:21,656 - ✅ Grup kayıtlı - Chat: -1002746043354
+2025-08-02 11:15:21,694 - 🔍 MONITOR GROUP MESSAGE ÇAĞRILDI - User: mike, Chat: -1002746043354
+2025-08-02 11:15:21,718 - 👤 Kullanıcı kayıt durumu - User: mike (6513506166), Registered: False
+2025-08-02 11:15:21,872 - 📊 Daily stats güncellendi - User: 6513506166, Group: -1002746043354
+2025-08-02 11:15:21,889 - ✅ Grup kayıtlı - Chat: -1002746043354
+2025-08-02 11:15:21,938 - 📊 Mesaj sayısı kaydedildi - User: mike (6513506166)
+2025-08-02 11:15:21,938 - 🎯 Kayıt olmayan kullanıcı - User: mike (6513506166)
+2025-08-02 11:15:21,938 - ⏰ Kayıt teşvik cooldown - User: mike (6513506166), Kalan: 294s
+2025-08-02 11:15:22,094 - 👤 Kullanıcı kayıt durumu - User: mike (6513506166), Registered: False
+2025-08-02 11:15:22,230 - 📊 Daily stats güncellendi - User: 6513506166, Group: -1002746043354
+2025-08-02 11:15:22,295 - 📊 Mesaj sayısı kaydedildi - User: mike (6513506166)
+2025-08-02 11:15:22,295 - 🎯 Kayıt olmayan kullanıcı - User: mike (6513506166)
+2025-08-02 11:15:22,296 - ⏰ Kayıt teşvik cooldown - User: mike (6513506166), Kalan: 294s
+2025-08-02 11:15:22,302 - 👤 Kullanıcı kayıt durumu - User: mike (6513506166), Registered: False
+2025-08-02 11:15:22,431 - 📊 Daily stats güncellendi - User: 6513506166, Group: -1002746043354
+2025-08-02 11:15:22,489 - ⏰ Recruitment bugün gönderilmiş - User: mike (6513506166)
+2025-08-02 11:15:22,489 - Update id=69400451 is handled. Duration 1398 ms by bot id=7633083532
+2025-08-02 11:15:22,496 - 📊 Mesaj sayısı kaydedildi - User: mike (6513506166)
+2025-08-02 11:15:22,496 - 🎯 Kayıt olmayan kullanıcı - User: mike (6513506166)
+2025-08-02 11:15:22,497 - ⏰ Kayıt teşvik cooldown - User: mike (6513506166), Kalan: 293s
+2025-08-02 11:15:22,826 - ⏰ Recruitment bugün gönderilmiş - User: mike (6513506166)
+2025-08-02 11:15:22,826 - Update id=69400452 is handled. Duration 1396 ms by bot id=7633083532
+2025-08-02 11:15:23,037 - ⏰ Recruitment bugün gönderilmiş - User: mike (6513506166)
+2025-08-02 11:15:23,037 - Update id=69400453 is handled. Duration 1343 ms by bot id=7633083532
+2025-08-02 11:15:30,157 - 📨 Özel mesaj alındı - User: 6513506166 (@mikedahjenko)
+2025-08-02 11:15:30,472 - ✅ Recruitment yanıtı gönderildi - User: 6513506166
+2025-08-02 11:15:30,473 - 🎯 INPUT STATE GET - User: 6513506166, State: None
+2025-08-02 11:15:30,670 - ✅ Özel mesaj işlendi - User: 6513506166
+2025-08-02 11:15:30,671 - Update id=69400454 is handled. Duration 515 ms by bot id=7633083532
+2025-08-02 11:15:32,667 - 🔍 MONITOR GROUP MESSAGE ÇAĞRILDI - User: mike, Chat: -1002746043354
+2025-08-02 11:15:32,889 - ✅ Grup kayıtlı - Chat: -1002746043354
+2025-08-02 11:15:33,296 - 👤 Kullanıcı kayıt durumu - User: mike (6513506166), Registered: False
+2025-08-02 11:15:33,425 - 📊 Daily stats güncellendi - User: 6513506166, Group: -1002746043354
+2025-08-02 11:15:33,490 - 📊 Mesaj sayısı kaydedildi - User: mike (6513506166)
+2025-08-02 11:15:33,490 - 🎯 Kayıt olmayan kullanıcı - User: mike (6513506166)
+2025-08-02 11:15:33,491 - ⏰ Kayıt teşvik cooldown - User: mike (6513506166), Kalan: 282s
+2025-08-02 11:15:34,027 - ⏰ Recruitment bugün gönderilmiş - User: mike (6513506166)
+2025-08-02 11:15:34,027 - ❌ Cooldown aktif - User: 6513506166
+2025-08-02 11:15:34,028 - Update id=69400455 is handled. Duration 1361 ms by bot id=7633083532
+2025-08-02 11:15:34,589 - 🔍 MONITOR GROUP MESSAGE ÇAĞRILDI - User: mike, Chat: -1002746043354
+2025-08-02 11:15:34,781 - ✅ Grup kayıtlı - Chat: -1002746043354
+2025-08-02 11:15:34,960 - 🔍 MONITOR GROUP MESSAGE ÇAĞRILDI - User: mike, Chat: -1002746043354
+2025-08-02 11:15:35,183 - ✅ Grup kayıtlı - Chat: -1002746043354
+2025-08-02 11:15:35,186 - 🔍 MONITOR GROUP MESSAGE ÇAĞRILDI - User: mike, Chat: -1002746043354
+2025-08-02 11:15:35,197 - 👤 Kullanıcı kayıt durumu - User: mike (6513506166), Registered: False
+2025-08-02 11:15:35,333 - 📊 Daily stats güncellendi - User: 6513506166, Group: -1002746043354
+2025-08-02 11:15:35,355 - 🔍 MONITOR GROUP MESSAGE ÇAĞRILDI - User: mike, Chat: -1002746043354
+2025-08-02 11:15:35,385 - ✅ Grup kayıtlı - Chat: -1002746043354
+2025-08-02 11:15:35,404 - 📊 Mesaj sayısı kaydedildi - User: mike (6513506166)
+2025-08-02 11:15:35,404 - 🎯 Kayıt olmayan kullanıcı - User: mike (6513506166)
+2025-08-02 11:15:35,404 - ⏰ Kayıt teşvik cooldown - User: mike (6513506166), Kalan: 280s
+2025-08-02 11:15:35,571 - 🔍 MONITOR GROUP MESSAGE ÇAĞRILDI - User: mike, Chat: -1002746043354
+2025-08-02 11:15:35,573 - ✅ Grup kayıtlı - Chat: -1002746043354
+2025-08-02 11:15:35,605 - 👤 Kullanıcı kayıt durumu - User: mike (6513506166), Registered: False
+2025-08-02 11:15:35,737 - 📊 Daily stats güncellendi - User: 6513506166, Group: -1002746043354
+2025-08-02 11:15:35,767 - ✅ Grup kayıtlı - Chat: -1002746043354
+2025-08-02 11:15:35,801 - 👤 Kullanıcı kayıt durumu - User: mike (6513506166), Registered: False
+2025-08-02 11:15:35,802 - 📊 Mesaj sayısı kaydedildi - User: mike (6513506166)
+2025-08-02 11:15:35,802 - 🎯 Kayıt olmayan kullanıcı - User: mike (6513506166)
+2025-08-02 11:15:35,803 - ⏰ Kayıt teşvik cooldown - User: mike (6513506166), Kalan: 280s
+2025-08-02 11:15:35,934 - 📊 Daily stats güncellendi - User: 6513506166, Group: -1002746043354
+2025-08-02 11:15:35,942 - ⏰ Recruitment bugün gönderilmiş - User: mike (6513506166)
+2025-08-02 11:15:35,942 - Update id=69400456 is handled. Duration 1353 ms by bot id=7633083532
+2025-08-02 11:15:35,964 - 👤 Kullanıcı kayıt durumu - User: mike (6513506166), Registered: False
+2025-08-02 11:15:35,999 - 📊 Mesaj sayısı kaydedildi - User: mike (6513506166)
+2025-08-02 11:15:35,999 - 🎯 Kayıt olmayan kullanıcı - User: mike (6513506166)
+2025-08-02 11:15:36,000 - ⏰ Kayıt teşvik cooldown - User: mike (6513506166), Kalan: 280s
+2025-08-02 11:15:36,097 - 📊 Daily stats güncellendi - User: 6513506166, Group: -1002746043354
+2025-08-02 11:15:36,162 - 👤 Kullanıcı kayıt durumu - User: mike (6513506166), Registered: False
+2025-08-02 11:15:36,163 - 📊 Mesaj sayısı kaydedildi - User: mike (6513506166)
+2025-08-02 11:15:36,164 - 🎯 Kayıt olmayan kullanıcı - User: mike (6513506166)
+2025-08-02 11:15:36,164 - ⏰ Kayıt teşvik cooldown - User: mike (6513506166), Kalan: 280s
+2025-08-02 11:15:36,303 - 📊 Daily stats güncellendi - User: 6513506166, Group: -1002746043354
+2025-08-02 11:15:36,329 - ⏰ Recruitment bugün gönderilmiş - User: mike (6513506166)
+2025-08-02 11:15:36,329 - Update id=69400457 is handled. Duration 1370 ms by bot id=7633083532
+2025-08-02 11:15:36,374 - 📊 Mesaj sayısı kaydedildi - User: mike (6513506166)
+2025-08-02 11:15:36,375 - 🎯 Kayıt olmayan kullanıcı - User: mike (6513506166)
+2025-08-02 11:15:36,375 - ⏰ Kayıt teşvik cooldown - User: mike (6513506166), Kalan: 279s
+2025-08-02 11:15:36,547 - ⏰ Recruitment bugün gönderilmiş - User: mike (6513506166)
+2025-08-02 11:15:36,548 - ❌ Text too short or empty
+2025-08-02 11:15:36,548 - Update id=69400458 is handled. Duration 1363 ms by bot id=7633083532
+2025-08-02 11:15:36,723 - ⏰ Recruitment bugün gönderilmiş - User: mike (6513506166)
+2025-08-02 11:15:36,723 - Update id=69400459 is handled. Duration 1369 ms by bot id=7633083532
+2025-08-02 11:15:36,918 - ⏰ Recruitment bugün gönderilmiş - User: mike (6513506166)
+2025-08-02 11:15:36,919 - Update id=69400460 is handled. Duration 1348 ms by bot id=7633083532
+2025-08-02 11:17:07,922 - 📝 Recruitment sistemi - Sadece özel mesajda teşvik yapılır
+2025-08-02 11:17:46,867 - Polling stopped
+2025-08-02 11:17:47,119 - 🧹 Temizlik işlemleri başlatılıyor...
+2025-08-02 11:17:47,185 - 🗄️ Database bağlantısı kapatıldı.
+2025-08-02 11:17:47,186 - ✅ Bot lock file kaldırıldı
+2025-08-02 11:17:47,187 - ✅ Temizlik işlemleri tamamlandı!
+2025-08-02 11:17:47,187 - Polling stopped for bot @KirveLastBot id=7633083532 - 'Kirve Bot'
+2025-08-02 11:17:49,783 - ✅ Bot lock file oluşturuldu - PID: 21576
+2025-08-02 11:17:49,783 - Bot başlatılıyor...
+2025-08-02 11:17:49,784 - Konfigürasyon doğrulandı
+2025-08-02 11:17:49,784 - Database bağlantısı kuruluyor...
+2025-08-02 11:17:49,784 - Database bağlantısı kuruluyor...
+2025-08-02 11:17:51,644 - ✅ Users tablosu kolonları güncellendi
+2025-08-02 11:17:51,772 - ✅ Registered groups tablosu kolonları güncellendi
+2025-08-02 11:17:52,095 - ℹ️ Unique constraint zaten var: relation "daily_stats_unique" already exists
+2025-08-02 11:17:52,482 - ✅ Eski unit_price kolonu kaldırıldı
+2025-08-02 11:17:52,803 - ✅ Tüm tablolar başarıyla oluşturuldu/güncellendi
+2025-08-02 11:17:53,518 - ✅ Custom commands tablosu güncellendi
+2025-08-02 11:17:53,657 - 🔍 Test kullanıcıları ekleniyor...
+2025-08-02 11:17:53,723 - ✅ Test kullanıcıları eklendi! Result: INSERT 0 0
+2025-08-02 11:17:53,851 - ✅ Database'de toplam 90 kullanıcı var
+2025-08-02 11:17:53,851 - 🔍 Test market ürünleri kontrol ediliyor...
+2025-08-02 11:17:53,979 - 🔍 Mevcut ürün sayısı: 3
+2025-08-02 11:17:54,172 - ✅ Duplicate ürünler temizlendi! Kalan ürün sayısı: 3
+2025-08-02 11:17:54,244 - Database bağlantısı ve tablolar hazır!
+2025-08-02 11:17:54,245 - ✅ Database bağlantısı başarılı!
+2025-08-02 11:17:54,245 - Bot instance oluşturuluyor...
+2025-08-02 11:17:54,470 - Bot instance handler'lara aktarılıyor...
+2025-08-02 11:17:54,478 - ✅ Bot instance tüm handler'lara aktarıldı!
+2025-08-02 11:17:54,478 - Handler'lar kaydediliyor...
+2025-08-02 11:17:54,479 - Callback handler'lar kaydedildi
+2025-08-02 11:17:54,483 - Router'lar kayıtlandı!
+2025-08-02 11:17:54,485 - Tüm handler'lar kaydedildi!
+2025-08-02 11:17:54,485 - Background cleanup task başlatıldı!
+2025-08-02 11:17:54,485 - 🎯 Kayıt teşvik sistemi başlatıldı!
+2025-08-02 11:17:54,486 - 🔍 Bot bilgileri alınıyor...
+2025-08-02 11:17:54,486 - 🧹 Memory cleanup task başlatıldı!
+2025-08-02 11:17:54,527 - 📝 Recruitment sistemi - Sadece özel mesajda teşvik yapılır
+2025-08-02 11:17:54,743 - 🔍 DEBUG - Yeni bot profili eklendi: bot_1753833578
+2025-08-02 11:17:54,743 - 🔍 DEBUG - BOT_PROFILES güncellendi: ['bot_1753833578']
+2025-08-02 11:17:54,774 - 🤖 Bot: @KirveLastBot - Kirve Bot
+2025-08-02 11:17:54,775 - 👤 Admin ID: 8154732274
+2025-08-02 11:17:54,775 - 🚀 Bot başarıyla çalışmaya başladı!
+2025-08-02 11:17:54,775 - ⏹️ Durdurmak için Ctrl+C
+2025-08-02 11:17:54,776 - 📱 Telegram logger başarıyla kuruldu
+2025-08-02 11:17:55,847 - 📢 Startup bildirimi hazırlanıyor...
+2025-08-02 11:17:55,848 - 🚀 Bot polling başlatılıyor...
+2025-08-02 11:17:55,848 - ✅ Bot başarıyla çalışıyor! Komutlar hazır.
+2025-08-02 11:17:55,848 - Start polling
+2025-08-02 11:17:55,848 - Database pool hazır, startup bildirimi gönderiliyor (attempt 1)
+2025-08-02 11:17:56,066 - 🔔 Admin startup bildirimi başlatılıyor...
+2025-08-02 11:17:56,147 - Run polling for bot @KirveLastBot id=7633083532 - 'Kirve Bot'
+2025-08-02 11:17:56,261 - 📬 1 admin'e startup bildirimi gönderiliyor...
+2025-08-02 11:17:56,894 - ✅ Admin startup bildirimi tamamlandı - Başarılı: 1, Başarısız: 0
+2025-08-02 11:18:02,134 - 📨 Özel mesaj alındı - User: 6513506166 (@mikedahjenko)
+2025-08-02 11:18:02,438 - ✅ Recruitment yanıtı gönderildi - User: 6513506166
+2025-08-02 11:18:02,439 - 🎯 INPUT STATE GET - User: 6513506166, State: None
+2025-08-02 11:18:02,633 - ✅ Özel mesaj işlendi - User: 6513506166
+2025-08-02 11:18:02,634 - Update id=69400461 is handled. Duration 500 ms by bot id=7633083532
+2025-08-02 11:18:04,819 - 📨 Özel mesaj alındı - User: 6513506166 (@mikedahjenko)
+2025-08-02 11:18:05,216 - ✅ Recruitment yanıtı gönderildi - User: 6513506166
+2025-08-02 11:18:05,216 - 🎯 INPUT STATE GET - User: 6513506166, State: None
+2025-08-02 11:18:05,427 - ✅ Özel mesaj işlendi - User: 6513506166
+2025-08-02 11:18:05,428 - Update id=69400462 is handled. Duration 610 ms by bot id=7633083532
+2025-08-02 11:18:06,275 - 📨 Özel mesaj alındı - User: 6513506166 (@mikedahjenko)
+2025-08-02 11:18:06,720 - ✅ Recruitment yanıtı gönderildi - User: 6513506166
+2025-08-02 11:18:06,720 - 🎯 INPUT STATE GET - User: 6513506166, State: None
+2025-08-02 11:18:06,948 - ✅ Özel mesaj işlendi - User: 6513506166
+2025-08-02 11:18:06,949 - Update id=69400463 is handled. Duration 676 ms by bot id=7633083532
+2025-08-02 11:18:07,690 - 📨 Özel mesaj alındı - User: 6513506166 (@mikedahjenko)
+2025-08-02 11:18:08,065 - ✅ Recruitment yanıtı gönderildi - User: 6513506166
+2025-08-02 11:18:08,066 - 🎯 INPUT STATE GET - User: 6513506166, State: None
+2025-08-02 11:18:08,295 - ✅ Özel mesaj işlendi - User: 6513506166
+2025-08-02 11:18:08,296 - Update id=69400464 is handled. Duration 607 ms by bot id=7633083532
+2025-08-02 11:18:10,712 - 🔍 MONITOR GROUP MESSAGE ÇAĞRILDI - User: mike, Chat: -1002746043354
+2025-08-02 11:18:10,907 - ✅ Grup kayıtlı - Chat: -1002746043354
+2025-08-02 11:18:11,298 - 👤 Kullanıcı kayıt durumu - User: mike (6513506166), Registered: False
+2025-08-02 11:18:11,429 - 📊 Daily stats güncellendi - User: 6513506166, Group: -1002746043354
+2025-08-02 11:18:11,494 - 📊 Mesaj sayısı kaydedildi - User: mike (6513506166)
+2025-08-02 11:18:11,495 - 🎯 Kayıt olmayan kullanıcı - User: mike (6513506166)
+2025-08-02 11:18:12,013 - ⏰ Recruitment bugün gönderilmiş - User: mike (6513506166)
+2025-08-02 11:18:12,013 - ❌ Text too short or empty
+2025-08-02 11:18:12,014 - Update id=69400465 is handled. Duration 1302 ms by bot id=7633083532
+2025-08-02 11:18:13,109 - 🔍 MONITOR GROUP MESSAGE ÇAĞRILDI - User: mike, Chat: -1002746043354
+2025-08-02 11:18:13,303 - ✅ Grup kayıtlı - Chat: -1002746043354
+2025-08-02 11:18:13,692 - 👤 Kullanıcı kayıt durumu - User: mike (6513506166), Registered: False
+2025-08-02 11:18:13,824 - 📊 Daily stats güncellendi - User: 6513506166, Group: -1002746043354
+2025-08-02 11:18:13,890 - 📊 Mesaj sayısı kaydedildi - User: mike (6513506166)
+2025-08-02 11:18:13,890 - 🎯 Kayıt olmayan kullanıcı - User: mike (6513506166)
+2025-08-02 11:18:14,283 - 🔍 MONITOR GROUP MESSAGE ÇAĞRILDI - User: mike, Chat: -1002746043354
+2025-08-02 11:18:14,407 - ⏰ Recruitment bugün gönderilmiş - User: mike (6513506166)
+2025-08-02 11:18:14,407 - Update id=69400466 is handled. Duration 1299 ms by bot id=7633083532
+2025-08-02 11:18:14,477 - ✅ Grup kayıtlı - Chat: -1002746043354
+2025-08-02 11:18:14,838 - 🔍 MONITOR GROUP MESSAGE ÇAĞRILDI - User: mike, Chat: -1002746043354
+2025-08-02 11:18:14,862 - 👤 Kullanıcı kayıt durumu - User: mike (6513506166), Registered: False
+2025-08-02 11:18:14,992 - 📊 Daily stats güncellendi - User: 6513506166, Group: -1002746043354
+2025-08-02 11:18:15,032 - ✅ Grup kayıtlı - Chat: -1002746043354
+2025-08-02 11:18:15,056 - 📊 Mesaj sayısı kaydedildi - User: mike (6513506166)
+2025-08-02 11:18:15,057 - 🎯 Kayıt olmayan kullanıcı - User: mike (6513506166)
+2025-08-02 11:18:15,422 - 👤 Kullanıcı kayıt durumu - User: mike (6513506166), Registered: False
+2025-08-02 11:18:15,552 - 📊 Daily stats güncellendi - User: 6513506166, Group: -1002746043354
+2025-08-02 11:18:15,568 - ⏰ Recruitment bugün gönderilmiş - User: mike (6513506166)
+2025-08-02 11:18:15,568 - ❌ Text too short or empty
+2025-08-02 11:18:15,569 - Update id=69400467 is handled. Duration 1286 ms by bot id=7633083532
+2025-08-02 11:18:15,618 - 📊 Mesaj sayısı kaydedildi - User: mike (6513506166)
+2025-08-02 11:18:15,618 - 🎯 Kayıt olmayan kullanıcı - User: mike (6513506166)
+2025-08-02 11:18:16,135 - ⏰ Recruitment bugün gönderilmiş - User: mike (6513506166)
+2025-08-02 11:18:16,135 - ❌ Text too short or empty
+2025-08-02 11:18:16,137 - Update id=69400468 is handled. Duration 1299 ms by bot id=7633083532
+2025-08-02 11:18:19,553 - 🔍 MONITOR GROUP MESSAGE ÇAĞRILDI - User: mike, Chat: -1002746043354
+2025-08-02 11:18:19,746 - ✅ Grup kayıtlı - Chat: -1002746043354
+2025-08-02 11:18:20,137 - 👤 Kullanıcı kayıt durumu - User: mike (6513506166), Registered: False
+2025-08-02 11:18:20,268 - 📊 Daily stats güncellendi - User: 6513506166, Group: -1002746043354
+2025-08-02 11:18:20,333 - 📊 Mesaj sayısı kaydedildi - User: mike (6513506166)
+2025-08-02 11:18:20,334 - 🎯 Kayıt olmayan kullanıcı - User: mike (6513506166)
+2025-08-02 11:18:20,852 - ⏰ Recruitment bugün gönderilmiş - User: mike (6513506166)
+2025-08-02 11:18:20,853 - Update id=69400469 is handled. Duration 1300 ms by bot id=7633083532
+2025-08-02 11:18:24,861 - 📨 Özel mesaj alındı - User: 6513506166 (@mikedahjenko)
+2025-08-02 11:18:25,213 - ✅ Recruitment yanıtı gönderildi - User: 6513506166
+2025-08-02 11:18:25,213 - 🎯 INPUT STATE GET - User: 6513506166, State: None
+2025-08-02 11:18:25,408 - ✅ Özel mesaj işlendi - User: 6513506166
+2025-08-02 11:18:25,409 - Update id=69400470 is handled. Duration 549 ms by bot id=7633083532
+2025-08-02 11:19:54,533 - 📝 Recruitment sistemi - Sadece özel mesajda teşvik yapılır
+2025-08-02 11:21:04,086 - Polling stopped
+2025-08-02 11:21:04,351 - 🧹 Temizlik işlemleri başlatılıyor...
+2025-08-02 11:21:04,418 - 🗄️ Database bağlantısı kapatıldı.
+2025-08-02 11:21:04,419 - ✅ Bot lock file kaldırıldı
+2025-08-02 11:21:04,420 - ✅ Temizlik işlemleri tamamlandı!
+2025-08-02 11:21:04,421 - Polling stopped for bot @KirveLastBot id=7633083532 - 'Kirve Bot'
+2025-08-02 11:21:04,679 - Task was destroyed but it is pending!
+task: <Task pending name='Task-184' coro=<TelegramLogHandler.send_logs() running at C:\Users\gamin\Desktop\telegrambot\utils\telegram_logger.py:116> wait_for=<_OverlappedFuture cancelled>>
+2025-08-02 11:21:07,349 - ✅ Bot lock file oluşturuldu - PID: 38512
+2025-08-02 11:21:07,349 - Bot başlatılıyor...
+2025-08-02 11:21:07,349 - Konfigürasyon doğrulandı
+2025-08-02 11:21:07,350 - Database bağlantısı kuruluyor...
+2025-08-02 11:21:07,350 - Database bağlantısı kuruluyor...
+2025-08-02 11:21:09,327 - ✅ Users tablosu kolonları güncellendi
+2025-08-02 11:21:09,501 - ✅ Registered groups tablosu kolonları güncellendi
+2025-08-02 11:21:09,915 - ℹ️ Unique constraint zaten var: relation "daily_stats_unique" already exists
+2025-08-02 11:21:10,311 - ✅ Eski unit_price kolonu kaldırıldı
+2025-08-02 11:21:10,678 - ✅ Tüm tablolar başarıyla oluşturuldu/güncellendi
+2025-08-02 11:21:11,559 - ✅ Custom commands tablosu güncellendi
+2025-08-02 11:21:11,714 - 🔍 Test kullanıcıları ekleniyor...
+2025-08-02 11:21:11,799 - ✅ Test kullanıcıları eklendi! Result: INSERT 0 0
+2025-08-02 11:21:11,963 - ✅ Database'de toplam 90 kullanıcı var
+2025-08-02 11:21:11,963 - 🔍 Test market ürünleri kontrol ediliyor...
+2025-08-02 11:21:12,131 - 🔍 Mevcut ürün sayısı: 3
+2025-08-02 11:21:12,349 - ✅ Duplicate ürünler temizlendi! Kalan ürün sayısı: 3
+2025-08-02 11:21:12,424 - Database bağlantısı ve tablolar hazır!
+2025-08-02 11:21:12,425 - ✅ Database bağlantısı başarılı!
+2025-08-02 11:21:12,426 - Bot instance oluşturuluyor...
+2025-08-02 11:21:12,658 - Bot instance handler'lara aktarılıyor...
+2025-08-02 11:21:12,666 - ✅ Bot instance tüm handler'lara aktarıldı!
+2025-08-02 11:21:12,667 - Handler'lar kaydediliyor...
+2025-08-02 11:21:12,669 - Callback handler'lar kaydedildi
+2025-08-02 11:21:12,673 - Router'lar kayıtlandı!
+2025-08-02 11:21:12,675 - Tüm handler'lar kaydedildi!
+2025-08-02 11:21:12,675 - Background cleanup task başlatıldı!
+2025-08-02 11:21:12,676 - 🎯 Kayıt teşvik sistemi başlatıldı!
+2025-08-02 11:21:12,676 - 🔍 Bot bilgileri alınıyor...
+2025-08-02 11:21:12,677 - 🧹 Memory cleanup task başlatıldı!
+2025-08-02 11:21:12,718 - 📝 Recruitment sistemi - Sadece özel mesajda teşvik yapılır
+2025-08-02 11:21:12,972 - 🔍 DEBUG - Yeni bot profili eklendi: bot_1753833578
+2025-08-02 11:21:12,973 - 🔍 DEBUG - BOT_PROFILES güncellendi: ['bot_1753833578']
+2025-08-02 11:21:12,997 - 🤖 Bot: @KirveLastBot - Kirve Bot
+2025-08-02 11:21:12,998 - 👤 Admin ID: 8154732274
+2025-08-02 11:21:12,998 - 🚀 Bot başarıyla çalışmaya başladı!
+2025-08-02 11:21:12,998 - ⏹️ Durdurmak için Ctrl+C
+2025-08-02 11:21:12,999 - 📱 Telegram logger başarıyla kuruldu
+2025-08-02 11:21:14,072 - 📢 Startup bildirimi hazırlanıyor...
+2025-08-02 11:21:14,073 - 🚀 Bot polling başlatılıyor...
+2025-08-02 11:21:14,073 - ✅ Bot başarıyla çalışıyor! Komutlar hazır.
+2025-08-02 11:21:14,074 - Start polling
+2025-08-02 11:21:14,074 - Database pool hazır, startup bildirimi gönderiliyor (attempt 1)
+2025-08-02 11:21:14,310 - 🔔 Admin startup bildirimi başlatılıyor...
+2025-08-02 11:21:14,390 - Run polling for bot @KirveLastBot id=7633083532 - 'Kirve Bot'
+2025-08-02 11:21:14,506 - 📬 1 admin'e startup bildirimi gönderiliyor...
+2025-08-02 11:21:15,147 - ✅ Admin startup bildirimi tamamlandı - Başarılı: 1, Başarısız: 0
+2025-08-02 11:21:16,634 - 📨 Özel mesaj alındı - User: 6513506166 (@mikedahjenko)
+2025-08-02 11:21:16,931 - ✅ Recruitment yanıtı gönderildi - User: 6513506166
+2025-08-02 11:21:16,932 - 🎯 INPUT STATE GET - User: 6513506166, State: None
+2025-08-02 11:21:17,128 - ✅ Özel mesaj işlendi - User: 6513506166
+2025-08-02 11:21:17,129 - Update id=69400471 is handled. Duration 496 ms by bot id=7633083532
+2025-08-02 11:21:17,700 - 📨 Özel mesaj alındı - User: 6513506166 (@mikedahjenko)
+2025-08-02 11:21:18,007 - ✅ Recruitment yanıtı gönderildi - User: 6513506166
+2025-08-02 11:21:18,008 - 🎯 INPUT STATE GET - User: 6513506166, State: None
+2025-08-02 11:21:18,243 - ✅ Özel mesaj işlendi - User: 6513506166
+2025-08-02 11:21:18,244 - Update id=69400472 is handled. Duration 544 ms by bot id=7633083532
+2025-08-02 11:21:18,690 - 📨 Özel mesaj alındı - User: 6513506166 (@mikedahjenko)
+2025-08-02 11:21:19,026 - ✅ Recruitment yanıtı gönderildi - User: 6513506166
+2025-08-02 11:21:19,026 - 🎯 INPUT STATE GET - User: 6513506166, State: None
+2025-08-02 11:21:19,223 - ✅ Özel mesaj işlendi - User: 6513506166
+2025-08-02 11:21:19,224 - Update id=69400473 is handled. Duration 534 ms by bot id=7633083532
+2025-08-02 11:21:50,189 - 🔍 MONITOR GROUP MESSAGE ÇAĞRILDI - User: mike, Chat: -1002746043354
+2025-08-02 11:21:50,385 - ✅ Grup kayıtlı - Chat: -1002746043354
+2025-08-02 11:21:50,778 - 👤 Kullanıcı kayıt durumu - User: mike (6513506166), Registered: False
+2025-08-02 11:21:50,910 - 📊 Daily stats güncellendi - User: 6513506166, Group: -1002746043354
+2025-08-02 11:21:50,975 - 📊 Mesaj sayısı kaydedildi - User: mike (6513506166)
+2025-08-02 11:21:50,976 - 🎯 Kayıt olmayan kullanıcı - User: mike (6513506166)
+2025-08-02 11:21:51,659 - 🔍 MONITOR GROUP MESSAGE ÇAĞRILDI - User: mike, Chat: -1002746043354
+2025-08-02 11:21:51,735 - 🎯 Kayıt teşvik mesajı gönderildi - User: mike (6513506166)
+2025-08-02 11:21:51,737 - Update id=69400474 is handled. Duration 1548 ms by bot id=7633083532
+2025-08-02 11:21:51,854 - ✅ Grup kayıtlı - Chat: -1002746043354
+2025-08-02 11:21:52,245 - 👤 Kullanıcı kayıt durumu - User: mike (6513506166), Registered: False
+2025-08-02 11:21:52,376 - 📊 Daily stats güncellendi - User: 6513506166, Group: -1002746043354
+2025-08-02 11:21:52,443 - 📊 Mesaj sayısı kaydedildi - User: mike (6513506166)
+2025-08-02 11:21:52,443 - 🎯 Kayıt olmayan kullanıcı - User: mike (6513506166)
+2025-08-02 11:21:52,444 - ⏰ Kayıt teşvik cooldown - User: mike (6513506166), Kalan: 299s
+2025-08-02 11:21:52,444 - Update id=69400475 is handled. Duration 785 ms by bot id=7633083532
+2025-08-02 11:21:53,061 - 🔍 MONITOR GROUP MESSAGE ÇAĞRILDI - User: mike, Chat: -1002746043354
+2025-08-02 11:21:53,257 - ✅ Grup kayıtlı - Chat: -1002746043354
+2025-08-02 11:21:53,620 - 🔍 MONITOR GROUP MESSAGE ÇAĞRILDI - User: mike, Chat: -1002746043354
+2025-08-02 11:21:53,649 - 👤 Kullanıcı kayıt durumu - User: mike (6513506166), Registered: False
+2025-08-02 11:21:53,780 - 📊 Daily stats güncellendi - User: 6513506166, Group: -1002746043354
+2025-08-02 11:21:53,815 - ✅ Grup kayıtlı - Chat: -1002746043354
+2025-08-02 11:21:53,846 - 📊 Mesaj sayısı kaydedildi - User: mike (6513506166)
+2025-08-02 11:21:53,846 - 🎯 Kayıt olmayan kullanıcı - User: mike (6513506166)
+2025-08-02 11:21:53,847 - ⏰ Kayıt teşvik cooldown - User: mike (6513506166), Kalan: 297s
+2025-08-02 11:21:53,848 - Update id=69400476 is handled. Duration 787 ms by bot id=7633083532
+2025-08-02 11:21:54,041 - 🔍 MONITOR GROUP MESSAGE ÇAĞRILDI - User: mike, Chat: -1002746043354
+2025-08-02 11:21:54,209 - 👤 Kullanıcı kayıt durumu - User: mike (6513506166), Registered: False
+2025-08-02 11:21:54,237 - ✅ Grup kayıtlı - Chat: -1002746043354
+2025-08-02 11:21:54,339 - 📊 Daily stats güncellendi - User: 6513506166, Group: -1002746043354
+2025-08-02 11:21:54,404 - 📊 Mesaj sayısı kaydedildi - User: mike (6513506166)
+2025-08-02 11:21:54,404 - 🎯 Kayıt olmayan kullanıcı - User: mike (6513506166)
+2025-08-02 11:21:54,405 - ⏰ Kayıt teşvik cooldown - User: mike (6513506166), Kalan: 297s
+2025-08-02 11:21:54,405 - Update id=69400477 is handled. Duration 785 ms by bot id=7633083532
+2025-08-02 11:21:54,630 - 👤 Kullanıcı kayıt durumu - User: mike (6513506166), Registered: False
+2025-08-02 11:21:54,762 - 📊 Daily stats güncellendi - User: 6513506166, Group: -1002746043354
+2025-08-02 11:21:54,827 - 📊 Mesaj sayısı kaydedildi - User: mike (6513506166)
+2025-08-02 11:21:54,828 - 🎯 Kayıt olmayan kullanıcı - User: mike (6513506166)
+2025-08-02 11:21:54,828 - ⏰ Kayıt teşvik cooldown - User: mike (6513506166), Kalan: 296s
+2025-08-02 11:21:54,829 - Update id=69400478 is handled. Duration 787 ms by bot id=7633083532
+2025-08-02 11:23:12,724 - 📝 Recruitment sistemi - Sadece özel mesajda teşvik yapılır
+2025-08-02 11:24:08,639 - Polling stopped
+2025-08-02 11:24:08,894 - 🧹 Temizlik işlemleri başlatılıyor...
+2025-08-02 11:24:08,960 - 🗄️ Database bağlantısı kapatıldı.
+2025-08-02 11:24:08,961 - ✅ Bot lock file kaldırıldı
+2025-08-02 11:24:08,962 - ✅ Temizlik işlemleri tamamlandı!
+2025-08-02 11:24:08,962 - Polling stopped for bot @KirveLastBot id=7633083532 - 'Kirve Bot'
+2025-08-02 11:24:11,531 - ✅ Bot lock file oluşturuldu - PID: 36212
+2025-08-02 11:24:11,532 - Bot başlatılıyor...
+2025-08-02 11:24:11,532 - Konfigürasyon doğrulandı
+2025-08-02 11:24:11,532 - Database bağlantısı kuruluyor...
+2025-08-02 11:24:11,533 - Database bağlantısı kuruluyor...
+2025-08-02 11:24:13,333 - ✅ Users tablosu kolonları güncellendi
+2025-08-02 11:24:13,464 - ✅ Registered groups tablosu kolonları güncellendi
+2025-08-02 11:24:13,789 - ℹ️ Unique constraint zaten var: relation "daily_stats_unique" already exists
+2025-08-02 11:24:14,181 - ✅ Eski unit_price kolonu kaldırıldı
+2025-08-02 11:24:14,505 - ✅ Tüm tablolar başarıyla oluşturuldu/güncellendi
+2025-08-02 11:24:15,225 - ✅ Custom commands tablosu güncellendi
+2025-08-02 11:24:15,358 - 🔍 Test kullanıcıları ekleniyor...
+2025-08-02 11:24:15,423 - ✅ Test kullanıcıları eklendi! Result: INSERT 0 0
+2025-08-02 11:24:15,552 - ✅ Database'de toplam 90 kullanıcı var
+2025-08-02 11:24:15,553 - 🔍 Test market ürünleri kontrol ediliyor...
+2025-08-02 11:24:15,682 - 🔍 Mevcut ürün sayısı: 3
+2025-08-02 11:24:15,877 - ✅ Duplicate ürünler temizlendi! Kalan ürün sayısı: 3
+2025-08-02 11:24:15,942 - Database bağlantısı ve tablolar hazır!
+2025-08-02 11:24:15,943 - ✅ Database bağlantısı başarılı!
+2025-08-02 11:24:15,943 - Bot instance oluşturuluyor...
+2025-08-02 11:24:16,168 - Bot instance handler'lara aktarılıyor...
+2025-08-02 11:24:16,177 - ✅ Bot instance tüm handler'lara aktarıldı!
+2025-08-02 11:24:16,178 - Handler'lar kaydediliyor...
+2025-08-02 11:24:16,178 - Callback handler'lar kaydedildi
+2025-08-02 11:24:16,182 - Router'lar kayıtlandı!
+2025-08-02 11:24:16,183 - Tüm handler'lar kaydedildi!
+2025-08-02 11:24:16,183 - Background cleanup task başlatıldı!
+2025-08-02 11:24:16,184 - 🎯 Kayıt teşvik sistemi başlatıldı!
+2025-08-02 11:24:16,184 - 🔍 Bot bilgileri alınıyor...
+2025-08-02 11:24:16,184 - 🧹 Memory cleanup task başlatıldı!
+2025-08-02 11:24:16,223 - 📝 Recruitment sistemi - Sadece özel mesajda teşvik yapılır
+2025-08-02 11:24:16,444 - 🔍 DEBUG - Yeni bot profili eklendi: bot_1753833578
+2025-08-02 11:24:16,445 - 🔍 DEBUG - BOT_PROFILES güncellendi: ['bot_1753833578']
+2025-08-02 11:24:16,712 - 🤖 Bot: @KirveLastBot - Kirve Bot
+2025-08-02 11:24:16,713 - 👤 Admin ID: 8154732274
+2025-08-02 11:24:16,713 - 🚀 Bot başarıyla çalışmaya başladı!
+2025-08-02 11:24:16,713 - ⏹️ Durdurmak için Ctrl+C
+2025-08-02 11:24:16,714 - 📱 Telegram logger başarıyla kuruldu
+2025-08-02 11:24:17,787 - 📢 Startup bildirimi hazırlanıyor...
+2025-08-02 11:24:17,788 - 🚀 Bot polling başlatılıyor...
+2025-08-02 11:24:17,788 - ✅ Bot başarıyla çalışıyor! Komutlar hazır.
+2025-08-02 11:24:17,789 - Start polling
+2025-08-02 11:24:17,789 - Database pool hazır, startup bildirimi gönderiliyor (attempt 1)
+2025-08-02 11:24:18,003 - 🔔 Admin startup bildirimi başlatılıyor...
+2025-08-02 11:24:18,086 - Run polling for bot @KirveLastBot id=7633083532 - 'Kirve Bot'
+2025-08-02 11:24:18,198 - 📬 1 admin'e startup bildirimi gönderiliyor...
+2025-08-02 11:24:18,834 - ✅ Admin startup bildirimi tamamlandı - Başarılı: 1, Başarısız: 0
+2025-08-02 11:24:22,731 - 🔍 MONITOR GROUP MESSAGE ÇAĞRILDI - User: mike, Chat: -1002746043354
+2025-08-02 11:24:22,933 - ✅ Grup kayıtlı - Chat: -1002746043354
+2025-08-02 11:24:23,388 - 👤 Kullanıcı kayıt durumu - User: mike (6513506166), Registered: False
+2025-08-02 11:24:23,521 - 📊 Daily stats güncellendi - User: 6513506166, Group: -1002746043354
+2025-08-02 11:24:23,587 - 📊 Mesaj sayısı kaydedildi - User: mike (6513506166)
+2025-08-02 11:24:23,587 - 🎯 Kayıt olmayan kullanıcı - User: mike (6513506166)
+2025-08-02 11:24:24,390 - 🎯 Kayıt teşvik mesajı gönderildi - User: mike (6513506166)
+2025-08-02 11:24:24,391 - ❌ Text too short or empty
+2025-08-02 11:24:24,392 - Update id=69400479 is handled. Duration 1661 ms by bot id=7633083532
+2025-08-02 11:24:26,844 - 🔍 MONITOR GROUP MESSAGE ÇAĞRILDI - User: mike, Chat: -1002746043354
+2025-08-02 11:24:27,039 - ✅ Grup kayıtlı - Chat: -1002746043354
+2025-08-02 11:24:27,450 - 👤 Kullanıcı kayıt durumu - User: mike (6513506166), Registered: False
+2025-08-02 11:24:27,582 - 📊 Daily stats güncellendi - User: 6513506166, Group: -1002746043354
+2025-08-02 11:24:27,647 - 📊 Mesaj sayısı kaydedildi - User: mike (6513506166)
+2025-08-02 11:24:27,647 - 🎯 Kayıt olmayan kullanıcı - User: mike (6513506166)
+2025-08-02 11:24:27,648 - ⏰ Kayıt teşvik cooldown - User: mike (6513506166), Kalan: 296s
+2025-08-02 11:24:27,648 - Update id=69400480 is handled. Duration 805 ms by bot id=7633083532
+2025-08-02 11:24:29,111 - 📨 Özel mesaj alındı - User: 6513506166 (@mikedahjenko)
+2025-08-02 11:24:29,111 - 🎯 INPUT STATE GET - User: 6513506166, State: None
+2025-08-02 11:24:29,306 - ✅ Özel mesaj işlendi - User: 6513506166
+2025-08-02 11:24:29,307 - Update id=69400481 is handled. Duration 197 ms by bot id=7633083532
+2025-08-02 11:24:30,800 - 📨 Özel mesaj alındı - User: 6513506166 (@mikedahjenko)
+2025-08-02 11:24:30,800 - 🎯 INPUT STATE GET - User: 6513506166, State: None
+2025-08-02 11:24:30,995 - ✅ Özel mesaj işlendi - User: 6513506166
+2025-08-02 11:24:30,996 - Update id=69400482 is handled. Duration 198 ms by bot id=7633083532
+2025-08-02 11:24:31,346 - 📨 Özel mesaj alındı - User: 6513506166 (@mikedahjenko)
+2025-08-02 11:24:31,347 - 🎯 INPUT STATE GET - User: 6513506166, State: None
+2025-08-02 11:24:31,541 - ✅ Özel mesaj işlendi - User: 6513506166
+2025-08-02 11:24:31,542 - Update id=69400483 is handled. Duration 197 ms by bot id=7633083532
+2025-08-02 11:24:31,845 - 📨 Özel mesaj alındı - User: 6513506166 (@mikedahjenko)
+2025-08-02 11:24:31,845 - 🎯 INPUT STATE GET - User: 6513506166, State: None
+2025-08-02 11:24:32,039 - ✅ Özel mesaj işlendi - User: 6513506166
+2025-08-02 11:24:32,040 - Update id=69400484 is handled. Duration 196 ms by bot id=7633083532
+2025-08-02 11:26:07,095 - Polling stopped
+2025-08-02 11:26:07,358 - 🧹 Temizlik işlemleri başlatılıyor...
+2025-08-02 11:26:07,427 - 🗄️ Database bağlantısı kapatıldı.
+2025-08-02 11:26:07,429 - ✅ Bot lock file kaldırıldı
+2025-08-02 11:26:07,429 - ✅ Temizlik işlemleri tamamlandı!
+2025-08-02 11:26:07,429 - Polling stopped for bot @KirveLastBot id=7633083532 - 'Kirve Bot'
+2025-08-02 11:26:09,745 - ✅ Bot lock file oluşturuldu - PID: 42592
+2025-08-02 11:26:09,746 - Bot başlatılıyor...
+2025-08-02 11:26:09,746 - Konfigürasyon doğrulandı
+2025-08-02 11:26:09,747 - Database bağlantısı kuruluyor...
+2025-08-02 11:26:09,747 - Database bağlantısı kuruluyor...
+2025-08-02 11:26:11,574 - ✅ Users tablosu kolonları güncellendi
+2025-08-02 11:26:11,703 - ✅ Registered groups tablosu kolonları güncellendi
+2025-08-02 11:26:12,026 - ℹ️ Unique constraint zaten var: relation "daily_stats_unique" already exists
+2025-08-02 11:26:12,415 - ✅ Eski unit_price kolonu kaldırıldı
+2025-08-02 11:26:12,736 - ✅ Tüm tablolar başarıyla oluşturuldu/güncellendi
+2025-08-02 11:26:13,448 - ✅ Custom commands tablosu güncellendi
+2025-08-02 11:26:13,579 - 🔍 Test kullanıcıları ekleniyor...
+2025-08-02 11:26:13,647 - ✅ Test kullanıcıları eklendi! Result: INSERT 0 0
+2025-08-02 11:26:13,787 - ✅ Database'de toplam 90 kullanıcı var
+2025-08-02 11:26:13,788 - 🔍 Test market ürünleri kontrol ediliyor...
+2025-08-02 11:26:13,935 - 🔍 Mevcut ürün sayısı: 3
+2025-08-02 11:26:14,159 - ✅ Duplicate ürünler temizlendi! Kalan ürün sayısı: 3
+2025-08-02 11:26:14,236 - Database bağlantısı ve tablolar hazır!
+2025-08-02 11:26:14,237 - ✅ Database bağlantısı başarılı!
+2025-08-02 11:26:14,238 - Bot instance oluşturuluyor...
+2025-08-02 11:26:14,482 - Bot instance handler'lara aktarılıyor...
+2025-08-02 11:26:14,489 - ✅ Bot instance tüm handler'lara aktarıldı!
+2025-08-02 11:26:14,489 - Handler'lar kaydediliyor...
+2025-08-02 11:26:14,490 - Callback handler'lar kaydedildi
+2025-08-02 11:26:14,494 - Router'lar kayıtlandı!
+2025-08-02 11:26:14,495 - Tüm handler'lar kaydedildi!
+2025-08-02 11:26:14,495 - Background cleanup task başlatıldı!
+2025-08-02 11:26:14,495 - 🎯 Kayıt teşvik sistemi başlatıldı!
+2025-08-02 11:26:14,496 - 🔍 Bot bilgileri alınıyor...
+2025-08-02 11:26:14,497 - 🧹 Memory cleanup task başlatıldı!
+2025-08-02 11:26:14,535 - 📝 Recruitment sistemi - Sadece özel mesajda teşvik yapılır
+2025-08-02 11:26:14,798 - 🔍 DEBUG - Yeni bot profili eklendi: bot_1753833578
+2025-08-02 11:26:14,799 - 🔍 DEBUG - BOT_PROFILES güncellendi: ['bot_1753833578']
+2025-08-02 11:26:15,061 - 🤖 Bot: @KirveLastBot - Kirve Bot
+2025-08-02 11:26:15,062 - 👤 Admin ID: 8154732274
+2025-08-02 11:26:15,062 - 🚀 Bot başarıyla çalışmaya başladı!
+2025-08-02 11:26:15,063 - ⏹️ Durdurmak için Ctrl+C
+2025-08-02 11:26:15,063 - 📱 Telegram logger başarıyla kuruldu
+2025-08-02 11:26:16,162 - 📢 Startup bildirimi hazırlanıyor...
+2025-08-02 11:26:16,163 - 🚀 Bot polling başlatılıyor...
+2025-08-02 11:26:16,163 - ✅ Bot başarıyla çalışıyor! Komutlar hazır.
+2025-08-02 11:26:16,164 - Start polling
+2025-08-02 11:26:16,164 - Database pool hazır, startup bildirimi gönderiliyor (attempt 1)
+2025-08-02 11:26:16,465 - 🔔 Admin startup bildirimi başlatılıyor...
+2025-08-02 11:26:16,562 - Run polling for bot @KirveLastBot id=7633083532 - 'Kirve Bot'
+2025-08-02 11:26:16,711 - 📬 1 admin'e startup bildirimi gönderiliyor...
+2025-08-02 11:26:17,434 - ✅ Admin startup bildirimi tamamlandı - Başarılı: 1, Başarısız: 0
+2025-08-02 11:26:17,922 - 📨 Özel mesaj alındı - User: 6513506166 (@mikedahjenko)
+2025-08-02 11:26:17,923 - 🎯 INPUT STATE GET - User: 6513506166, State: None
+2025-08-02 11:26:18,153 - ✅ Özel mesaj işlendi - User: 6513506166
+2025-08-02 11:26:18,154 - Update id=69400485 is handled. Duration 234 ms by bot id=7633083532
+2025-08-02 11:26:24,027 - 🔍 MONITOR GROUP MESSAGE ÇAĞRILDI - User: mike, Chat: -1002746043354
+2025-08-02 11:26:24,220 - ✅ Grup kayıtlı - Chat: -1002746043354
+2025-08-02 11:26:24,608 - 👤 Kullanıcı kayıt durumu - User: mike (6513506166), Registered: False
+2025-08-02 11:26:24,738 - 📊 Daily stats güncellendi - User: 6513506166, Group: -1002746043354
+2025-08-02 11:26:24,802 - 📊 Mesaj sayısı kaydedildi - User: mike (6513506166)
+2025-08-02 11:26:24,802 - 🎯 Kayıt olmayan kullanıcı - User: mike (6513506166)
+2025-08-02 11:26:25,549 - 🎯 Kayıt teşvik mesajı gönderildi - User: mike (6513506166)
+2025-08-02 11:26:25,550 - ❌ Text too short or empty
+2025-08-02 11:26:25,550 - Update id=69400486 is handled. Duration 1523 ms by bot id=7633083532
+2025-08-02 11:26:30,034 - ✅ Recruitment info gönderildi - User: 6513506166
+2025-08-02 11:26:30,135 - Update id=69400487 is handled. Duration 892 ms by bot id=7633083532
+2025-08-02 11:26:33,408 - /menu komutu - User: Kirve Bot (7633083532)
+2025-08-02 11:26:36,603 - Profil menüsü gösterildi - User: 7633083532
+2025-08-02 11:26:36,721 - Update id=69400488 is handled. Duration 3508 ms by bot id=7633083532
+2025-08-02 11:27:24,186 - 📨 Özel mesaj alındı - User: 6513506166 (@mikedahjenko)
+2025-08-02 11:27:24,187 - 🎯 INPUT STATE GET - User: 6513506166, State: None
+2025-08-02 11:27:24,380 - ✅ Özel mesaj işlendi - User: 6513506166
+2025-08-02 11:27:24,380 - Update id=69400489 is handled. Duration 196 ms by bot id=7633083532
+2025-08-02 11:27:25,790 - 📨 Özel mesaj alındı - User: 6513506166 (@mikedahjenko)
+2025-08-02 11:27:25,790 - 🎯 INPUT STATE GET - User: 6513506166, State: None
+2025-08-02 11:27:26,014 - 📨 Özel mesaj alındı - User: 6513506166 (@mikedahjenko)
+2025-08-02 11:27:26,014 - 🎯 INPUT STATE GET - User: 6513506166, State: None
+2025-08-02 11:27:26,059 - ✅ Özel mesaj işlendi - User: 6513506166
+2025-08-02 11:27:26,060 - Update id=69400490 is handled. Duration 270 ms by bot id=7633083532
+2025-08-02 11:27:26,384 - ✅ Özel mesaj işlendi - User: 6513506166
+2025-08-02 11:27:26,385 - Update id=69400491 is handled. Duration 373 ms by bot id=7633083532
+2025-08-02 11:27:31,077 - 🔍 SQL sorguları test komutu - User: mike (6513506166)
+2025-08-02 11:27:32,175 - 🚨 DIRECT SQL DELETE - User: 6513506166 silindi!
+2025-08-02 11:27:32,305 - Update id=69400492 is handled. Duration 1228 ms by bot id=7633083532
+2025-08-02 11:28:14,548 - 📝 Recruitment sistemi - Sadece özel mesajda teşvik yapılır
+2025-08-02 11:29:39,532 - Polling stopped
+2025-08-02 11:29:39,795 - 🧹 Temizlik işlemleri başlatılıyor...
+2025-08-02 11:29:39,861 - 🗄️ Database bağlantısı kapatıldı.
+2025-08-02 11:29:39,862 - ✅ Bot lock file kaldırıldı
+2025-08-02 11:29:39,863 - ✅ Temizlik işlemleri tamamlandı!
+2025-08-02 11:29:39,863 - Polling stopped for bot @KirveLastBot id=7633083532 - 'Kirve Bot'
+2025-08-02 11:29:42,201 - ✅ Bot lock file oluşturuldu - PID: 36948
+2025-08-02 11:29:42,202 - Bot başlatılıyor...
+2025-08-02 11:29:42,202 - Konfigürasyon doğrulandı
+2025-08-02 11:29:42,202 - Database bağlantısı kuruluyor...
+2025-08-02 11:29:42,203 - Database bağlantısı kuruluyor...
+2025-08-02 11:29:44,938 - ✅ Users tablosu kolonları güncellendi
+2025-08-02 11:29:45,183 - ✅ Registered groups tablosu kolonları güncellendi
+2025-08-02 11:29:45,633 - ℹ️ Unique constraint zaten var: relation "daily_stats_unique" already exists
+2025-08-02 11:29:46,142 - ✅ Eski unit_price kolonu kaldırıldı
+2025-08-02 11:29:46,482 - ✅ Tüm tablolar başarıyla oluşturuldu/güncellendi
+2025-08-02 11:29:47,471 - ✅ Custom commands tablosu güncellendi
+2025-08-02 11:29:47,668 - 🔍 Test kullanıcıları ekleniyor...
+2025-08-02 11:29:47,739 - ✅ Test kullanıcıları eklendi! Result: INSERT 0 1
+2025-08-02 11:29:47,875 - ✅ Database'de toplam 90 kullanıcı var
+2025-08-02 11:29:47,875 - 🔍 Test market ürünleri kontrol ediliyor...
+2025-08-02 11:29:48,010 - 🔍 Mevcut ürün sayısı: 3
+2025-08-02 11:29:48,215 - ✅ Duplicate ürünler temizlendi! Kalan ürün sayısı: 3
+2025-08-02 11:29:48,535 - Database bağlantısı ve tablolar hazır!
+2025-08-02 11:29:48,536 - ✅ Database bağlantısı başarılı!
+2025-08-02 11:29:48,536 - Bot instance oluşturuluyor...
+2025-08-02 11:29:48,737 - Bot instance handler'lara aktarılıyor...
+2025-08-02 11:29:48,744 - ✅ Bot instance tüm handler'lara aktarıldı!
+2025-08-02 11:29:48,744 - Handler'lar kaydediliyor...
+2025-08-02 11:29:48,745 - Callback handler'lar kaydedildi
+2025-08-02 11:29:48,748 - Router'lar kayıtlandı!
+2025-08-02 11:29:48,749 - Tüm handler'lar kaydedildi!
+2025-08-02 11:29:48,750 - Background cleanup task başlatıldı!
+2025-08-02 11:29:48,750 - 🎯 Kayıt teşvik sistemi başlatıldı!
+2025-08-02 11:29:48,750 - 🔍 Bot bilgileri alınıyor...
+2025-08-02 11:29:48,750 - 🧹 Memory cleanup task başlatıldı!
+2025-08-02 11:29:48,782 - 📝 Recruitment sistemi - Sadece özel mesajda teşvik yapılır
+2025-08-02 11:29:49,031 - 🔍 DEBUG - Yeni bot profili eklendi: bot_1753833578
+2025-08-02 11:29:49,032 - 🔍 DEBUG - BOT_PROFILES güncellendi: ['bot_1753833578']
+2025-08-02 11:29:49,266 - 🤖 Bot: @KirveLastBot - Kirve Bot
+2025-08-02 11:29:49,267 - 👤 Admin ID: 8154732274
+2025-08-02 11:29:49,267 - 🚀 Bot başarıyla çalışmaya başladı!
+2025-08-02 11:29:49,267 - ⏹️ Durdurmak için Ctrl+C
+2025-08-02 11:29:49,268 - 📱 Telegram logger başarıyla kuruldu
+2025-08-02 11:29:50,333 - 📢 Startup bildirimi hazırlanıyor...
+2025-08-02 11:29:50,334 - 🚀 Bot polling başlatılıyor...
+2025-08-02 11:29:50,335 - ✅ Bot başarıyla çalışıyor! Komutlar hazır.
+2025-08-02 11:29:50,335 - Start polling
+2025-08-02 11:29:50,335 - Database pool hazır, startup bildirimi gönderiliyor (attempt 1)
+2025-08-02 11:29:50,533 - 🔔 Admin startup bildirimi başlatılıyor...
+2025-08-02 11:29:50,616 - Run polling for bot @KirveLastBot id=7633083532 - 'Kirve Bot'
+2025-08-02 11:29:50,879 - 📬 1 admin'e startup bildirimi gönderiliyor...
+2025-08-02 11:29:51,513 - ✅ Admin startup bildirimi tamamlandı - Başarılı: 1, Başarısız: 0
+2025-08-02 11:29:55,100 - 🔍 MONITOR GROUP MESSAGE ÇAĞRILDI - User: mike, Chat: -1002746043354
+2025-08-02 11:29:55,636 - ✅ Grup kayıtlı - Chat: -1002746043354
+2025-08-02 11:29:56,053 - 👤 Kullanıcı kayıt durumu - User: mike (6513506166), Registered: True
+2025-08-02 11:29:56,250 - 📊 Daily stats güncellendi - User: 6513506166, Group: -1002746043354
+2025-08-02 11:29:56,318 - 📊 Mesaj sayısı kaydedildi - User: mike (6513506166)
+2025-08-02 11:29:56,319 - 💎 Kayıtlı kullanıcı - User: mike (6513506166)
+2025-08-02 11:29:56,319 - 🆕 İlk mesaj - User: 6513506166
+2025-08-02 11:29:56,319 - ⏰ Flood check - User: mike (6513506166), Result: True
+2025-08-02 11:29:57,574 - 📝 Mesaj sayısı - User: mike (6513506166), Current: 1, For point: 5
+2025-08-02 11:29:57,575 - 📝 Mesaj sayısı artırıldı - User: mike (6513506166), Mesaj: 1/5
+2025-08-02 11:29:57,576 - Update id=69400493 is handled. Duration 2476 ms by bot id=7633083532
+2025-08-02 11:29:57,714 - 🔍 MONITOR GROUP MESSAGE ÇAĞRILDI - User: mike, Chat: -1002746043354
+2025-08-02 11:29:57,919 - ✅ Grup kayıtlı - Chat: -1002746043354
+2025-08-02 11:29:58,326 - 👤 Kullanıcı kayıt durumu - User: mike (6513506166), Registered: True
+2025-08-02 11:29:58,461 - 📊 Daily stats güncellendi - User: 6513506166, Group: -1002746043354
+2025-08-02 11:29:58,529 - 📊 Mesaj sayısı kaydedildi - User: mike (6513506166)
+2025-08-02 11:29:58,530 - 💎 Kayıtlı kullanıcı - User: mike (6513506166)
+2025-08-02 11:29:58,868 - ⏰ Flood protection - User: 6513506166, Time diff: 2.2s, Limit: 10s
+2025-08-02 11:29:58,869 - ⏰ Flood check - User: mike (6513506166), Result: False
+2025-08-02 11:29:58,869 - ⏰ Mesaj cooldown - User: mike (6513506166) 5 saniye beklemeli
+2025-08-02 11:29:58,870 - ❌ Rastgele cevap verme olasılığı düşük - User: 6513506166
+2025-08-02 11:29:58,870 - Update id=69400494 is handled. Duration 1156 ms by bot id=7633083532
+2025-08-02 11:29:59,830 - 🔍 MONITOR GROUP MESSAGE ÇAĞRILDI - User: mike, Chat: -1002746043354
+2025-08-02 11:30:00,033 - ✅ Grup kayıtlı - Chat: -1002746043354
+2025-08-02 11:30:00,493 - 👤 Kullanıcı kayıt durumu - User: mike (6513506166), Registered: True
+2025-08-02 11:30:00,946 - 📊 Daily stats güncellendi - User: 6513506166, Group: -1002746043354
+2025-08-02 11:30:01,063 - 📊 Mesaj sayısı kaydedildi - User: mike (6513506166)
+2025-08-02 11:30:01,064 - 💎 Kayıtlı kullanıcı - User: mike (6513506166)
+2025-08-02 11:30:01,404 - ⏰ Flood protection - User: 6513506166, Time diff: 4.7s, Limit: 10s
+2025-08-02 11:30:01,404 - ⏰ Flood check - User: mike (6513506166), Result: False
+2025-08-02 11:30:01,405 - ⏰ Mesaj cooldown - User: mike (6513506166) 5 saniye beklemeli
+2025-08-02 11:30:01,405 - ❌ Cooldown aktif - User: 6513506166
+2025-08-02 11:30:01,405 - Update id=69400495 is handled. Duration 1575 ms by bot id=7633083532
+2025-08-02 11:30:04,106 - 🔍 MONITOR GROUP MESSAGE ÇAĞRILDI - User: mike, Chat: -1002746043354
+2025-08-02 11:30:04,353 - ✅ Grup kayıtlı - Chat: -1002746043354
+2025-08-02 11:30:04,912 - 👤 Kullanıcı kayıt durumu - User: mike (6513506166), Registered: True
+2025-08-02 11:30:05,093 - 📊 Daily stats güncellendi - User: 6513506166, Group: -1002746043354
+2025-08-02 11:30:05,161 - 📊 Mesaj sayısı kaydedildi - User: mike (6513506166)
+2025-08-02 11:30:05,162 - 💎 Kayıtlı kullanıcı - User: mike (6513506166)
+2025-08-02 11:30:05,561 - ⏰ Flood protection - User: 6513506166, Time diff: 8.8s, Limit: 10s
+2025-08-02 11:30:05,561 - ⏰ Flood check - User: mike (6513506166), Result: False
+2025-08-02 11:30:05,562 - ⏰ Mesaj cooldown - User: mike (6513506166) 5 saniye beklemeli
+2025-08-02 11:30:05,562 - ❌ Cooldown aktif - User: 6513506166
+2025-08-02 11:30:05,562 - Update id=69400496 is handled. Duration 1457 ms by bot id=7633083532
+2025-08-02 11:30:09,275 - 🔇 Grup komutu yakalandı - User: 6513506166, Command: /testsql, Group: -1002746043354
+2025-08-02 11:30:09,374 - ✅ Grup komut mesajı silindi - Command: /testsql
+2025-08-02 11:30:09,649 - ❌ Admin panel mesajı silinemedi: Telegram server says - Bad Request: message to delete not found
+2025-08-02 11:30:09,650 - 🔍 SQL sorguları test komutu - User: mike (6513506166)
+2025-08-02 11:30:10,874 - ❌ SQL test komutu hatası: Telegram server says - Bad Request: message to be replied not found
+2025-08-02 11:30:10,956 - ❌ Grup komut işleme hatası: Telegram server says - Bad Request: message to be replied not found
+2025-08-02 11:30:11,671 - Update id=69400497 is handled. Duration 2396 ms by bot id=7633083532
+2025-08-02 11:30:14,963 - 🔍 SQL sorguları test komutu - User: mike (6513506166)
+2025-08-02 11:30:16,818 - 🚨 DIRECT SQL DELETE - User: 6513506166 silindi!
+2025-08-02 11:30:17,145 - Update id=69400498 is handled. Duration 2182 ms by bot id=7633083532
+2025-08-02 11:30:21,613 - 🔍 MONITOR GROUP MESSAGE ÇAĞRILDI - User: mike, Chat: -1002746043354
+2025-08-02 11:30:21,826 - ✅ Grup kayıtlı - Chat: -1002746043354
+2025-08-02 11:30:22,334 - 👤 Kullanıcı kayıt durumu - User: mike (6513506166), Registered: False
+2025-08-02 11:30:22,496 - 📊 Daily stats güncellendi - User: 6513506166, Group: -1002746043354
+2025-08-02 11:30:22,674 - 📊 Mesaj sayısı kaydedildi - User: mike (6513506166)
+2025-08-02 11:30:22,675 - 🎯 Kayıt olmayan kullanıcı - User: mike (6513506166)
+2025-08-02 11:30:23,029 - 🔍 MONITOR GROUP MESSAGE ÇAĞRILDI - User: mike, Chat: -1002746043354
+2025-08-02 11:30:23,232 - ✅ Grup kayıtlı - Chat: -1002746043354
+2025-08-02 11:30:23,408 - 🎯 Kayıt teşvik mesajı gönderildi - User: mike (6513506166)
+2025-08-02 11:30:23,410 - Update id=69400499 is handled. Duration 1797 ms by bot id=7633083532
+2025-08-02 11:30:23,641 - 👤 Kullanıcı kayıt durumu - User: mike (6513506166), Registered: False
+2025-08-02 11:30:23,984 - 📊 Daily stats güncellendi - User: 6513506166, Group: -1002746043354
+2025-08-02 11:30:24,137 - 🔍 MONITOR GROUP MESSAGE ÇAĞRILDI - User: mike, Chat: -1002746043354
+2025-08-02 11:30:24,185 - 📊 Mesaj sayısı kaydedildi - User: mike (6513506166)
+2025-08-02 11:30:24,186 - 🎯 Kayıt olmayan kullanıcı - User: mike (6513506166)
+2025-08-02 11:30:24,186 - ⏰ Kayıt teşvik cooldown - User: mike (6513506166), Kalan: 298s
+2025-08-02 11:30:24,187 - Update id=69400500 is handled. Duration 1158 ms by bot id=7633083532
+2025-08-02 11:30:24,713 - ✅ Grup kayıtlı - Chat: -1002746043354
+2025-08-02 11:30:25,411 - 👤 Kullanıcı kayıt durumu - User: mike (6513506166), Registered: False
+2025-08-02 11:30:25,617 - 📊 Daily stats güncellendi - User: 6513506166, Group: -1002746043354
+2025-08-02 11:30:25,898 - 📊 Mesaj sayısı kaydedildi - User: mike (6513506166)
+2025-08-02 11:30:25,899 - 🎯 Kayıt olmayan kullanıcı - User: mike (6513506166)
+2025-08-02 11:30:25,899 - ⏰ Kayıt teşvik cooldown - User: mike (6513506166), Kalan: 297s
+2025-08-02 11:30:27,031 - ✅ Kayıt olmayan kullanıcıya hatırlatma mesajı gönderildi - User: 6513506166
+2025-08-02 11:30:27,032 - ✅ Kayıt olmayan kullanıcıya ilk teşvik mesajı gönderildi - User: 6513506166
+2025-08-02 11:30:27,033 - Update id=69400501 is handled. Duration 2896 ms by bot id=7633083532
+2025-08-02 11:31:44,031 - Polling stopped
+2025-08-02 11:31:44,297 - 🧹 Temizlik işlemleri başlatılıyor...
+2025-08-02 11:31:44,364 - 🗄️ Database bağlantısı kapatıldı.
+2025-08-02 11:31:44,365 - ✅ Bot lock file kaldırıldı
+2025-08-02 11:31:44,366 - ✅ Temizlik işlemleri tamamlandı!
+2025-08-02 11:31:44,366 - Polling stopped for bot @KirveLastBot id=7633083532 - 'Kirve Bot'
+2025-08-02 11:31:46,649 - ✅ Bot lock file oluşturuldu - PID: 22652
+2025-08-02 11:31:46,650 - Bot başlatılıyor...
+2025-08-02 11:31:46,651 - Konfigürasyon doğrulandı
+2025-08-02 11:31:46,652 - Database bağlantısı kuruluyor...
+2025-08-02 11:31:46,652 - Database bağlantısı kuruluyor...
+2025-08-02 11:31:48,591 - ✅ Users tablosu kolonları güncellendi
+2025-08-02 11:31:48,754 - ✅ Registered groups tablosu kolonları güncellendi
+2025-08-02 11:31:49,153 - ℹ️ Unique constraint zaten var: relation "daily_stats_unique" already exists
+2025-08-02 11:31:49,657 - ✅ Eski unit_price kolonu kaldırıldı
+2025-08-02 11:31:50,080 - ✅ Tüm tablolar başarıyla oluşturuldu/güncellendi
+2025-08-02 11:31:50,952 - ✅ Custom commands tablosu güncellendi
+2025-08-02 11:31:51,114 - 🔍 Test kullanıcıları ekleniyor...
+2025-08-02 11:31:51,200 - ✅ Test kullanıcıları eklendi! Result: INSERT 0 0
+2025-08-02 11:31:51,372 - ✅ Database'de toplam 90 kullanıcı var
+2025-08-02 11:31:51,372 - 🔍 Test market ürünleri kontrol ediliyor...
+2025-08-02 11:31:51,524 - 🔍 Mevcut ürün sayısı: 3
+2025-08-02 11:31:51,724 - ✅ Duplicate ürünler temizlendi! Kalan ürün sayısı: 3
+2025-08-02 11:31:51,791 - Database bağlantısı ve tablolar hazır!
+2025-08-02 11:31:51,792 - ✅ Database bağlantısı başarılı!
+2025-08-02 11:31:51,792 - Bot instance oluşturuluyor...
+2025-08-02 11:31:51,992 - Bot instance handler'lara aktarılıyor...
+2025-08-02 11:31:51,998 - ✅ Bot instance tüm handler'lara aktarıldı!
+2025-08-02 11:31:51,999 - Handler'lar kaydediliyor...
+2025-08-02 11:31:51,999 - Callback handler'lar kaydedildi
+2025-08-02 11:31:52,003 - Router'lar kayıtlandı!
+2025-08-02 11:31:52,004 - Tüm handler'lar kaydedildi!
+2025-08-02 11:31:52,004 - Background cleanup task başlatıldı!
+2025-08-02 11:31:52,004 - 🎯 Kayıt teşvik sistemi başlatıldı!
+2025-08-02 11:31:52,004 - 🔍 Bot bilgileri alınıyor...
+2025-08-02 11:31:52,005 - 🧹 Memory cleanup task başlatıldı!
+2025-08-02 11:31:52,037 - 📝 Recruitment sistemi - Sadece özel mesajda teşvik yapılır
+2025-08-02 11:31:52,268 - 🔍 DEBUG - Yeni bot profili eklendi: bot_1753833578
+2025-08-02 11:31:52,268 - 🔍 DEBUG - BOT_PROFILES güncellendi: ['bot_1753833578']
+2025-08-02 11:31:52,314 - 🤖 Bot: @KirveLastBot - Kirve Bot
+2025-08-02 11:31:52,315 - 👤 Admin ID: 8154732274
+2025-08-02 11:31:52,315 - 🚀 Bot başarıyla çalışmaya başladı!
+2025-08-02 11:31:52,315 - ⏹️ Durdurmak için Ctrl+C
+2025-08-02 11:31:52,316 - 📱 Telegram logger başarıyla kuruldu
+2025-08-02 11:31:53,382 - 📢 Startup bildirimi hazırlanıyor...
+2025-08-02 11:31:53,383 - 🚀 Bot polling başlatılıyor...
+2025-08-02 11:31:53,383 - ✅ Bot başarıyla çalışıyor! Komutlar hazır.
+2025-08-02 11:31:53,384 - Start polling
+2025-08-02 11:31:53,384 - Database pool hazır, startup bildirimi gönderiliyor (attempt 1)
+2025-08-02 11:31:53,584 - 🔔 Admin startup bildirimi başlatılıyor...
+2025-08-02 11:31:53,693 - Run polling for bot @KirveLastBot id=7633083532 - 'Kirve Bot'
+2025-08-02 11:31:53,784 - 📬 1 admin'e startup bildirimi gönderiliyor...
+2025-08-02 11:31:54,427 - ✅ Admin startup bildirimi tamamlandı - Başarılı: 1, Başarısız: 0

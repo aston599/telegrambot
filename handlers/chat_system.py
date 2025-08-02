@@ -503,30 +503,8 @@ async def handle_chat_message(message: Message) -> Optional[str]:
         # Kayıt kontrolü
         is_registered = await is_user_registered(user_id)
         
-        # Kayıt olmayan kullanıcılar için teşvik sistemi
+        # Kayıt olmayan kullanıcılar için hiçbir şey yapma (message_monitor.py'de hallediliyor)
         if not is_registered:
-            # Sadece grupta çalış
-            if message.chat.type in ["group", "supergroup"]:
-                current_time = time.time()
-                
-                # Kullanıcının son mesaj zamanını kaydet
-                if user_id not in unregistered_users_last_message:
-                    unregistered_users_last_message[user_id] = current_time
-                    # İlk mesaj - hemen teşvik gönder
-                    await send_registration_reminder(user_id, message.from_user.first_name)
-                    logger.info(f"✅ Kayıt olmayan kullanıcıya ilk teşvik mesajı gönderildi - User: {user_id}")
-                    return None  # Grupta hiçbir şey yazma
-                else:
-                    # Son mesaj zamanını güncelle
-                    unregistered_users_last_message[user_id] = current_time
-                    
-                    # 10 dakika geçmişse hatırlatma gönder
-                    if should_send_registration_reminder(user_id):
-                        await send_registration_reminder(user_id, message.from_user.first_name)
-                        logger.info(f"✅ Kayıt olmayan kullanıcıya hatırlatma mesajı gönderildi - User: {user_id}")
-                        return None  # Grupta hiçbir şey yazma
-            
-            # Kayıtsız kullanıcı özelde yazıyorsa da hiçbir şey yapma
             return None
         
         # Mesajı kaydet

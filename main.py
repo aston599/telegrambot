@@ -595,9 +595,8 @@ async def main():
                     await handle_custom_input(message)
                     return
                 
-                # 6. Recruitment response kontrolü - kendi kontrolünü yapar
-                from handlers.recruitment_system import handle_recruitment_response
-                await handle_recruitment_response(message)
+                # 6. Recruitment response kontrolü - sadece recruitment callback'lerinde çalışır
+                # Burada çağrılmaz, sadece callback'lerde çalışır
                 
                 # 7. Çekiliş input kontrolü - çekiliş oluşturma sürecinde
                 lottery_data = memory_manager.get_lottery_data(user_id)
@@ -889,6 +888,11 @@ _🏆 Etkinliklerde point'lerinle özel ödüller kazanabilirsin!_
                 elif data == "help_command":
                     from handlers.register_handler import yardim_command
                     await yardim_command(callback.message)
+                elif data == "start_command":
+                    # Start komutunu çağır
+                    from handlers.start_handler import start_command
+                    await start_command(callback.message)
+
                 
                 await callback.answer("✅ Komut çalıştırıldı!")
                 
@@ -897,7 +901,7 @@ _🏆 Etkinliklerde point'lerinle özel ödüller kazanabilirsin!_
                 await callback.answer("❌ Hata oluştu!")
         
         # Start menü callback'lerini kaydet
-        dp.callback_query(F.data.in_(["menu_command", "market_command", "events_command", "profile_command", "ranking_command", "help_command"]))(start_menu_callback)
+        dp.callback_query(F.data.in_(["menu_command", "market_command", "events_command", "profile_command", "ranking_command", "help_command", "start_command"]))(start_menu_callback)
         
         # Dinamik komut oluşturucu callback'leri - MANUEL KAYIT
         from handlers.dynamic_command_creator import (

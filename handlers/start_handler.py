@@ -91,7 +91,7 @@ async def start_command(message: Message) -> None:
 **KirveHub**'a geri döndün! Zaten kayıtlısın ve tüm özellikleri kullanabilirsin.
 
 **💎 Kirve Point Sistemi:**
-• Her mesajın **0.02 KP** kazandırır
+• Her mesajın point kazandırır
 • Point'lerini **Market'te** freespinler, bakiyeler için kullanabilirsin
 • **Etkinliklere** point'lerinle katılabilirsin
 • Günlük **5 bonus point** kazanabilirsin
@@ -124,7 +124,7 @@ Tüm özelliklere **Ana Menü**'den ulaşabilirsin!
 🎯 Etkinliklere katıl, bonuslar kazan!
 🎮 Ana Menü'den her şeye ulaş!
 
-_💡 Her mesajın 0.02 KP kazandırır!_
+_💡 Her mesajın point kazandırır!_
 _🎯 Market'te point'lerini freespinler için kullanabilirsin!_
 _🏆 Etkinliklerde point'lerinle özel ödüller kazanabilirsin!_
 _🎮 Ana Menü'den tüm özelliklere ulaşabilirsin!_
@@ -159,7 +159,7 @@ _🎮 Ana Menü'den tüm özelliklere ulaşabilirsin!_
 **KirveHub**'a başarıyla kayıt oldun! Artık tüm özellikleri kullanabilirsin.
 
 **💎 Kirve Point Sistemi:**
-• Her mesajın **0.02 KP** kazandırır
+• Her mesajın point kazandırır
 • Point'lerini **Market'te** freespinler, bakiyeler için kullanabilirsin
 • **Etkinliklere** point'lerinle katılabilirsin
 • Günlük **5 bonus point** kazanabilirsin
@@ -192,7 +192,7 @@ Tüm özelliklere **Ana Menü**'den ulaşabilirsin!
 🎯 Etkinliklere katıl, bonuslar kazan!
 🎮 Ana Menü'den her şeye ulaş!
 
-_💡 Her mesajın 0.02 KP kazandırır!_
+_💡 Her mesajın point kazandırır!_
 _🎯 Market'te point'lerini freespinler için kullanabilirsin!_
 _🏆 Etkinliklerde point'lerinle özel ödüller kazanabilirsin!_
 _🎮 Ana Menü'den tüm özelliklere ulaşabilirsin!_
@@ -225,9 +225,9 @@ _🎮 Ana Menü'den tüm özelliklere ulaşabilirsin!_
                     await message.reply(error_text, parse_mode="Markdown")
                     logger.error(f"❌ Kullanıcı kayıt hatası - User: {user.id}")
             
-            else:
-                # Database bağlantı sorunu
-                error_text = f"""
+        else:
+            # Database bağlantı sorunu
+            error_text = f"""
 ❌ **Sistem Hatası**
 
 Üzgünüm {user.first_name}, sistem şu anda kullanılamıyor.
@@ -238,10 +238,10 @@ _🎮 Ana Menü'den tüm özelliklere ulaşabilirsin!_
 
 **Tekrar denemek için:**
 /start komutunu tekrar kullanın
-                """
-                
-                await message.reply(error_text, parse_mode="Markdown")
-                logger.error(f"❌ Database bağlantı hatası - User: {user.id}")
+            """
+            
+            await message.reply(error_text, parse_mode="Markdown")
+            logger.error(f"❌ Database bağlantı hatası - User: {user.id}")
                 
     except Exception as e:
         logger.error(f"❌ Start command hatası - User: {message.from_user.id}, Error: {e}")
@@ -271,27 +271,72 @@ async def _send_start_privately(user_id: int):
         # Kullanıcı bilgilerini al
         user_info = await _bot_instance.get_chat(user_id)
         
-        # Özel mesaj için kısa versiyon
-        response_text = f"""
+        # Kayıtlı olup olmadığını kontrol et
+        from database import is_user_registered
+        is_registered = await is_user_registered(user_id)
+        
+        if is_registered:
+            # Kayıtlı kullanıcı - menüye yönlendir
+            from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+            
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="🎮 Ana Menü", callback_data="menu_command")],
+                [InlineKeyboardButton(text="🛍️ Market", callback_data="market_command")],
+                [InlineKeyboardButton(text="🎯 Etkinlikler", callback_data="events_command")],
+                [InlineKeyboardButton(text="📊 Profilim", callback_data="profile_command")],
+                [InlineKeyboardButton(text="🏆 Sıralama", callback_data="ranking_command")]
+            ])
+            
+            response_text = f"""
 **Hoş Geldin {user_info.first_name}!** 🎉
 
-**KirveHub**'a kayıt olmak için özel mesajda `/start` komutunu kullan!
+**KirveHub**'a zaten kayıtlısın! Tüm özellikleri kullanabilirsin.
 
 **💎 Özellikler:**
-• Her mesajın **0.02 KP** kazandırır
+• Her mesajın point kazandırır
+• **Market'te** freespinler, bakiyeler
+• **Etkinliklere** katıl, bonuslar kazan
+• **Sıralamada** yer al
+
+**🎮 Ana Menü'den başla!**
+        """
+            
+            await _bot_instance.send_message(
+                chat_id=user_id,
+                text=response_text,
+                parse_mode="Markdown",
+                reply_markup=keyboard
+            )
+            
+        else:
+            # Kayıtlı olmayan kullanıcı - kayıt olmaya yönlendir
+            from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+            
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="🎮 Hemen Kayıt Ol", callback_data="start_command")]
+            ])
+            
+            response_text = f"""
+**Hoş Geldin {user_info.first_name}!** 🎉
+
+**KirveHub**'a kayıt olarak şunları kazanabilirsin:
+
+**💎 Özellikler:**
+• Her mesajın point kazandırır
 • **Market'te** freespinler, bakiyeler
 • **Etkinliklere** katıl, bonuslar kazan
 • **Sıralamada** yer al
 
 **🎮 Hemen başla:**
-Özel mesajda `/start` yazarak kayıt ol!
+Kayıt ol butonuna bas veya `/start` yaz!
         """
-        
-        await _bot_instance.send_message(
-            chat_id=user_id,
-            text=response_text,
-            parse_mode="Markdown"
-        )
+            
+            await _bot_instance.send_message(
+                chat_id=user_id,
+                text=response_text,
+                parse_mode="Markdown",
+                reply_markup=keyboard
+            )
         
         logger.info(f"✅ Start özel mesajı gönderildi - User: {user_id}")
         

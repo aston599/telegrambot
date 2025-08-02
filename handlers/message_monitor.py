@@ -15,8 +15,67 @@ from database import (
     save_user_info, get_user_points, db_pool, get_db_pool, get_user_points_cached
 )
 
-# Recruitment sistemi import'u
-from handlers.recruitment_system import check_recruitment_eligibility, send_recruitment_message
+# Kayıt teşvik mesajları için cooldown cache'i
+registration_encouragement_cooldown: Dict[int, datetime] = {}
+
+# Kayıt olmayan kullanıcılara teşvik mesajı gönderme fonksiyonu
+async def send_registration_encouragement(user_id: int, first_name: str, group_name: str) -> None:
+    """Kayıt olmayan kullanıcılara teşvik mesajı gönder (5 dakika cooldown)"""
+    try:
+        # Cooldown kontrolü - 5 dakika
+        now = datetime.now()
+        if user_id in registration_encouragement_cooldown:
+            last_sent = registration_encouragement_cooldown[user_id]
+            time_diff = (now - last_sent).total_seconds()
+            
+            if time_diff < 300:  # 5 dakika = 300 saniye
+                logger.info(f"⏰ Kayıt teşvik cooldown - User: {first_name} ({user_id}), Kalan: {300 - time_diff:.0f}s")
+                return
+        
+        from config import get_config
+        from aiogram import Bot
+        
+        config = get_config()
+        bot = Bot(token=config.BOT_TOKEN)
+        
+        from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+        
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🎮 Hemen Kayıt Ol", callback_data="start_command")]
+        ])
+        
+        encouragement_text = f"""
+**Hey {first_name}!** 👋
+
+**{group_name}** grubunda sohbet ediyorsun ama henüz **KirveHub**'a kayıt olmamışsın!
+
+**💎 Kayıt ol ve kazan:**
+• Her mesajın point kazandırır
+• **Market'te** freespinler, bakiyeler al
+• **Etkinliklere** katıl, bonuslar kazan
+• **Sıralamada** yer al
+
+**🎮 Hemen kayıt ol:**
+Kayıt ol butonuna bas veya `/start` yaz!
+
+**💡 Kayıt olmadan point kazanamazsın!**
+        """
+        
+        await bot.send_message(
+            chat_id=user_id,
+            text=encouragement_text,
+            parse_mode="Markdown",
+            reply_markup=keyboard
+        )
+        
+        # Cooldown'u güncelle
+        registration_encouragement_cooldown[user_id] = now
+        
+        await bot.session.close()
+        logger.info(f"🎯 Kayıt teşvik mesajı gönderildi - User: {first_name} ({user_id})")
+        
+    except Exception as e:
+        logger.error(f"❌ Kayıt teşvik mesajı hatası - User: {user_id}, Error: {e}")
 
 # Sistem ayarlarını getiren fonksiyon
 async def get_system_settings() -> dict:
@@ -95,39 +154,7 @@ async def get_dynamic_settings():
             'weekly_limit': 20.0
         }
 
-# Kayıt olmayan kullanıcılara teşvik mesajı gönderme fonksiyonu
-async def send_registration_encouragement(user_id: int, first_name: str, group_name: str) -> None:
-    """Kayıt olmayan kullanıcılara teşvik mesajı gönder"""
-    try:
-        from main import bot
-        
-        encouragement_text = f"""
-**Hey {first_name}!** 👋
 
-**{group_name}** grubunda sohbet ediyorsun ama henüz **KirveHub**'a kayıt olmamışsın!
-
-**💎 Kayıt ol ve kazan:**
-• Her mesajın **0.02 KP** kazandırır
-• **Market'te** freespinler, bakiyeler al
-• **Etkinliklere** katıl, bonuslar kazan
-• **Sıralamada** yer al
-
-**🎮 Hemen kayıt ol:**
-Bot'a özel mesaj gönder ve `/start` yaz!
-
-**💡 Kayıt olmadan point kazanamazsın!**
-        """
-        
-        await bot.send_message(
-            chat_id=user_id,
-            text=encouragement_text,
-            parse_mode="Markdown"
-        )
-        
-        logger.info(f"🎯 Kayıt teşvik mesajı gönderildi - User: {first_name} ({user_id})")
-        
-    except Exception as e:
-        logger.error(f"❌ Kayıt teşvik mesajı hatası - User: {user_id}, Error: {e}")
 
 async def update_daily_stats(user_id: int, group_id: int):
     """Günlük istatistikleri güncelle"""
@@ -196,20 +223,11 @@ async def monitor_group_message(message: Message) -> None:
         if not is_registered:
             logger.info(f"🎯 Kayıt olmayan kullanıcı - User: {user.first_name} ({user.id})")
             
-            # Kayıt olmayan kullanıcılara teşvik mesajı gönder
+            # Kayıt olmayan kullanıcılara teşvik mesajı gönder (cooldown ile)
             try:
                 await send_registration_encouragement(user.id, user.first_name, chat.title)
-                logger.info(f"✅ Kayıt teşvik mesajı gönderildi - User: {user.first_name} ({user.id})")
             except Exception as e:
                 logger.error(f"❌ Kayıt teşvik mesajı hatası - User: {user.id}, Error: {e}")
-            
-            # Recruitment sistemi kontrolü
-            try:
-                if await check_recruitment_eligibility(user.id, user.username, user.first_name, chat.title):
-                    await send_recruitment_message(user.id, user.username, user.first_name, chat.title)
-                    logger.info(f"✅ Recruitment mesajı gönderildi - User: {user.first_name} ({user.id})")
-            except Exception as e:
-                logger.error(f"❌ Recruitment sistemi hatası: {e}")
         else:
             logger.info(f"💎 Kayıtlı kullanıcı - User: {user.first_name} ({user.id})")
             

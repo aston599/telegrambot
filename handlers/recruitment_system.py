@@ -1,6 +1,6 @@
 """
 🎯 Kayıt Teşvik Sistemi - KirveHub Bot
-Otomatik kayıt teşvik mesajları ve özel bilgilendirme
+Sadece özel mesajda kayıt teşvik mesajları
 """
 
 import logging
@@ -32,24 +32,7 @@ last_recruited_user = None
 user_recruitment_times: Dict[int, datetime] = {}
 last_recruitment_users: Set[int] = set()
 
-# Grup reply mesajları (daha nazik ve az agresif)
-GROUP_REPLY_MESSAGES = [
-    "💎 Kirvem! Kayıt olmak ister misin? Özelden yazabilirsin!",
-    "🎯 Kirve! Sistemde kayıtlı değilsin. Özelden yaz, detayları vereyim!",
-    "💎 Kirvem! Kayıt olarak point kazanabilirsin. Özelden yaz!",
-    "🎮 Kirve! Hala kayıtsız mısın? Özelden yaz, sistemini anlatayım!",
-    "💎 Kirvem! Kayıt olarak etkinliklere katılabilirsin!",
-    "🎯 Kirve! Özelden yaz, market sistemini anlatayım!",
-    "💎 Kirvem! Kayıt olarak çok daha fazlasını kazanabilirsin!",
-    "🎮 Kirve! Özelden yaz, tüm özellikleri anlatayım!",
-    "💎 Kirvem! Kayıt olarak günlük point kazanabilirsin!",
-    "🎯 Kirve! Özelden yaz, bonus sistemini anlatayım!",
-    "💎 Kirvem! Kayıt olarak sıralamada yer alabilirsin!",
-    "🎮 Kirve! Özelden yaz, çekiliş sistemini anlatayım!",
-    "💎 Kirvem! Kayıt olarak özel ayrıcalıklar kazanabilirsin!"
-]
-
-# Özel mesaj şablonları (daha etkili ve yönlendirici)
+# Özel mesaj şablonları (sadece özel mesajda gönderilir)
 RECRUITMENT_MESSAGES = [
     "🎯 **Kirvem!** Hala gruba kayıt olmadığını görüyorum. Bana özelden yaz, tüm bonusları anlatayım! 💎",
     "💎 **Kirve!** Kayıt olarak çok daha fazlasını kazanabilirsin. Özelden yaz, detayları vereyim! 🚀",
@@ -96,120 +79,94 @@ async def start_recruitment_system():
             await asyncio.sleep(300)  # 5 dakika bekle
 
 async def send_recruitment_messages():
-    """Kayıt teşvik mesajlarını gönder - Sıralı sistem"""
+    """Kayıt teşvik mesajlarını gönder - Sadece özel mesajda"""
     try:
-        if not recruitment_system_active:
-            return
-            
-        config = get_config()
-        bot = Bot(token=config.BOT_TOKEN)
-        
-        # Ana grup ID'si (config'den alınabilir)
-        main_group_id = -1002746043354  # Ana grup ID'si
-        
-        # Yeni kayıtsız kullanıcıları bul
-        unregistered_users = await get_unregistered_users_in_group(main_group_id)
-        
-        if not unregistered_users:
-            logger.info("📭 Yeni kayıtsız kullanıcı bulunamadı")
-            await bot.session.close()
-            return
-        
-        # SIRALI SİSTEM: Kullanıcı bazlı cooldown kontrolü
-        current_time = datetime.now()
-        available_users = []
-        
-        for user_id in unregistered_users:
-            # Son 24 saatte bu kullanıcıya mesaj gönderilmiş mi kontrol et
-            if user_id not in last_recruitment_users:
-                # Bu kullanıcıya son ne zaman teşvik gönderildi?
-                last_time = user_recruitment_times.get(user_id)
-                if not last_time or (current_time - last_time).total_seconds() >= recruitment_message_cooldown:
-                    available_users.append(user_id)
-        
-        if not available_users:
-            logger.info("📭 Spam koruması: Tüm kullanıcılar cooldown'da")
-            await bot.session.close()
-            return
-        
-        # Sadece 1 kullanıcıya mesaj gönder (sıralı sistem)
-        target_user = available_users[0]
-        
-        # Rastgele mesaj seç
-        message = random.choice(RECRUITMENT_MESSAGES)
-        
-        # Mesajı gönder
-        await bot.send_message(
-            chat_id=main_group_id,
-            text=message,
-            parse_mode="Markdown"
-        )
-        
-        # Teşvik edilen kullanıcıyı kaydet
-        last_recruitment_users.add(target_user)
-        user_recruitment_times[target_user] = current_time
-        
-        # 24 saat sonra kullanıcıları listeden çıkar (otomatik temizlik)
-        if len(last_recruitment_users) > 100:  # Liste çok büyükse temizle
-            last_recruitment_users.clear()
-            user_recruitment_times.clear()
-        
-        await bot.session.close()
-        logger.info(f"🎯 Kayıt teşvik mesajı gönderildi - User: {target_user} (1dk cooldown aktif)")
+        # Bu fonksiyon artık grup mesajları göndermez
+        # Sadece özel mesajda teşvik yapar
+        logger.info("📝 Recruitment sistemi - Sadece özel mesajda teşvik yapılır")
         
     except Exception as e:
-        logger.error(f"❌ Recruitment message hatası: {e}")
+        logger.error(f"❌ Recruitment messages hatası: {e}")
 
 async def get_unregistered_users_in_group(group_id: int) -> List[int]:
-    """Gruptaki kayıtsız kullanıcıları bul - Yeni kullanıcı odaklı"""
+    """Gruptaki kayıt olmayan kullanıcıları al"""
     try:
         pool = await get_db_pool()
         if not pool:
             return []
             
         async with pool.acquire() as conn:
-            # İlk defa mesaj atan kayıtsız kullanıcıları bul
-            # Son 1 saatte aktif olan, ama daha önce hiç mesaj atmamış olanlar
+            # Kayıt olmayan kullanıcıları al
             users = await conn.fetch("""
-                SELECT DISTINCT u.user_id, 
-                       u.last_activity,
-                       COALESCE(SUM(ds.message_count), 0) as total_messages
+                SELECT DISTINCT u.user_id 
                 FROM users u
-                LEFT JOIN daily_stats ds ON u.user_id = ds.user_id 
-                    AND ds.message_date >= CURRENT_DATE - INTERVAL '7 days'
-                WHERE u.is_registered = FALSE 
-                  AND u.last_activity >= NOW() - INTERVAL '1 hour'  -- Son 1 saatte aktif
-                  AND u.last_activity <= NOW() - INTERVAL '2 minutes'  -- 2 dk önce aktif olanlar
-                GROUP BY u.user_id, u.last_activity
-                HAVING COALESCE(SUM(ds.message_count), 0) <= 3  -- En fazla 3 mesaj atmış olanlar (yeni kullanıcılar)
-                ORDER BY u.last_activity DESC
-                LIMIT 10  -- Spam önlemi - maksimum 10 kullanıcı
-            """)
+                LEFT JOIN user_groups ug ON u.user_id = ug.user_id AND ug.group_id = $1
+                WHERE ug.user_id IS NULL
+                AND u.is_registered = FALSE
+                LIMIT 10
+            """, group_id)
             
             return [user['user_id'] for user in users]
             
     except Exception as e:
-        logger.error(f"❌ Get unregistered users hatası: {e}")
+        logger.error(f"❌ Unregistered users hatası: {e}")
         return []
 
 async def handle_recruitment_response(message: Message):
-    """Kayıt teşvik mesajına gelen yanıtları işle"""
+    """Kayıt teşvik mesajına yanıt işle"""
     try:
         user = message.from_user
         
         # Kullanıcı kayıtlı mı kontrol et
-        if await is_user_registered(user.id):
-            return
-            
-        # Özel mesaj kontrolü
-        if message.chat.type != "private":
-            return
-            
-        # Kullanıcı bilgilerini kaydet (kayıt olmadan)
-        await save_user_info(user.id, user.username, user.first_name, user.last_name)
+        is_registered = await is_user_registered(user.id)
         
-        # Bilgilendirme mesajı gönder
-        await send_recruitment_info(user.id, user.first_name)
+        if is_registered:
+            # Zaten kayıtlı
+            response_text = f"""
+✅ **Zaten kayıtlısın {user.first_name}!**
+
+Artık tüm özellikleri kullanabilirsin:
+
+💎 **Point kazanma**
+🎮 **Etkinliklere katılma**
+🛍️ **Market alışverişi**
+📊 **Profil takibi**
+
+/menu komutu ile ana menüye ulaşabilirsin!
+            """
+        else:
+            # Kayıt olmamış - detaylı bilgi ver
+            response_text = f"""
+🎯 **Hoş geldin {user.first_name}!**
+
+**KirveHub**'a kayıt olarak şunları kazanabilirsin:
+
+💎 **Kirve Point Sistemi**
+• Her mesajın **0.02 KP** kazandırır
+• Günlük **5 KP** limiti
+• Market'te freespinler, bakiyeler
+
+🎮 **Etkinlik Sistemi**
+• Çekilişlere katıl
+• Bonus hunt'lar
+• Özel yarışmalar
+
+🛍️ **Market Sistemi**
+• Point'lerini kullan
+• Freespinler al
+• Site bakiyeleri satın al
+
+📊 **Profil Sistemi**
+• İstatistiklerini gör
+• Sıralamada yer al
+• Başarılarını takip et
+
+**Hemen kayıt olmak için:**
+/start komutunu kullan!
+            """
+        
+        await message.reply(response_text, parse_mode="Markdown")
+        logger.info(f"✅ Recruitment yanıtı gönderildi - User: {user.id}")
         
     except Exception as e:
         logger.error(f"❌ Recruitment response hatası: {e}")
@@ -217,393 +174,344 @@ async def handle_recruitment_response(message: Message):
 async def send_recruitment_info(user_id: int, first_name: str):
     """Kayıt bilgilendirme mesajı gönder"""
     try:
+        from config import get_config
+        from aiogram import Bot
+        
         config = get_config()
         bot = Bot(token=config.BOT_TOKEN)
         
-        # Rastgele bilgilendirme mesajı seç
+        # Rastgele bilgi mesajı seç
         info_message = random.choice(INFO_MESSAGES)
         
-        # Ana bilgilendirme mesajı
-        main_message = f"""
-🎯 **Merhaba {first_name}!**
-
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🎮 Ana Menü", callback_data="menu_command")],
+            [InlineKeyboardButton(text="🛍️ Market", callback_data="market_command")],
+            [InlineKeyboardButton(text="🎯 Etkinlikler", callback_data="events_command")],
+            [InlineKeyboardButton(text="📊 Profilim", callback_data="profile_command")]
+        ])
+        
+        response_text = f"""
 {info_message}
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-💎 **KAYIT OLMAK İÇİN:**
-
-1. **Grup sohbetinde:** `/kirvekayit` yaz
-2. **Butona bas:** "Kayıt Ol!" butonuna tıkla
-3. **Hemen başla:** Point kazanmaya başla!
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-🎮 **KOMUTLAR:**
-• `/start` - Ana menü ve bot durumu
-• `/kirvekayit` - Hemen kayıt ol
-• `/yardim` - Detaylı bilgi ve yardım
-
-🚀 **Hemen kayıt ol ve KirveHub'ın bir parçası ol!** 💎
-
-_💡 İpucu: Kayıt olduktan sonra grup sohbetlerinde mesaj atarak günlük 5 Kirve Point kazanabilirsin!_
+**🎯 Hemen başlamak için:**
+/start komutunu kullan ve kayıt ol!
         """
-        
-        # Butonlu mesaj
-        keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="💎 Hemen Kayıt Ol!", callback_data="recruitment_register")],
-            [InlineKeyboardButton(text="📊 Detaylı Bilgi", callback_data="recruitment_info")],
-            [InlineKeyboardButton(text="🎮 Komutları Gör", callback_data="recruitment_show_commands")],
-            [InlineKeyboardButton(text="❌ Kapat", callback_data="recruitment_close")]
-        ])
         
         await bot.send_message(
             chat_id=user_id,
-            text=main_message,
+            text=response_text,
             parse_mode="Markdown",
             reply_markup=keyboard
         )
         
         await bot.session.close()
-        logger.info(f"🎯 Recruitment info gönderildi - User: {user_id}")
+        logger.info(f"✅ Recruitment info gönderildi - User: {user_id}")
         
     except Exception as e:
-        logger.error(f"❌ Recruitment info hatası: {e}")
+        logger.error(f"❌ Recruitment info hatası - User: {user_id}, Error: {e}")
 
-# Admin panel fonksiyonları
 def toggle_recruitment_system(enable: bool):
     """Kayıt teşvik sistemini aç/kapat"""
     global recruitment_system_active
     recruitment_system_active = enable
-    
-    status = "✅ Açıldı" if enable else "❌ Kapatıldı"
-    logger.info(f"🎯 Recruitment system {status}")
-    
-    return recruitment_system_active
+    logger.info(f"🔄 Recruitment sistemi {'açıldı' if enable else 'kapatıldı'}")
 
 def get_recruitment_status() -> bool:
     """Kayıt teşvik sistemi durumunu al"""
     return recruitment_system_active
 
 def set_recruitment_interval(seconds: int):
-    """Kayıt teşvik mesaj aralığını ayarla"""
+    """Kayıt teşvik aralığını ayarla"""
     global recruitment_interval
     recruitment_interval = seconds
-    logger.info(f"🎯 Recruitment interval: {seconds} saniye")
+    logger.info(f"⏰ Recruitment aralığı ayarlandı: {seconds} saniye")
 
-# Background task başlatıcı
 async def start_recruitment_background():
-    """Background recruitment task'ını başlat"""
+    """Arka planda recruitment sistemi başlat"""
     asyncio.create_task(start_recruitment_system())
-    logger.info("🎯 Recruitment background task başlatıldı")
-
-# ==============================================
-# ROUTER HANDLER'LARI
-# ==============================================
 
 @router.callback_query(F.data.startswith("recruitment_"))
 async def handle_recruitment_callback(callback: CallbackQuery):
-    """Recruitment callback handler"""
+    """Recruitment callback'lerini işle"""
     try:
-        user_id = callback.from_user.id
         data = callback.data
+        user = callback.from_user
         
-        logger.info(f"🎯 Recruitment callback - User: {user_id}, Data: {data}")
-        
-        if data == "recruitment_register":
-            # Kayıt ol butonu
-            await callback.answer("🎯 Kayıt sayfasına yönlendiriliyorsunuz...")
-            
-            # Kayıt mesajı gönder
-            from handlers.register_handler import send_registration_message
-            await send_registration_message(callback.from_user.id, callback.from_user.first_name)
-            
-        elif data == "recruitment_info":
-            # Detaylı bilgi butonu
-            await callback.answer("📊 Detaylı bilgi gönderiliyor...")
-            
-            info_message = f"""
-📊 **KIRVEHUB DETAYLI BİLGİ**
+        if data == "recruitment_info":
+            await send_recruitment_info(user.id, user.first_name)
+        elif data == "recruitment_register":
+            # Kayıt sayfasına yönlendir
+            response_text = f"""
+🎯 **Kayıt Ol {user.first_name}!**
 
-💎 **Point Sistemi:**
-• Her 10 mesaj: 0.02 KP
-• Günlük limit: 5.00 KP
-• Flood koruması: 10 saniye
+**KirveHub**'a kayıt olarak tüm özellikleri kullanabilirsin!
 
-🎯 **Kayıt Avantajları:**
-• Point kazanma
-• Etkinlik katılımı
-• Market alışverişi
-• Sıralama sistemi
+**💎 Özellikler:**
+• Her mesajın **0.02 KP** kazandırır
+• **Market'te** freespinler, bakiyeler
+• **Etkinliklere** katıl, bonuslar kazan
+• **Sıralamada** yer al
 
-🏆 **Başarımlar:**
-• Point Milyoneri (1000 KP)
-• Sohbet Uzmanı (100 mesaj)
-• Günlük Hedef (5 KP/gün)
-
-🎮 **Komutlar:**
-• `/start` - Ana menü
-• `/menu` - Profil ve istatistikler
-• `/etkinlikler` - Aktif etkinlikler
-• `/yardim` - Yardım menüsü
-
-💡 **İpucu:** Grup sohbetlerinde aktif olun!
+**🎮 Hemen başla:**
+/start komutunu kullan!
             """
             
             await callback.message.edit_text(
-                info_message,
-                parse_mode="Markdown",
-                reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                    [InlineKeyboardButton(text="⬅️ Geri", callback_data="recruitment_back")]
-                ])
+                response_text,
+                parse_mode="Markdown"
             )
-            
-        elif data == "recruitment_show_commands":
-            # Komutları göster butonu
-            await callback.answer("🎮 Komutlar gösteriliyor...")
-            
-            commands_message = f"""
-🎮 **KIRVEHUB KOMUTLARI**
-
-📋 **Ana Komutlar:**
-• `/start` - Bot durumu ve ana menü
-• `/menu` - Profil ve istatistikler
-• `/yardim` - Yardım ve bilgi
-
-💎 **Point Sistemi:**
-• `/kirvekayit` - Hemen kayıt ol
-• `/etkinlikler` - Aktif etkinlikler
-• `/cekilisler` - Çekiliş listesi
-
-🎯 **Etkinlikler:**
-• `/etkinlik` - Yeni etkinlik oluştur (Admin)
-• `/cekilisbitir ID` - Çekiliş bitir (Admin)
-
-🛍️ **Market:**
-• Market menüsü profil içinde
-• Ürün satın alma
-• Sipariş takibi
-
-📊 **İstatistikler:**
-• Detaylı profil istatistikleri
-• Point geçmişi
-• Sıralama sistemi
-
-💡 **İpucu:** Kayıt olduktan sonra tüm özellikler açılır!
-            """
-            
-            await callback.message.edit_text(
-                commands_message,
-                parse_mode="Markdown",
-                reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                    [InlineKeyboardButton(text="⬅️ Geri", callback_data="recruitment_back")]
-                ])
-            )
-            
-        elif data == "recruitment_close":
-            # Kapat butonu
-            await callback.answer("❌ Mesaj kapatılıyor...")
-            await callback.message.delete()
-            
-        elif data == "recruitment_back":
-            # Geri butonu - Ana recruitment mesajına dön
-            await callback.answer("⬅️ Geri dönülüyor...")
-            await send_recruitment_info(user_id, callback.from_user.first_name)
-            
+        elif data == "recruitment_menu":
+            # Ana menüye yönlendir
+            from handlers.profile_handler import show_main_menu
+            await show_main_menu(callback)
+        
+        await callback.answer()
+        
     except Exception as e:
         logger.error(f"❌ Recruitment callback hatası: {e}")
-        await callback.answer("❌ Bir hata oluştu!", show_alert=True)
+        await callback.answer("❌ Bir hata oluştu!")
 
 @router.message(Command("recruitment"))
 async def recruitment_command(message: Message):
-    """Recruitment sistemi admin komutu"""
+    """Recruitment komutunu işle"""
     try:
-        # Admin kontrolü
+        user = message.from_user
+        
+        # Sadece admin kullanabilir
         from config import get_config
         config = get_config()
-        if message.from_user.id != config.ADMIN_USER_ID:
-            return
-
-        # Grup chatindeyse komut mesajını sil
-        if message.chat.type != "private":
-            try:
-                await message.delete()
-                logger.info(f"🔇 Recruitment komutu mesajı silindi - Group: {message.chat.id}")
-            except Exception as e:
-                logger.error(f"❌ Recruitment mesajı silinemedi: {e}")
-            return
-
-        # Recruitment durumunu göster
-        status = "✅ Açık" if recruitment_system_active else "❌ Kapalı"
         
-        status_message = f"""
-🎯 **RECRUITMENT SİSTEMİ DURUMU**
+        if user.id != config.ADMIN_USER_ID:
+            await message.reply("❌ Bu komutu sadece admin kullanabilir!")
+            return
+        
+        # Recruitment sistemi durumunu göster
+        status = get_recruitment_status()
+        interval = recruitment_interval
+        
+        response_text = f"""
+🎯 **Recruitment Sistemi Durumu**
 
-📊 **Mevcut Durum:** {status}
-⏱️ **Mesaj Aralığı:** {recruitment_interval} saniye
-🔄 **Cooldown:** {recruitment_message_cooldown} saniye
+**Durum:** {'✅ Aktif' if status else '❌ Pasif'}
+**Aralık:** {interval} saniye
+**Son güncelleme:** {datetime.now().strftime('%H:%M:%S')}
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-🎮 **KOMUTLAR:**
-• `/recruitment` - Bu menü
-• `/recruitment_toggle` - Sistemi aç/kapat
-• `/recruitment_interval <saniye>` - Aralığı ayarla
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-💡 **Bilgi:** Sistem otomatik olarak kayıtsız kullanıcılara teşvik mesajları gönderir.
+**Komutlar:**
+/recruitment_toggle - Sistemi aç/kapat
+/recruitment_interval - Aralığı ayarla
         """
         
+        await message.reply(response_text, parse_mode="Markdown")
+        
+    except Exception as e:
+        logger.error(f"❌ Recruitment command hatası: {e}")
+
+@router.message(Command("recruitment_toggle"))
+async def recruitment_toggle_command(message: Message):
+    """Recruitment toggle komutunu işle"""
+    try:
+        user = message.from_user
+        
+        # Sadece admin kullanabilir
+        from config import get_config
+        config = get_config()
+        
+        if user.id != config.ADMIN_USER_ID:
+            await message.reply("❌ Bu komutu sadece admin kullanabilir!")
+            return
+        
+        # Durumu değiştir
+        current_status = get_recruitment_status()
+        new_status = not current_status
+        toggle_recruitment_system(new_status)
+        
+        response_text = f"""
+🔄 **Recruitment Sistemi {'Açıldı' if new_status else 'Kapatıldı'}**
+
+**Yeni durum:** {'✅ Aktif' if new_status else '❌ Pasif'}
+        """
+        
+        await message.reply(response_text, parse_mode="Markdown")
+        
+    except Exception as e:
+        logger.error(f"❌ Recruitment toggle hatası: {e}")
+
+@router.message(Command("recruitment_interval"))
+async def recruitment_interval_command(message: Message):
+    """Recruitment interval komutunu işle"""
+    try:
+        user = message.from_user
+        
+        # Sadece admin kullanabilir
+        from config import get_config
+        config = get_config()
+        
+        if user.id != config.ADMIN_USER_ID:
+            await message.reply("❌ Bu komutu sadece admin kullanabilir!")
+            return
+        
+        # Mesajdan saniye al
+        text = message.text.split()
+        if len(text) < 2:
+            await message.reply("❌ Kullanım: /recruitment_interval <saniye>")
+            return
+        
+        try:
+            seconds = int(text[1])
+            if seconds < 30:
+                await message.reply("❌ Minimum 30 saniye olmalı!")
+                return
+                
+            set_recruitment_interval(seconds)
+            
+            response_text = f"""
+⏰ **Recruitment Aralığı Güncellendi**
+
+**Yeni aralık:** {seconds} saniye
+**Önceki aralık:** {recruitment_interval} saniye
+            """
+            
+            await message.reply(response_text, parse_mode="Markdown")
+            
+        except ValueError:
+            await message.reply("❌ Geçerli bir sayı girin!")
+        
+    except Exception as e:
+        logger.error(f"❌ Recruitment interval hatası: {e}")
+
+async def check_recruitment_eligibility(user_id: int, username: str, first_name: str, group_name: str) -> bool:
+    """Kullanıcının recruitment için uygun olup olmadığını kontrol et"""
+    try:
+        # Kullanıcı kayıtlı mı kontrol et
+        is_registered = await is_user_registered(user_id)
+        
+        if is_registered:
+            return False  # Kayıtlı kullanıcılara recruitment gönderilmez
+        
+        # Bugün recruitment gönderilmiş mi kontrol et
+        if await is_recruitment_sent_today(user_id):
+            logger.info(f"⏰ Recruitment bugün gönderilmiş - User: {first_name} ({user_id})")
+            return False
+        
+        # Cooldown kontrolü - 5 dakika
+        now = datetime.now()
+        if user_id in user_recruitment_times:
+            time_diff = now - user_recruitment_times[user_id]
+            if time_diff.total_seconds() < 300:  # 5 dakika = 300 saniye
+                logger.info(f"⏰ Recruitment cooldown - User: {first_name} ({user_id}), Kalan: {300 - time_diff.total_seconds():.0f}s")
+                return False
+        
+        return True
+        
+    except Exception as e:
+        logger.error(f"❌ Recruitment eligibility hatası: {e}")
+        return False
+
+async def send_recruitment_message(user_id: int, username: str, first_name: str, group_name: str):
+    """Kayıt teşvik mesajı gönder - Sadece özel mesajda"""
+    try:
+        from config import get_config
+        from aiogram import Bot
+        
+        config = get_config()
+        bot = Bot(token=config.BOT_TOKEN)
+        
+        # Rastgele mesaj seç
+        message_text = random.choice(RECRUITMENT_MESSAGES)
+        
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="🔄 Durumu Güncelle", callback_data="recruitment_status_refresh")],
-            [InlineKeyboardButton(text="❌ Kapat", callback_data="recruitment_close")]
+            [InlineKeyboardButton(text="💎 Detayları Öğren", callback_data="recruitment_info")],
+            [InlineKeyboardButton(text="🎮 Hemen Kayıt Ol", callback_data="recruitment_register")],
+            [InlineKeyboardButton(text="📊 Ana Menü", callback_data="recruitment_menu")]
         ])
         
-        await message.reply(
-            status_message,
+        await bot.send_message(
+            chat_id=user_id,
+            text=message_text,
             parse_mode="Markdown",
             reply_markup=keyboard
         )
         
+        # Recruitment zamanını kaydet
+        user_recruitment_times[user_id] = datetime.now()
+        await mark_recruitment_sent_today(user_id)
+        
+        await bot.session.close()
+        logger.info(f"✅ Recruitment mesajı gönderildi - User: {first_name} ({user_id})")
+        
     except Exception as e:
-        logger.error(f"❌ Recruitment komut hatası: {e}")
-        await message.reply("❌ Recruitment durumu yüklenemedi!")
+        logger.error(f"❌ Recruitment message hatası - User: {user_id}, Error: {e}")
 
-@router.message(Command("recruitment_toggle"))
-async def recruitment_toggle_command(message: Message):
-    """Recruitment sistemi aç/kapat komutu"""
+async def is_recruitment_sent_today(user_id: int) -> bool:
+    """Bugün recruitment gönderilmiş mi kontrol et"""
     try:
-        # Admin kontrolü
-        from config import get_config
-        config = get_config()
-        if message.from_user.id != config.ADMIN_USER_ID:
-            return
-
-        # Grup chatindeyse komut mesajını sil
-        if message.chat.type != "private":
-            try:
-                await message.delete()
-                logger.info(f"🔇 Recruitment toggle komutu mesajı silindi - Group: {message.chat.id}")
-            except Exception as e:
-                logger.error(f"❌ Recruitment toggle mesajı silinemedi: {e}")
-            return
-
-        # Sistemi aç/kapat
-        global recruitment_system_active
-        recruitment_system_active = not recruitment_system_active
-        
-        status = "✅ Açıldı" if recruitment_system_active else "❌ Kapatıldı"
-        
-        await message.reply(f"🎯 Recruitment sistemi {status}!")
-        
-    except Exception as e:
-        logger.error(f"❌ Recruitment toggle komut hatası: {e}")
-        await message.reply("❌ Recruitment sistemi değiştirilemedi!")
-
-@router.message(Command("recruitment_interval"))
-async def recruitment_interval_command(message: Message):
-    """Recruitment mesaj aralığını ayarla"""
-    try:
-        # Admin kontrolü
-        from config import get_config
-        config = get_config()
-        if message.from_user.id != config.ADMIN_USER_ID:
-            return
-
-        # Grup chatindeyse komut mesajını sil
-        if message.chat.type != "private":
-            try:
-                await message.delete()
-                logger.info(f"🔇 Recruitment interval komutu mesajı silindi - Group: {message.chat.id}")
-            except Exception as e:
-                logger.error(f"❌ Recruitment interval mesajı silinemedi: {e}")
-            return
-
-        # Parametre kontrolü
-        args = message.text.split()
-        if len(args) != 2:
-            await message.reply("❌ Kullanım: `/recruitment_interval <saniye>`")
-            return
-            
-        try:
-            new_interval = int(args[1])
-            if new_interval < 30:  # Minimum 30 saniye
-                await message.reply("❌ Minimum aralık 30 saniye olmalı!")
-                return
-                
-            global recruitment_interval
-            recruitment_interval = new_interval
-            
-            await message.reply(f"✅ Recruitment mesaj aralığı {new_interval} saniye olarak ayarlandı!")
-            
-        except ValueError:
-            await message.reply("❌ Geçersiz sayı! Örnek: `/recruitment_interval 120`")
-        
-    except Exception as e:
-        logger.error(f"❌ Recruitment interval komut hatası: {e}")
-        await message.reply("❌ Recruitment aralığı ayarlanamadı!")
-
-async def check_recruitment_eligibility(user_id: int, username: str, first_name: str, group_name: str) -> bool:
-    """Kullanıcının teşvik için uygun olup olmadığını kontrol et"""
-    global last_recruitment_time, last_recruited_user
-    
-    # Sistem kapalıysa False döndür
-    if not recruitment_system_active:
-        return False
-    
-    current_time = time.time()
-    
-    # Son teşvik zamanından 2 dakika geçmemişse False döndür
-    if current_time - last_recruitment_time < recruitment_interval:
-        return False
-    
-    # Aynı kullanıcıya tekrar teşvik yapma
-    if last_recruited_user == user_id:
-        return False
-    
-    # Kullanıcı kayıtlı mı kontrol et
-    pool = await get_db_pool()
-    if not pool:
-        return False
-        
-    async with pool.acquire() as conn:
-        result = await conn.fetchrow(
-            "SELECT id FROM users WHERE telegram_id = $1",
-            user_id
-        )
-        
-        # Kayıtlı kullanıcıları teşvik etme
-        if result:
+        pool = await get_db_pool()
+        if not pool:
             return False
-    
-    # Tüm koşullar sağlanıyorsa True döndür
-    return True
+            
+        async with pool.acquire() as conn:
+            today = datetime.now().date()
+            result = await conn.fetchrow("""
+                SELECT COUNT(*) as count
+                FROM recruitment_logs
+                WHERE user_id = $1 AND sent_date = $2
+            """, user_id, today)
+            
+            return result['count'] > 0 if result else False
+            
+    except Exception as e:
+        logger.error(f"❌ Recruitment sent today hatası: {e}")
+        return False
 
-async def send_recruitment_message(user_id: int, username: str, first_name: str, group_name: str):
-    """Teşvik mesajı gönder"""
-    global last_recruitment_time, last_recruited_user
-    
+async def mark_recruitment_sent_today(user_id: int) -> None:
+    """Recruitment gönderildiğini kaydet"""
     try:
-        # Rastgele mesaj seç
-        message = random.choice(GROUP_REPLY_MESSAGES)
+        pool = await get_db_pool()
+        if not pool:
+            return
+            
+        async with pool.acquire() as conn:
+            today = datetime.now().date()
+            await conn.execute("""
+                INSERT INTO recruitment_logs (user_id, sent_date)
+                VALUES ($1, $2)
+                ON CONFLICT (user_id, sent_date)
+                DO NOTHING
+            """, user_id, today)
+            
+    except Exception as e:
+        logger.error(f"❌ Mark recruitment sent hatası: {e}")
+
+async def send_milestone_notification(user_id: int, first_name: str, new_balance: float) -> None:
+    """Milestone bildirimi gönder"""
+    try:
+        from config import get_config
+        from aiogram import Bot
         
-        # Mesajı gönder
         config = get_config()
         bot = Bot(token=config.BOT_TOKEN)
         
+        response_text = f"""
+🎉 **Tebrikler {first_name}!**
+
+**1.00 KP'ye ulaştın!** 🎯
+
+Artık market'te alışveriş yapabilir ve etkinliklere katılabilirsin!
+
+**💎 Yeni bakiyen:** {new_balance:.2f} KP
+
+**🎮 Hemen kullan:**
+/menu komutu ile market'e git!
+        """
+        
         await bot.send_message(
             chat_id=user_id,
-            text=message,
-            parse_mode="HTML"
+            text=response_text,
+            parse_mode="Markdown"
         )
         
-        # Zaman damgalarını güncelle
-        last_recruitment_time = time.time()
-        last_recruited_user = user_id
-        
         await bot.session.close()
-        logger.info(f"🎯 Teşvik mesajı gönderildi - User: {user_id}, Name: {first_name}")
+        logger.info(f"🎉 Milestone bildirimi gönderildi - User: {first_name} ({user_id})")
         
     except Exception as e:
-        logger.error(f"❌ Teşvik mesajı gönderilemedi - User: {user_id}, Error: {e}") 
+        logger.error(f"❌ Milestone notification hatası - User: {user_id}, Error: {e}") 
